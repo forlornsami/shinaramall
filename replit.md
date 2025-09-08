@@ -1,0 +1,80 @@
+# Overview
+
+This is a Pakistani e-commerce platform called PakMart that allows customers to browse and purchase products using local payment methods like EasyPaisa, JazzCash, and HBL. The application features separate authentication systems for customers (via Replit Auth) and administrators (via JWT), with a comprehensive product catalog management system and order processing capabilities.
+
+# User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+# System Architecture
+
+## Frontend Architecture
+- **React + TypeScript** with Vite as the build tool
+- **Routing**: Wouter for client-side routing
+- **State Management**: TanStack Query for server state management 
+- **UI Framework**: Shadcn/UI components built on Radix UI primitives
+- **Styling**: Tailwind CSS with CSS custom properties for theming
+- **Component Structure**: Modular components organized by feature (admin, ui, pages)
+
+## Backend Architecture
+- **Express.js** server with TypeScript support
+- **Database Layer**: Drizzle ORM with PostgreSQL (Neon serverless)
+- **Session Management**: Express sessions with PostgreSQL storage
+- **API Design**: RESTful endpoints for customer and admin operations
+- **File Structure**: Monorepo with shared schema between client and server
+
+## Authentication & Authorization
+- **Customer Authentication**: Replit OpenID Connect (OIDC) integration with session-based auth
+- **Admin Authentication**: JWT-based authentication with bcrypt password hashing
+- **Dual Auth Systems**: Separate authentication flows for customers and administrators
+- **Session Storage**: PostgreSQL-backed session store for Replit Auth
+
+## Database Design
+- **Users Table**: Customer data from Replit Auth (id, email, names, profile image)
+- **Admin Users Table**: Separate admin accounts with username/password
+- **Product Catalog**: Products, categories with full e-commerce fields (pricing, inventory, images)
+- **Order Management**: Orders, order items, and cart items with shipping details
+- **Session Storage**: Dedicated sessions table for authentication persistence
+
+## Payment Integration
+- **Pakistani Payment Methods**: EasyPaisa, JazzCash, and HBL bank support
+- **Order Processing**: Structured checkout flow with shipping address collection
+- **Payment Status Tracking**: Order status management (pending, processing, shipped, delivered)
+
+## Key Features
+- **Dual User Roles**: Customer shopping interface and admin management dashboard
+- **Product Management**: Full CRUD operations for products and categories
+- **Shopping Cart**: Session-based cart with quantity management
+- **Order Processing**: Complete order lifecycle from cart to delivery
+- **Admin Dashboard**: Statistics, order management, product management, and customer oversight
+
+# External Dependencies
+
+## Database & ORM
+- **Neon PostgreSQL**: Serverless PostgreSQL database hosting
+- **Drizzle ORM**: Type-safe database operations with schema migrations
+- **connect-pg-simple**: PostgreSQL session store for Express sessions
+
+## Authentication
+- **Replit Auth**: OpenID Connect integration for customer authentication
+- **openid-client**: OIDC client implementation
+- **Passport.js**: Authentication middleware framework
+- **bcrypt**: Password hashing for admin accounts
+- **jsonwebtoken**: JWT token generation and verification
+
+## UI & Styling
+- **Radix UI**: Headless UI component primitives
+- **Tailwind CSS**: Utility-first CSS framework
+- **Shadcn/UI**: Pre-built component library
+- **Lucide React**: Icon library
+
+## State Management & API
+- **TanStack Query**: Server state management and caching
+- **React Hook Form**: Form handling with validation
+- **Zod**: Schema validation
+
+## Development Tools
+- **Vite**: Frontend build tool and development server
+- **TypeScript**: Type safety across the entire stack
+- **ESBuild**: Backend bundling for production
+- **Replit Plugins**: Development environment integration
