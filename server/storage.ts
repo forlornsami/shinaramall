@@ -6,6 +6,8 @@ import {
   orders,
   orderItems,
   cartItems,
+  paymentGateways,
+  paymentTransactions,
   type User,
   type UpsertUser,
   type AdminUser,
@@ -20,6 +22,10 @@ import {
   type InsertOrderItem,
   type CartItem,
   type InsertCartItem,
+  type PaymentGateway,
+  type InsertPaymentGateway,
+  type PaymentTransaction,
+  type InsertPaymentTransaction,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike } from "drizzle-orm";
@@ -74,6 +80,19 @@ export interface IStorage {
   updateCartItem(id: string, quantity: number): Promise<CartItem>;
   removeFromCart(id: string): Promise<boolean>;
   clearCart(userId: string): Promise<boolean>;
+  
+  // Payment gateway operations
+  getPaymentGateways(): Promise<PaymentGateway[]>;
+  getPaymentGateway(id: string): Promise<PaymentGateway | undefined>;
+  getPaymentGatewayByName(name: string): Promise<PaymentGateway | undefined>;
+  createPaymentGateway(gatewayData: InsertPaymentGateway): Promise<PaymentGateway>;
+  updatePaymentGateway(id: string, gatewayData: Partial<InsertPaymentGateway>): Promise<PaymentGateway>;
+  
+  // Payment transaction operations
+  getPaymentTransactions(filters?: any): Promise<PaymentTransaction[]>;
+  getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined>;
+  createPaymentTransaction(transactionData: InsertPaymentTransaction): Promise<PaymentTransaction>;
+  updatePaymentTransaction(id: string, transactionData: Partial<InsertPaymentTransaction>): Promise<PaymentTransaction>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -465,6 +484,99 @@ export class DatabaseStorage implements IStorage {
   async clearCart(userId: string): Promise<boolean> {
     const result = await db.delete(cartItems).where(eq(cartItems.userId, userId));
     return result.rowCount >= 0;
+  }
+
+  // Payment gateway operations
+  async getPaymentGateways(): Promise<PaymentGateway[]> {
+    return await db.select().from(paymentGateways).orderBy(paymentGateways.name);
+  }
+
+  async getPaymentGateway(id: string): Promise<PaymentGateway | undefined> {
+    const [gateway] = await db.select().from(paymentGateways).where(eq(paymentGateways.id, id));
+    return gateway;
+  }
+
+  async getPaymentGatewayByName(name: string): Promise<PaymentGateway | undefined> {
+    const [gateway] = await db.select().from(paymentGateways).where(eq(paymentGateways.name, name));
+    return gateway;
+  }
+
+  async createPaymentGateway(gatewayData: InsertPaymentGateway): Promise<PaymentGateway> {
+    const [gateway] = await db.insert(paymentGateways).values({
+      ...gatewayData,
+      updatedAt: new Date(),
+    }).returning();
+    return gateway;
+  }
+
+  async updatePaymentGateway(id: string, gatewayData: Partial<InsertPaymentGateway>): Promise<PaymentGateway> {
+    const [gateway] = await db
+      .update(paymentGateways)
+      .set({
+        ...gatewayData,
+        updatedAt: new Date(),
+      })
+      .where(eq(paymentGateways.id, id))
+      .returning();
+    return gateway;
+  }
+
+  // Payment transaction operations
+  async getPaymentTransactions(filters?: { 
+    orderId?: string; 
+    gatewayId?: string; 
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PaymentTransaction[]> {
+    let query = db.select().from(paymentTransactions);
+    
+    if (filters?.orderId) {
+      query = query.where(eq(paymentTransactions.orderId, filters.orderId));
+    }
+    if (filters?.gatewayId) {
+      query = query.where(eq(paymentTransactions.gatewayId, filters.gatewayId));
+    }
+    if (filters?.status) {
+      query = query.where(eq(paymentTransactions.status, filters.status));
+    }
+    
+    query = query.orderBy(desc(paymentTransactions.createdAt));
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    
+    if (filters?.offset) {
+      query = query.offset(filters.offset);
+    }
+    
+    return await query;
+  }
+
+  async getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined> {
+    const [transaction] = await db.select().from(paymentTransactions).where(eq(paymentTransactions.id, id));
+    return transaction;
+  }
+
+  async createPaymentTransaction(transactionData: InsertPaymentTransaction): Promise<PaymentTransaction> {
+    const [transaction] = await db.insert(paymentTransactions).values({
+      ...transactionData,
+      updatedAt: new Date(),
+    }).returning();
+    return transaction;
+  }
+
+  async updatePaymentTransaction(id: string, transactionData: Partial<InsertPaymentTransaction>): Promise<PaymentTransaction> {
+    const [transaction] = await db
+      .update(paymentTransactions)
+      .set({
+        ...transactionData,
+        updatedAt: new Date(),
+      })
+      .where(eq(paymentTransactions.id, id))
+      .returning();
+    return transaction;
   }
 }
 
