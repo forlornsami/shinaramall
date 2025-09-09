@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { X, Smartphone, Music, University, Lock } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface CheckoutModalProps {
@@ -72,6 +72,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             title: "Order Placed Successfully!",
             description: `Your order #${order.orderNumber} has been placed. Transaction ID: ${paymentResult.transactionId}`,
           });
+          // Refresh product data to show updated stock levels
+          queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/products'] });
           clearCart();
           onClose();
         } else {
