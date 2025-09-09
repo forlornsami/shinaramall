@@ -549,6 +549,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin payment gateway management routes
+  app.get('/api/admin/payment-gateways', adminAuth, async (req, res) => {
+    try {
+      const gateways = await storage.getPaymentGateways();
+      res.json(gateways);
+    } catch (error) {
+      console.error("Error fetching payment gateways:", error);
+      res.status(500).json({ message: "Failed to fetch payment gateways" });
+    }
+  });
+
+  app.post('/api/admin/payment-gateways', adminAuth, async (req, res) => {
+    try {
+      const gateway = await storage.createPaymentGateway(req.body);
+      res.json(gateway);
+    } catch (error) {
+      console.error("Error creating payment gateway:", error);
+      res.status(500).json({ message: "Failed to create payment gateway" });
+    }
+  });
+
+  app.patch('/api/admin/payment-gateways/:id', adminAuth, async (req, res) => {
+    try {
+      const gateway = await storage.updatePaymentGateway(req.params.id, req.body);
+      res.json(gateway);
+    } catch (error) {
+      console.error("Error updating payment gateway:", error);
+      res.status(500).json({ message: "Failed to update payment gateway" });
+    }
+  });
+
+  app.get('/api/admin/payment-transactions', adminAuth, async (req, res) => {
+    try {
+      const { limit = '50', offset = '0', status, gatewayId } = req.query;
+      const transactions = await storage.getPaymentTransactions({
+        status: status as string,
+        gatewayId: gatewayId as string,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      });
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching payment transactions:", error);
+      res.status(500).json({ message: "Failed to fetch payment transactions" });
+    }
+  });
+
+  app.get('/api/admin/payment-analytics', adminAuth, async (req, res) => {
+    try {
+      const transactions = await storage.getPaymentTransactions();
+      const gateways = await storage.getPaymentGateways();
+      
+      const analytics = {
+        totalTransactions: transactions.length,
+        completedTransactions: transactions.filter(t => t.status === 'completed').length,
+        failedTransactions: transactions.filter(t => t.status === 'failed').length,
+        pendingTransactions: transactions.filter(t => t.status === 'pending').length,
+        totalRevenue: transactions
+          .filter(t => t.status === 'completed')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0),
+        gatewayStats: gateways.map(gateway => {
+          const gatewayTransactions = transactions.filter(t => t.gatewayId === gateway.id);
+          return {
+            gateway: gateway.displayName,
+            totalTransactions: gatewayTransactions.length,
+            successRate: gatewayTransactions.length > 0 ? 
+              (gatewayTransactions.filter(t => t.status === 'completed').length / gatewayTransactions.length * 100) : 0,
+            revenue: gatewayTransactions
+              .filter(t => t.status === 'completed')
+              .reduce((sum, t) => sum + parseFloat(t.amount), 0),
+          };
+        }),
+      };
+      
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching payment analytics:", error);
+      res.status(500).json({ message: "Failed to fetch payment analytics" });
+    }
+  });
+
+  // Initialize default payment gateways if they don't exist
+  app.post('/api/admin/initialize-payment-gateways', adminAuth, async (req, res) => {
+    try {
+      const defaultGateways = [
+        {
+          name: 'easypaisa',
+          displayName: 'EasyPaisa',
+          isEnabled: true,
+          testMode: true,
+          configuration: { supportedOperations: ['wallet_payment', 'mobile_account'] },
+        },
+        {
+          name: 'jazzcash',
+          displayName: 'JazzCash',
+          isEnabled: true,
+          testMode: true,
+          configuration: { supportedOperations: ['wallet_payment', 'mobile_account'] },
+        },
+        {
+          name: 'hbl',
+          displayName: 'HBL Bank',
+          isEnabled: true,
+          testMode: true,
+          configuration: { supportedOperations: ['bank_transfer', 'online_banking'] },
+        },
+      ];
+
+      const createdGateways = [];
+      for (const gatewayData of defaultGateways) {
+        const existing = await storage.getPaymentGatewayByName(gatewayData.name);
+        if (!existing) {
+          const gateway = await storage.createPaymentGateway(gatewayData);
+          createdGateways.push(gateway);
+        }
+      }
+
+      res.json({ message: 'Payment gateways initialized', gateways: createdGateways });
+    } catch (error) {
+      console.error("Error initializing payment gateways:", error);
+      res.status(500).json({ message: "Failed to initialize payment gateways" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

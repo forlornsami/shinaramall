@@ -6,6 +6,7 @@ import OrderManagement from "@/components/admin/order-management";
 import CustomerManagement from "@/components/admin/customer-management";
 import CategoryManagement from "@/components/admin/category-management";
 import InventoryManagement from "@/components/admin/inventory-management";
+import PaymentManagement from "@/components/admin/payment-management";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -150,16 +151,7 @@ export default function AdminDashboard() {
       case "customers":
         return <CustomerManagement />;
       case "payments":
-        return (
-          <div data-testid="section-payments">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Payment Management</h2>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Payment gateway management functionality will be implemented here...</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <PaymentManagement />;
       default:
         return <div>Section not found</div>;
     }
