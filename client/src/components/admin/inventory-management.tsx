@@ -55,11 +55,16 @@ export default function InventoryManagement() {
   const adjustStockMutation = useMutation({
     mutationFn: async ({ productId, quantity, operation }: { productId: string; quantity: number; operation: string }) => {
       const token = localStorage.getItem('adminToken');
-      return await apiRequest(`/api/admin/inventory/adjust/${productId}`, {
+      const response = await fetch(`/api/admin/inventory/adjust/${productId}`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ quantity, operation }),
       });
+      if (!response.ok) throw new Error('Failed to adjust inventory');
+      return response.json();
     },
     onSuccess: () => {
       toast({

@@ -182,7 +182,6 @@ export default function AdminDashboard() {
               {activeSection === "inventory" && "Inventory Management"}
               {activeSection === "orders" && "Order Management"}
               {activeSection === "customers" && "Customer Management"}
-              {activeSection === "inventory" && "Inventory Management"}
               {activeSection === "payments" && "Payment Management"}
             </h1>
             <div className="flex items-center space-x-4">
