@@ -147,6 +147,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/categories/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const categoryData = insertCategorySchema.partial().parse(req.body);
+      const category = await storage.updateCategory(id, categoryData);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete('/api/categories/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteCategory(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json({ message: "Category deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
   // Product routes
   app.get('/api/products', async (req, res) => {
     try {
