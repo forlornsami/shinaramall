@@ -82,6 +82,8 @@ export default function ProductManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/featured'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
       toast({
         title: "Success",
         description: "Product created successfully",
@@ -115,11 +117,14 @@ export default function ProductManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/featured'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
       toast({
         title: "Success",
         description: "Product updated successfully",
       });
       setEditingProduct(null);
+      setIsAddModalOpen(false);
       resetForm();
     },
     onError: (error) => {
@@ -144,6 +149,8 @@ export default function ProductManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/featured'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
       toast({
         title: "Success",
         description: "Product deleted successfully",

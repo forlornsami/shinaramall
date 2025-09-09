@@ -191,8 +191,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const products = await storage.getProducts({
         categoryId: categoryId as string,
         search: search as string,
-        isActive: isActive === 'true',
-        isFeatured: isFeatured === 'true',
+        isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+        isFeatured: isFeatured === 'true' ? true : isFeatured === 'false' ? false : undefined,
         limit: parseInt(limit as string),
         offset: parseInt(offset as string),
       });
