@@ -367,7 +367,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get cart items and create order items
       const cartItems = await storage.getCartItems(userId);
       
+      // Check stock availability before processing
       for (const cartItem of cartItems) {
+        const product = await storage.getProduct(cartItem.productId);
+        if (!product || product.stock < cartItem.quantity) {
+          return res.status(400).json({ 
+            message: `Insufficient stock for product: ${product?.name || 'Unknown'}. Available: ${product?.stock || 0}, Requested: ${cartItem.quantity}` 
+          });
+        }
+      }
+      
+      for (const cartItem of cartItems) {
+        // Create order item
         await storage.createOrderItem({
           orderId: order.id,
           productId: cartItem.productId,
@@ -375,6 +386,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           price: cartItem.product.price,
           total: (parseFloat(cartItem.product.price) * cartItem.quantity).toString(),
         });
+        
+        // Update product inventory
+        await storage.reduceProductStock(cartItem.productId, cartItem.quantity);
       }
 
       // Clear cart
@@ -408,14 +422,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/admin/orders/:id', adminAuth, async (req, res) => {
     try {
       const { status, paymentStatus } = req.body;
-      const order = await storage.updateOrder(req.params.id, {
-        status,
-        paymentStatus,
-      });
-      res.json(order);
+      
+      // If status is being changed to cancelled, restore inventory
+      if (status === 'cancelled') {
+        const order = await storage.cancelOrderAndRestoreInventory(req.params.id);
+        res.json(order);
+      } else {
+        const order = await storage.updateOrder(req.params.id, {
+          status,
+          paymentStatus,
+        });
+        res.json(order);
+      }
     } catch (error) {
       console.error("Error updating order:", error);
       res.status(500).json({ message: "Failed to update order" });
+    }
+  });
+
+  // Admin inventory management routes
+  app.post('/api/admin/inventory/adjust/:productId', adminAuth, async (req, res) => {
+    try {
+      const { productId } = req.params;
+      const { quantity, operation } = req.body; // operation: 'increase' or 'decrease'
+      
+      let updatedProduct;
+      if (operation === 'increase') {
+        updatedProduct = await storage.increaseProductStock(productId, quantity);
+      } else if (operation === 'decrease') {
+        updatedProduct = await storage.reduceProductStock(productId, quantity);
+      } else {
+        return res.status(400).json({ message: "Invalid operation. Use 'increase' or 'decrease'" });
+      }
+      
+      if (!updatedProduct) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      res.json(updatedProduct);
+    } catch (error) {
+      console.error("Error adjusting inventory:", error);
+      res.status(500).json({ message: "Failed to adjust inventory" });
     }
   });
 

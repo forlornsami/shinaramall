@@ -254,7 +254,73 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount > 0;
   }
 
+  // Inventory management
+  async reduceProductStock(productId: string, quantity: number): Promise<Product | null> {
+    // Get current product
+    const product = await this.getProduct(productId);
+    if (!product) return null;
+
+    // Calculate new stock
+    const newStock = Math.max(0, product.stock - quantity);
+    
+    // Update product stock
+    const [updatedProduct] = await db
+      .update(products)
+      .set({ 
+        stock: newStock,
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, productId))
+      .returning();
+    
+    return updatedProduct;
+  }
+
+  async increaseProductStock(productId: string, quantity: number): Promise<Product | null> {
+    // Get current product
+    const product = await this.getProduct(productId);
+    if (!product) return null;
+
+    // Calculate new stock
+    const newStock = product.stock + quantity;
+    
+    // Update product stock
+    const [updatedProduct] = await db
+      .update(products)
+      .set({ 
+        stock: newStock,
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, productId))
+      .returning();
+    
+    return updatedProduct;
+  }
+
   // Order operations
+  async cancelOrderAndRestoreInventory(orderId: string): Promise<Order | null> {
+    // Get order with items
+    const orderWithItems = await this.getOrderWithItems(orderId);
+    if (!orderWithItems) return null;
+    
+    // Restore inventory for each item
+    for (const item of orderWithItems.items) {
+      await this.increaseProductStock(item.productId, item.quantity);
+    }
+    
+    // Update order status to cancelled
+    const [cancelledOrder] = await db
+      .update(orders)
+      .set({ 
+        status: 'cancelled',
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+    
+    return cancelledOrder;
+  }
+
   async getOrders(userId?: string, limit?: number, offset?: number): Promise<Order[]> {
     let query = db.select().from(orders);
     
