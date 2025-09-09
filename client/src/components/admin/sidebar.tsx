@@ -6,7 +6,8 @@ import {
   ShoppingBag, 
   Users, 
   Warehouse, 
-  CreditCard 
+  CreditCard,
+  Tag
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -24,6 +25,11 @@ const sidebarItems = [
     id: "products",
     label: "Products", 
     icon: Package,
+  },
+  {
+    id: "categories",
+    label: "Categories",
+    icon: Tag,
   },
   {
     id: "orders",

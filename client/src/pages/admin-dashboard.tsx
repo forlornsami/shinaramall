@@ -4,13 +4,14 @@ import AdminSidebar from "@/components/admin/sidebar";
 import ProductManagement from "@/components/admin/product-management";
 import OrderManagement from "@/components/admin/order-management";
 import CustomerManagement from "@/components/admin/customer-management";
+import CategoryManagement from "@/components/admin/category-management";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { BarChart3, Package, ShoppingBag, Users, LogOut } from "lucide-react";
 
-type AdminSection = "overview" | "products" | "orders" | "customers" | "inventory" | "payments";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -139,6 +140,8 @@ export default function AdminDashboard() {
         );
       case "products":
         return <ProductManagement />;
+      case "categories":
+        return <CategoryManagement />;
       case "orders":
         return <OrderManagement />;
       case "customers":
@@ -174,7 +177,7 @@ export default function AdminDashboard() {
     <div className="flex h-screen bg-background">
       <AdminSidebar 
         activeSection={activeSection} 
-        onSectionChange={setActiveSection} 
+        onSectionChange={(section) => setActiveSection(section as AdminSection)} 
       />
       
       <div className="flex-1 overflow-y-auto">
@@ -183,6 +186,7 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-semibold text-foreground" data-testid="text-section-title">
               {activeSection === "overview" && "Dashboard Overview"}
               {activeSection === "products" && "Product Management"}
+              {activeSection === "categories" && "Category Management"}
               {activeSection === "orders" && "Order Management"}
               {activeSection === "customers" && "Customer Management"}
               {activeSection === "inventory" && "Inventory Management"}
