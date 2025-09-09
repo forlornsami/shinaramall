@@ -490,19 +490,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment gateway routes (mock implementation)
+  // Payment gateway routes (with transaction tracking)
   app.post('/api/payment/easypaisa', isAuthenticated, async (req, res) => {
     try {
-      // Mock EasyPaisa payment processing
       const { orderId, amount, phoneNumber } = req.body;
       
-      // In a real implementation, this would integrate with EasyPaisa API
+      // Get EasyPaisa gateway
+      const gateway = await storage.getPaymentGatewayByName('easypaisa');
+      if (!gateway || !gateway.isEnabled) {
+        return res.status(400).json({ message: 'EasyPaisa payment method is not available' });
+      }
+      
+      // Mock EasyPaisa payment processing
       const mockResponse = {
         success: true,
         transactionId: `EP_${Date.now()}`,
         status: 'completed',
         message: 'Payment processed successfully',
       };
+      
+      // Create transaction record
+      await storage.createPaymentTransaction({
+        orderId,
+        gatewayId: gateway.id,
+        gatewayTransactionId: mockResponse.transactionId,
+        amount,
+        currency: 'PKR',
+        status: mockResponse.status,
+        gatewayResponse: mockResponse,
+        customerInfo: { phoneNumber },
+        processingFee: '0',
+      });
 
       res.json(mockResponse);
     } catch (error) {
@@ -513,15 +531,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/payment/jazzcash', isAuthenticated, async (req, res) => {
     try {
-      // Mock JazzCash payment processing
       const { orderId, amount, phoneNumber } = req.body;
       
+      // Get JazzCash gateway
+      const gateway = await storage.getPaymentGatewayByName('jazzcash');
+      if (!gateway || !gateway.isEnabled) {
+        return res.status(400).json({ message: 'JazzCash payment method is not available' });
+      }
+      
+      // Mock JazzCash payment processing
       const mockResponse = {
         success: true,
         transactionId: `JC_${Date.now()}`,
         status: 'completed',
         message: 'Payment processed successfully',
       };
+      
+      // Create transaction record
+      await storage.createPaymentTransaction({
+        orderId,
+        gatewayId: gateway.id,
+        gatewayTransactionId: mockResponse.transactionId,
+        amount,
+        currency: 'PKR',
+        status: mockResponse.status,
+        gatewayResponse: mockResponse,
+        customerInfo: { phoneNumber },
+        processingFee: '0',
+      });
 
       res.json(mockResponse);
     } catch (error) {
@@ -532,15 +569,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/payment/hbl', isAuthenticated, async (req, res) => {
     try {
-      // Mock HBL bank transfer processing
       const { orderId, amount, accountNumber } = req.body;
       
+      // Get HBL gateway
+      const gateway = await storage.getPaymentGatewayByName('hbl');
+      if (!gateway || !gateway.isEnabled) {
+        return res.status(400).json({ message: 'HBL Bank payment method is not available' });
+      }
+      
+      // Mock HBL bank transfer processing
       const mockResponse = {
         success: true,
         transactionId: `HBL_${Date.now()}`,
         status: 'pending',
         message: 'Bank transfer initiated',
       };
+      
+      // Create transaction record
+      await storage.createPaymentTransaction({
+        orderId,
+        gatewayId: gateway.id,
+        gatewayTransactionId: mockResponse.transactionId,
+        amount,
+        currency: 'PKR',
+        status: mockResponse.status,
+        gatewayResponse: mockResponse,
+        customerInfo: { accountNumber },
+        processingFee: '0',
+      });
 
       res.json(mockResponse);
     } catch (error) {
