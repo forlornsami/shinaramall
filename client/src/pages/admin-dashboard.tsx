@@ -5,6 +5,7 @@ import ProductManagement from "@/components/admin/product-management";
 import OrderManagement from "@/components/admin/order-management";
 import CustomerManagement from "@/components/admin/customer-management";
 import CategoryManagement from "@/components/admin/category-management";
+import InventoryManagement from "@/components/admin/inventory-management";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -142,21 +143,12 @@ export default function AdminDashboard() {
         return <ProductManagement />;
       case "categories":
         return <CategoryManagement />;
+      case "inventory":
+        return <InventoryManagement />;
       case "orders":
         return <OrderManagement />;
       case "customers":
         return <CustomerManagement />;
-      case "inventory":
-        return (
-          <div data-testid="section-inventory">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Inventory Management</h2>
-            <Card>
-              <CardContent className="p-6">
-                <p className="text-muted-foreground">Inventory management functionality will be implemented here...</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
       case "payments":
         return (
           <div data-testid="section-payments">
@@ -187,6 +179,7 @@ export default function AdminDashboard() {
               {activeSection === "overview" && "Dashboard Overview"}
               {activeSection === "products" && "Product Management"}
               {activeSection === "categories" && "Category Management"}
+              {activeSection === "inventory" && "Inventory Management"}
               {activeSection === "orders" && "Order Management"}
               {activeSection === "customers" && "Customer Management"}
               {activeSection === "inventory" && "Inventory Management"}
