@@ -276,3 +276,64 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type CartItem = typeof cartItems.$inferSelect;
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
+
+// Payment gateway configuration table
+export const paymentGateways = pgTable("payment_gateways", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(), // 'easypaisa', 'jazzcash', 'hbl'
+  displayName: varchar("display_name").notNull(),
+  isEnabled: boolean("is_enabled").default(true),
+  apiKey: varchar("api_key"),
+  apiSecret: varchar("api_secret"),
+  webhookUrl: varchar("webhook_url"),
+  testMode: boolean("test_mode").default(true),
+  configuration: jsonb("configuration"), // Additional gateway-specific settings
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Payment transactions table for tracking
+export const paymentTransactions = pgTable("payment_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  gatewayId: varchar("gateway_id").references(() => paymentGateways.id).notNull(),
+  gatewayTransactionId: varchar("gateway_transaction_id"),
+  amount: varchar("amount").notNull(),
+  currency: varchar("currency").default("PKR"),
+  status: varchar("status").notNull(), // 'pending', 'completed', 'failed', 'cancelled'
+  gatewayResponse: jsonb("gateway_response"),
+  customerInfo: jsonb("customer_info"), // phone number, account number, etc.
+  processingFee: varchar("processing_fee").default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Insert schemas for payment management
+export const insertPaymentGatewaySchema = createInsertSchema(paymentGateways).pick({
+  name: true,
+  displayName: true,
+  isEnabled: true,
+  apiKey: true,
+  apiSecret: true,
+  webhookUrl: true,
+  testMode: true,
+  configuration: true,
+});
+
+export const insertPaymentTransactionSchema = createInsertSchema(paymentTransactions).pick({
+  orderId: true,
+  gatewayId: true,
+  gatewayTransactionId: true,
+  amount: true,
+  currency: true,
+  status: true,
+  gatewayResponse: true,
+  customerInfo: true,
+  processingFee: true,
+});
+
+// Additional types
+export type PaymentGateway = typeof paymentGateways.$inferSelect;
+export type InsertPaymentGateway = z.infer<typeof insertPaymentGatewaySchema>;
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+export type InsertPaymentTransaction = z.infer<typeof insertPaymentTransactionSchema>;
