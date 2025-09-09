@@ -104,7 +104,7 @@ export default function Home() {
       <section id="featured-products" className="py-16 bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-foreground mb-12 text-center" data-testid="text-products-title">
-            Featured Products
+            Our Products
           </h2>
           <ProductGrid />
         </div>

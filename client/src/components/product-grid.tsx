@@ -12,7 +12,12 @@ export default function ProductGrid() {
   const { toast } = useToast();
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ['/api/products/featured'],
+    queryKey: ['/api/products/storefront'],
+    queryFn: async () => {
+      const response = await fetch('/api/products?isActive=true&limit=20');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
     retry: false,
   });
 
