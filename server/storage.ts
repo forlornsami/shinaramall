@@ -204,19 +204,44 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
+  // Generate unique slug for product
+  async generateUniqueProductSlug(baseSlug: string, excludeId?: string): Promise<string> {
+    let slug = baseSlug;
+    let counter = 1;
+    
+    while (true) {
+      const existing = await this.getProductBySlug(slug);
+      if (!existing || (excludeId && existing.id === excludeId)) {
+        return slug;
+      }
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+  }
+
   async createProduct(productData: InsertProduct): Promise<Product> {
+    // Ensure unique slug
+    const uniqueSlug = await this.generateUniqueProductSlug(productData.slug);
+    
     const [product] = await db.insert(products).values({
       ...productData,
+      slug: uniqueSlug,
       updatedAt: new Date(),
     }).returning();
     return product;
   }
 
   async updateProduct(id: string, productData: Partial<InsertProduct>): Promise<Product> {
+    // If slug is being updated, ensure it's unique
+    const updateData = { ...productData };
+    if (productData.slug) {
+      updateData.slug = await this.generateUniqueProductSlug(productData.slug, id);
+    }
+    
     const [product] = await db
       .update(products)
       .set({
-        ...productData,
+        ...updateData,
         updatedAt: new Date(),
       })
       .where(eq(products.id, id))
