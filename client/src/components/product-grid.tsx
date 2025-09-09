@@ -252,72 +252,113 @@ export default function ProductGrid() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredProducts.map((product: Product) => (
-        <Card key={product.id} className="overflow-hidden hover:shadow-md transition-shadow" data-testid={`card-product-${product.id}`}>
-          <div className="relative">
-            <img 
-              src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"} 
-              alt={product.name} 
-              className="w-full h-48 object-cover"
-              data-testid={`img-product-${product.id}`}
-            />
-            {product.isFeatured && (
-              <Badge className="absolute top-2 left-2 bg-secondary" data-testid={`badge-featured-${product.id}`}>
-                Featured
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute top-2 right-2 h-8 w-8 p-0 bg-white/80 hover:bg-white"
-              data-testid={`button-wishlist-${product.id}`}
-            >
-              <Heart className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <CardContent className="p-4">
-            <h3 className="font-semibold text-foreground mb-2 line-clamp-2" data-testid={`text-product-name-${product.id}`}>
-              {product.name}
-            </h3>
-            <p className="text-sm text-muted-foreground mb-2" data-testid={`text-product-description-${product.id}`}>
-              {product.shortDescription || product.description?.substring(0, 100)}
-            </p>
-            
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg font-bold text-primary" data-testid={`text-product-price-${product.id}`}>
-                  Rs. {parseFloat(product.price).toLocaleString()}
-                </span>
+            <Card key={product.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-0 shadow-lg" data-testid={`card-product-${product.id}`}>
+              <div className="relative overflow-hidden">
+                <img 
+                  src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"} 
+                  alt={product.name} 
+                  className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
+                  data-testid={`img-product-${product.id}`}
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300"></div>
+                
+                {/* Badges */}
+                <div className="absolute top-3 left-3 flex flex-col gap-2">
+                  {product.isFeatured && (
+                    <Badge className="bg-secondary shadow-lg" data-testid={`badge-featured-${product.id}`}>
+                      ⭐ Featured
+                    </Badge>
+                  )}
+                  {product.stock > 0 && product.stock <= 10 && (
+                    <Badge variant="destructive" className="shadow-lg" data-testid={`badge-low-stock-${product.id}`}>
+                      🔥 Low Stock
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Action buttons */}
+                <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-9 w-9 p-0 bg-white/90 hover:bg-white shadow-lg"
+                    data-testid={`button-wishlist-${product.id}`}
+                  >
+                    <Heart className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-9 w-9 p-0 bg-white/90 hover:bg-white shadow-lg"
+                    data-testid={`button-quick-view-${product.id}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {/* Discount percentage */}
                 {product.compareAtPrice && (
-                  <span className="text-sm text-muted-foreground line-through" data-testid={`text-product-compare-price-${product.id}`}>
-                    Rs. {parseFloat(product.compareAtPrice).toLocaleString()}
-                  </span>
+                  <div className="absolute bottom-3 left-3">
+                    <Badge className="bg-red-500 text-white shadow-lg" data-testid={`badge-discount-${product.id}`}>
+                      {Math.round((1 - parseFloat(product.price) / parseFloat(product.compareAtPrice)) * 100)}% OFF
+                    </Badge>
+                  </div>
                 )}
               </div>
-              {product.stock > 0 && product.stock <= 10 && (
-                <Badge variant="destructive" data-testid={`badge-low-stock-${product.id}`}>
-                  Low Stock
-                </Badge>
-              )}
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground" data-testid={`text-product-stock-${product.id}`}>
-                {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
-              </span>
-              <Button
-                size="sm"
-                disabled={product.stock === 0 || addToCartMutation.isPending}
-                onClick={() => addToCartMutation.mutate(product.id)}
-                data-testid={`button-add-cart-${product.id}`}
-              >
-                <ShoppingCart className="h-4 w-4 mr-1" />
-                {addToCartMutation.isPending ? 'Adding...' : 'Add to Cart'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+          
+              <CardContent className="p-5">
+                <div className="mb-3">
+                  <h3 className="font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors" data-testid={`text-product-name-${product.id}`}>
+                    {product.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`text-product-description-${product.id}`}>
+                    {product.shortDescription || product.description?.substring(0, 80) + '...'}
+                  </p>
+                  
+                  {/* Rating stars (placeholder) */}
+                  <div className="flex items-center mt-2 gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    ))}
+                    <span className="text-xs text-muted-foreground ml-1">(4.8)</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Price section */}
+                  <div className="flex flex-col">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-primary" data-testid={`text-product-price-${product.id}`}>
+                        Rs. {parseFloat(product.price).toLocaleString()}
+                      </span>
+                      {product.compareAtPrice && (
+                        <span className="text-sm text-muted-foreground line-through" data-testid={`text-product-compare-price-${product.id}`}>
+                          Rs. {parseFloat(product.compareAtPrice).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground" data-testid={`text-product-stock-${product.id}`}>
+                      {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                    </span>
+                  </div>
+                  
+                  {/* Add to cart button */}
+                  <Button
+                    className="w-full group-hover:bg-primary group-hover:text-white transition-colors"
+                    size="sm"
+                    disabled={product.stock === 0 || addToCartMutation.isPending}
+                    onClick={() => addToCartMutation.mutate(product.id)}
+                    data-testid={`button-add-cart-${product.id}`}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    {addToCartMutation.isPending ? 'Adding...' : product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
