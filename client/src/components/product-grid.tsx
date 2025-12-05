@@ -8,7 +8,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ShoppingCart, Heart, Search, Filter, Eye, Star } from "lucide-react";
+import { ShoppingCart, Heart, Search, Filter, Eye, Star, Sparkles, TrendingUp } from "lucide-react";
 import type { Product } from "@shared/schema";
 
 export default function ProductGrid() {
@@ -18,7 +18,7 @@ export default function ProductGrid() {
   const [sortBy, setSortBy] = useState("name");
   const [priceRange, setPriceRange] = useState("all");
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['/api/products/storefront'],
     queryFn: async () => {
       const response = await fetch('/api/products?isActive=true&limit=20');
@@ -28,53 +28,48 @@ export default function ProductGrid() {
     retry: false,
   });
 
-  // Filter and sort products
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     
     let filtered = [...products];
     
-    // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter((product: Product) => 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
-    // Category filter
     if (selectedCategory !== "all") {
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter((product: Product) => 
         product.category?.toLowerCase() === selectedCategory.toLowerCase()
       );
     }
     
-    // Price range filter
     if (priceRange !== "all") {
       switch (priceRange) {
         case "under-500":
-          filtered = filtered.filter(product => parseFloat(product.price) < 500);
+          filtered = filtered.filter((product: Product) => parseFloat(product.price) < 500);
           break;
         case "500-1000":
-          filtered = filtered.filter(product => {
+          filtered = filtered.filter((product: Product) => {
             const price = parseFloat(product.price);
             return price >= 500 && price <= 1000;
           });
           break;
         case "1000-2000":
-          filtered = filtered.filter(product => {
+          filtered = filtered.filter((product: Product) => {
             const price = parseFloat(product.price);
             return price > 1000 && price <= 2000;
           });
           break;
         case "over-2000":
-          filtered = filtered.filter(product => parseFloat(product.price) > 2000);
+          filtered = filtered.filter((product: Product) => parseFloat(product.price) > 2000);
           break;
       }
     }
     
-    // Sort products
-    filtered.sort((a, b) => {
+    filtered.sort((a: Product, b: Product) => {
       switch (sortBy) {
         case "price-low":
           return parseFloat(a.price) - parseFloat(b.price);
@@ -92,10 +87,9 @@ export default function ProductGrid() {
     return filtered;
   }, [products, searchQuery, selectedCategory, sortBy, priceRange]);
 
-  // Get unique categories for filter
   const categories = useMemo(() => {
     if (!products) return [];
-    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    const uniqueCategories = [...new Set(products.map((p: Product) => p.category).filter(Boolean))] as string[];
     return uniqueCategories;
   }, [products]);
 
@@ -113,10 +107,10 @@ export default function ProductGrid() {
         description: "Product added to your cart successfully",
       });
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: "Failed to add product to cart",
+        description: "Failed to add product to cart. Please try again.",
         variant: "destructive",
       });
     },
@@ -124,106 +118,117 @@ export default function ProductGrid() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(8)].map((_, i) => (
-          <Card key={i} className="overflow-hidden" data-testid={`skeleton-product-${i}`}>
-            <div className="w-full h-48 bg-muted animate-pulse" />
-            <CardContent className="p-4">
-              <div className="h-4 bg-muted rounded animate-pulse mb-2" />
-              <div className="h-3 bg-muted rounded animate-pulse mb-2 w-2/3" />
-              <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-8">
+        <div className="glass-card rounded-2xl p-6 animate-pulse">
+          <div className="h-12 bg-muted rounded-xl w-full"></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="card-modern animate-pulse" data-testid={`skeleton-product-${i}`}>
+              <div className="w-full h-64 bg-muted rounded-t-2xl" />
+              <CardContent className="p-5">
+                <div className="h-5 bg-muted rounded-lg mb-3 w-3/4" />
+                <div className="h-4 bg-muted rounded-lg mb-4 w-1/2" />
+                <div className="h-10 bg-muted rounded-xl" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (!products || products.length === 0) {
     return (
-      <div className="text-center py-12" data-testid="text-no-products">
-        <h3 className="text-lg font-semibold text-foreground mb-2">No Products Found</h3>
-        <p className="text-muted-foreground">Check back later for new products.</p>
+      <div className="text-center py-20" data-testid="text-no-products">
+        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+          <ShoppingCart className="w-10 h-10 text-muted-foreground" />
+        </div>
+        <h3 className="text-2xl font-semibold text-foreground mb-3">No Products Found</h3>
+        <p className="text-muted-foreground text-lg">Check back later for new products.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* Enhanced Filters and Search */}
-      <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+      {/* Enhanced Filters */}
+      <div className="glass-card rounded-2xl p-6">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
           {/* Search */}
           <div className="flex-1 w-full lg:max-w-md">
             <label className="text-sm font-medium text-foreground mb-2 block">Search Products</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 group-focus-within:text-primary transition-colors" />
               <Input
                 type="text"
                 placeholder="Search by name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-12 h-12 rounded-xl border-2 border-muted focus:border-primary transition-colors"
                 data-testid="input-product-search"
               />
             </div>
           </div>
           
           {/* Category Filter */}
-          <div className="w-full lg:w-48">
+          <div className="w-full lg:w-52">
             <label className="text-sm font-medium text-foreground mb-2 block">Category</label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger data-testid="select-category">
+              <SelectTrigger className="h-12 rounded-xl border-2 border-muted" data-testid="select-category">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category} value={category}>{category}</SelectItem>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all" className="rounded-lg">All Categories</SelectItem>
+                {categories.map((category: string) => (
+                  <SelectItem key={category} value={category} className="rounded-lg">{category}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           
-          {/* Price Range Filter */}
-          <div className="w-full lg:w-48">
+          {/* Price Range */}
+          <div className="w-full lg:w-52">
             <label className="text-sm font-medium text-foreground mb-2 block">Price Range</label>
             <Select value={priceRange} onValueChange={setPriceRange}>
-              <SelectTrigger data-testid="select-price-range">
+              <SelectTrigger className="h-12 rounded-xl border-2 border-muted" data-testid="select-price-range">
                 <SelectValue placeholder="All Prices" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Prices</SelectItem>
-                <SelectItem value="under-500">Under Rs. 500</SelectItem>
-                <SelectItem value="500-1000">Rs. 500 - 1,000</SelectItem>
-                <SelectItem value="1000-2000">Rs. 1,000 - 2,000</SelectItem>
-                <SelectItem value="over-2000">Over Rs. 2,000</SelectItem>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all" className="rounded-lg">All Prices</SelectItem>
+                <SelectItem value="under-500" className="rounded-lg">Under Rs. 500</SelectItem>
+                <SelectItem value="500-1000" className="rounded-lg">Rs. 500 - 1,000</SelectItem>
+                <SelectItem value="1000-2000" className="rounded-lg">Rs. 1,000 - 2,000</SelectItem>
+                <SelectItem value="over-2000" className="rounded-lg">Over Rs. 2,000</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
           {/* Sort */}
-          <div className="w-full lg:w-48">
+          <div className="w-full lg:w-52">
             <label className="text-sm font-medium text-foreground mb-2 block">Sort By</label>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger data-testid="select-sort">
+              <SelectTrigger className="h-12 rounded-xl border-2 border-muted" data-testid="select-sort">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name A-Z</SelectItem>
-                <SelectItem value="price-low">Price: Low to High</SelectItem>
-                <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="stock">Stock Level</SelectItem>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="name" className="rounded-lg">Name A-Z</SelectItem>
+                <SelectItem value="price-low" className="rounded-lg">Price: Low to High</SelectItem>
+                <SelectItem value="price-high" className="rounded-lg">Price: High to Low</SelectItem>
+                <SelectItem value="stock" className="rounded-lg">Stock Level</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         
         {/* Results info */}
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground" data-testid="text-results-count">
-            Showing {filteredProducts.length} of {products.length} products
-          </p>
+        <div className="mt-6 flex items-center justify-between pt-4 border-t border-border/50">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <p className="text-sm text-muted-foreground" data-testid="text-results-count">
+              Showing <span className="font-semibold text-foreground">{filteredProducts.length}</span> of {products.length} products
+            </p>
+          </div>
           {(searchQuery || selectedCategory !== "all" || priceRange !== "all") && (
             <Button 
               variant="outline" 
@@ -234,6 +239,7 @@ export default function ProductGrid() {
                 setPriceRange("all");
                 setSortBy("name");
               }}
+              className="rounded-xl hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
               data-testid="button-clear-filters"
             >
               Clear Filters
@@ -244,91 +250,121 @@ export default function ProductGrid() {
       
       {/* Products Grid */}
       {filteredProducts.length === 0 ? (
-        <div className="text-center py-12" data-testid="text-no-filtered-products">
-          <Filter className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">No Products Match Your Filters</h3>
-          <p className="text-muted-foreground">Try adjusting your search criteria or clear the filters.</p>
+        <div className="text-center py-20" data-testid="text-no-filtered-products">
+          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+            <Filter className="w-10 h-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-2xl font-semibold text-foreground mb-3">No Products Match Your Filters</h3>
+          <p className="text-muted-foreground text-lg mb-6">Try adjusting your search criteria or clear the filters.</p>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedCategory("all");
+              setPriceRange("all");
+              setSortBy("name");
+            }}
+            className="rounded-xl"
+          >
+            Clear All Filters
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredProducts.map((product: Product) => (
-            <Card key={product.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-0 shadow-lg" data-testid={`card-product-${product.id}`}>
-              <div className="relative overflow-hidden">
+            <Card 
+              key={product.id} 
+              className="group card-modern border-0"
+              data-testid={`card-product-${product.id}`}
+            >
+              <div className="relative overflow-hidden rounded-t-2xl">
                 <img 
                   src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"} 
                   alt={product.name} 
-                  className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
+                  className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
                   data-testid={`img-product-${product.id}`}
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300"></div>
+                
+                {/* Overlay gradient on hover */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 
                 {/* Badges */}
-                <div className="absolute top-3 left-3 flex flex-col gap-2">
+                <div className="absolute top-4 left-4 flex flex-col gap-2">
                   {product.isFeatured && (
-                    <Badge className="bg-secondary shadow-lg" data-testid={`badge-featured-${product.id}`}>
-                      ⭐ Featured
+                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-lg" data-testid={`badge-featured-${product.id}`}>
+                      <Sparkles className="w-3 h-3 mr-1" /> Featured
                     </Badge>
                   )}
                   {product.stock > 0 && product.stock <= 10 && (
-                    <Badge variant="destructive" className="shadow-lg" data-testid={`badge-low-stock-${product.id}`}>
-                      🔥 Low Stock
+                    <Badge className="bg-gradient-to-r from-red-500 to-rose-500 text-white border-0 shadow-lg" data-testid={`badge-low-stock-${product.id}`}>
+                      Only {product.stock} left
+                    </Badge>
+                  )}
+                  {product.compareAtPrice && (
+                    <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg" data-testid={`badge-discount-${product.id}`}>
+                      {Math.round((1 - parseFloat(product.price) / parseFloat(product.compareAtPrice)) * 100)}% OFF
                     </Badge>
                   )}
                 </div>
                 
                 {/* Action buttons */}
-                <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-9 w-9 p-0 bg-white/90 hover:bg-white shadow-lg"
+                    className="h-10 w-10 p-0 rounded-xl bg-white/90 hover:bg-white shadow-lg backdrop-blur-sm"
                     data-testid={`button-wishlist-${product.id}`}
                   >
-                    <Heart className="h-4 w-4" />
+                    <Heart className="h-4 w-4 text-gray-700" />
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-9 w-9 p-0 bg-white/90 hover:bg-white shadow-lg"
+                    className="h-10 w-10 p-0 rounded-xl bg-white/90 hover:bg-white shadow-lg backdrop-blur-sm"
                     data-testid={`button-quick-view-${product.id}`}
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4 text-gray-700" />
                   </Button>
                 </div>
                 
-                {/* Discount percentage */}
-                {product.compareAtPrice && (
-                  <div className="absolute bottom-3 left-3">
-                    <Badge className="bg-red-500 text-white shadow-lg" data-testid={`badge-discount-${product.id}`}>
-                      {Math.round((1 - parseFloat(product.price) / parseFloat(product.compareAtPrice)) * 100)}% OFF
-                    </Badge>
-                  </div>
-                )}
+                {/* Quick Add Button */}
+                <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                  <Button
+                    className="w-full btn-modern rounded-xl bg-white text-primary hover:bg-white/90 shadow-lg"
+                    size="sm"
+                    disabled={product.stock === 0 || addToCartMutation.isPending}
+                    onClick={() => addToCartMutation.mutate(product.id)}
+                    data-testid={`button-quick-add-${product.id}`}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Quick Add
+                  </Button>
+                </div>
               </div>
-          
+              
               <CardContent className="p-5">
-                <div className="mb-3">
-                  <h3 className="font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors" data-testid={`text-product-name-${product.id}`}>
+                <div className="mb-4">
+                  <h3 className="font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-tight" data-testid={`text-product-name-${product.id}`}>
                     {product.name}
                   </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`text-product-description-${product.id}`}>
-                    {product.shortDescription || product.description?.substring(0, 80) + '...'}
+                  <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed" data-testid={`text-product-description-${product.id}`}>
+                    {product.shortDescription || product.description?.substring(0, 80)}
                   </p>
                   
-                  {/* Rating stars (placeholder) */}
-                  <div className="flex items-center mt-2 gap-1">
+                  {/* Rating */}
+                  <div className="flex items-center mt-3 gap-1">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     ))}
-                    <span className="text-xs text-muted-foreground ml-1">(4.8)</span>
+                    <span className="text-xs text-muted-foreground ml-2">(4.8) · 120 reviews</span>
                   </div>
                 </div>
                 
-                <div className="space-y-3">
-                  {/* Price section */}
-                  <div className="flex flex-col">
+                {/* Price and stock */}
+                <div className="flex items-end justify-between">
+                  <div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-bold text-primary" data-testid={`text-product-price-${product.id}`}>
+                      <span className="text-2xl font-bold text-primary" data-testid={`text-product-price-${product.id}`}>
                         Rs. {parseFloat(product.price).toLocaleString()}
                       </span>
                       {product.compareAtPrice && (
@@ -342,18 +378,28 @@ export default function ProductGrid() {
                     </span>
                   </div>
                   
-                  {/* Add to cart button */}
+                  {/* Add to cart button (desktop) */}
                   <Button
-                    className="w-full group-hover:bg-primary group-hover:text-white transition-colors"
+                    className="hidden sm:flex btn-modern rounded-xl"
                     size="sm"
                     disabled={product.stock === 0 || addToCartMutation.isPending}
                     onClick={() => addToCartMutation.mutate(product.id)}
                     data-testid={`button-add-cart-${product.id}`}
                   >
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    {addToCartMutation.isPending ? 'Adding...' : product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                    <ShoppingCart className="h-4 w-4" />
                   </Button>
                 </div>
+                
+                {/* Mobile add to cart */}
+                <Button
+                  className="w-full mt-4 sm:hidden btn-modern rounded-xl"
+                  disabled={product.stock === 0 || addToCartMutation.isPending}
+                  onClick={() => addToCartMutation.mutate(product.id)}
+                  data-testid={`button-add-cart-mobile-${product.id}`}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  {addToCartMutation.isPending ? 'Adding...' : product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                </Button>
               </CardContent>
             </Card>
           ))}

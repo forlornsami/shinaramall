@@ -1,203 +1,244 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
-import { ShoppingCart, Search, User, LogOut, Menu, Heart, Bell } from "lucide-react";
-import { useState } from "react";
+import type { User as UserType, CartItem } from "@shared/schema";
+import { ShoppingCart, Search, User as UserIcon, LogOut, Menu, X, Heart, Bell, ChevronDown, Package, Settings, HelpCircle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavigationProps {
   onCartToggle: () => void;
 }
 
 export default function Navigation({ onCartToggle }: NavigationProps) {
-  const { user } = useAuth();
-  const { cartItems } = useCart();
-  const [searchQuery, setSearchQuery] = useState("");
+  const { user } = useAuth() as { user: UserType | null };
+  const { cartItems } = useCart() as { cartItems: CartItem[] | undefined };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const cartItemCount = cartItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const cartItemCount = cartItems?.reduce((sum: number, item: CartItem) => sum + item.quantity, 0) || 0;
+
+  const categories = [
+    { name: "Fashion", href: "#" },
+    { name: "Electronics", href: "#" },
+    { name: "Home & Living", href: "#" },
+    { name: "Beauty", href: "#" },
+  ];
 
   return (
-    <nav className="bg-white/95 backdrop-blur-md border-b border-border shadow-lg sticky top-0 z-50">
+    <nav className="sticky top-0 z-50 glass-nav" data-testid="navigation">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex items-center justify-between h-18 py-3">
+          {/* Logo */}
           <div className="flex items-center space-x-8">
-            <h1 className="text-2xl font-bold text-primary" data-testid="logo-text">PakMart</h1>
+            <a href="/" className="flex items-center space-x-2 group" data-testid="logo-link">
+              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+                <span className="text-white font-bold text-lg">P</span>
+              </div>
+              <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent" data-testid="logo-text">
+                PakMart
+              </span>
+            </a>
             
             {/* Desktop Categories */}
-            <div className="hidden md:flex items-center space-x-6">
-              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
-                Fashion
-              </Button>
-              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
-                Electronics
-              </Button>
-              <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
-                Home & Decor
-              </Button>
+            <div className="hidden lg:flex items-center space-x-1">
+              {categories.map((category) => (
+                <Button 
+                  key={category.name}
+                  variant="ghost" 
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground hover:bg-primary/5 rounded-lg transition-colors"
+                  data-testid={`nav-category-${category.name.toLowerCase()}`}
+                >
+                  {category.name}
+                </Button>
+              ))}
             </div>
           </div>
           
-          {/* Desktop Search Bar */}
-          <div className="hidden md:flex items-center flex-1 max-w-lg mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          {/* Search Bar - Desktop */}
+          <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <div className="relative w-full group">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 group-focus-within:text-primary transition-colors" />
               <Input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 bg-background/50 border-border focus:bg-background transition-colors"
-                data-testid="input-search"
+                className="w-full pl-11 pr-4 h-11 rounded-xl bg-muted/50 border-0 focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all"
+                data-testid="input-nav-search"
               />
             </div>
           </div>
           
-          <div className="flex items-center space-x-3">
-            {/* Mobile menu button */}
+          {/* Right Section */}
+          <div className="flex items-center space-x-2">
+            {/* Mobile Search */}
             <Button 
               variant="ghost" 
               size="sm"
-              className="md:hidden"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              data-testid="button-mobile-menu"
+              className="md:hidden h-10 w-10 p-0 rounded-xl hover:bg-muted"
+              data-testid="button-mobile-search"
             >
-              <Menu className="w-5 h-5" />
+              <Search className="w-5 h-5" />
             </Button>
             
-            {/* Wishlist button */}
+            {/* Wishlist */}
             <Button 
               variant="ghost" 
               size="sm"
-              className="hidden sm:flex relative"
+              className="hidden sm:flex h-10 w-10 p-0 rounded-xl hover:bg-muted relative"
               data-testid="button-wishlist"
             >
-              <Heart className="w-4 h-4" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center text-[10px]">
-                0
-              </span>
+              <Heart className="w-5 h-5" />
             </Button>
             
             {/* Notifications */}
             <Button 
               variant="ghost" 
               size="sm"
-              className="hidden sm:flex relative"
+              className="hidden sm:flex h-10 w-10 p-0 rounded-xl hover:bg-muted relative"
               data-testid="button-notifications"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </Button>
             
-            {/* Cart button */}
+            {/* Cart */}
             <Button 
               variant="ghost" 
               size="sm" 
-              className="relative"
+              className="h-10 px-3 rounded-xl hover:bg-muted relative group"
               onClick={onCartToggle}
               data-testid="button-cart"
             >
-              <ShoppingCart className="w-5 h-5" />
+              <ShoppingCart className="w-5 h-5 group-hover:scale-110 transition-transform" />
               {cartItemCount > 0 && (
-                <span 
-                  className="absolute -top-1 -right-1 bg-secondary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium"
+                <Badge 
+                  className="absolute -top-1 -right-1 h-5 min-w-5 p-0 flex items-center justify-center bg-secondary text-white text-xs font-semibold rounded-full shadow-lg"
                   data-testid="text-cart-count"
                 >
                   {cartItemCount}
-                </span>
+                </Badge>
               )}
             </Button>
             
-            {/* User profile section */}
-            <div className="hidden sm:flex items-center space-x-3 pl-3 border-l border-border">
-              {user?.profileImageUrl && (
-                <img 
-                  src={user.profileImageUrl} 
-                  alt="Profile" 
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20"
-                  data-testid="img-user-avatar"
-                />
-              )}
-              <div className="hidden lg:block">
-                <div className="text-sm font-medium text-foreground" data-testid="text-user-name">
-                  {user?.firstName} {user?.lastName}
-                </div>
-                <div className="text-xs text-muted-foreground" data-testid="text-user-email">
-                  {user?.email}
-                </div>
-              </div>
-              
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => window.location.href = '/api/logout'}
-                className="hover:bg-red-50 hover:text-red-600"
-                data-testid="button-logout"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-        
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-border bg-white/95 backdrop-blur-md">
-            <div className="px-4 py-4 space-y-4">
-              {/* Mobile search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4"
-                  data-testid="input-search-mobile"
-                />
-              </div>
-              
-              {/* Mobile categories */}
-              <div className="grid grid-cols-3 gap-2">
-                <Button variant="outline" size="sm" className="justify-start">
-                  Fashion
-                </Button>
-                <Button variant="outline" size="sm" className="justify-start">
-                  Electronics
-                </Button>
-                <Button variant="outline" size="sm" className="justify-start">
-                  Home & Decor
-                </Button>
-              </div>
-              
-              {/* Mobile user info */}
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div className="flex items-center space-x-3">
-                  {user?.profileImageUrl && (
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="h-10 px-2 rounded-xl hover:bg-muted flex items-center space-x-2"
+                  data-testid="button-user-menu"
+                >
+                  {user?.profileImageUrl ? (
                     <img 
                       src={user.profileImageUrl} 
                       alt="Profile" 
-                      className="w-10 h-10 rounded-full object-cover"
-                      data-testid="img-user-avatar-mobile"
+                      className="w-8 h-8 rounded-lg object-cover ring-2 ring-primary/20"
+                      data-testid="img-user-avatar"
                     />
-                  )}
-                  <div>
-                    <div className="text-sm font-medium text-foreground" data-testid="text-user-name-mobile">
-                      {user?.firstName} {user?.lastName}
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center">
+                      <UserIcon className="w-4 h-4 text-white" />
                     </div>
-                    <div className="text-xs text-muted-foreground" data-testid="text-user-email-mobile">
-                      {user?.email}
+                  )}
+                  <div className="hidden lg:block text-left">
+                    <div className="text-sm font-medium text-foreground leading-tight" data-testid="text-user-name">
+                      {user?.firstName || 'Guest'}
+                    </div>
+                    <div className="text-xs text-muted-foreground" data-testid="text-user-greeting">
+                      Welcome back!
                     </div>
                   </div>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => window.location.href = '/api/logout'}
-                  className="hover:bg-red-50 hover:text-red-600"
-                  data-testid="button-logout-mobile"
-                >
-                  <LogOut className="w-4 h-4" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground hidden lg:block" />
                 </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-xl border-0 glass-card p-2">
+                <DropdownMenuLabel className="font-normal px-3 py-2">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-2" />
+                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-my-orders">
+                  <Package className="w-4 h-4 mr-3" />
+                  My Orders
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-wishlist">
+                  <Heart className="w-4 h-4 mr-3" />
+                  Wishlist
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-settings">
+                  <Settings className="w-4 h-4 mr-3" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-help">
+                  <HelpCircle className="w-4 h-4 mr-3" />
+                  Help Center
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-2" />
+                <DropdownMenuItem 
+                  className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
+                  onClick={() => window.location.href = '/api/logout'}
+                  data-testid="menu-logout"
+                >
+                  <LogOut className="w-4 h-4 mr-3" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Mobile Menu Toggle */}
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="lg:hidden h-10 w-10 p-0 rounded-xl hover:bg-muted"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              data-testid="button-mobile-menu"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+          </div>
+        </div>
+        
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden pb-4 animate-slide-up" data-testid="mobile-menu">
+            <div className="pt-4 border-t border-border/50">
+              {/* Mobile Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  className="w-full pl-11 pr-4 h-12 rounded-xl bg-muted/50 border-0"
+                  data-testid="input-mobile-search"
+                />
+              </div>
+              
+              {/* Mobile Categories */}
+              <div className="grid grid-cols-2 gap-2">
+                {categories.map((category) => (
+                  <Button 
+                    key={category.name}
+                    variant="outline" 
+                    className="justify-start h-12 rounded-xl border-muted hover:bg-muted/50"
+                    data-testid={`mobile-nav-category-${category.name.toLowerCase()}`}
+                  >
+                    {category.name}
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
