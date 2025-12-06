@@ -28,7 +28,10 @@ import {
   Clock,
   MapPin,
   Eye,
-  EyeOff
+  EyeOff,
+  Upload,
+  ImagePlus,
+  X
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
@@ -37,6 +40,7 @@ export default function SettingsSection() {
   
   const [storeSettings, setStoreSettings] = useState({
     storeName: "",
+    storeLogo: "",
     storeEmail: "",
     storePhone: "",
     storeAddress: "",
@@ -70,6 +74,7 @@ export default function SettingsSection() {
     if (settings) {
       setStoreSettings({
         storeName: settings.storeName || "",
+        storeLogo: settings.storeLogo || "",
         storeEmail: settings.storeEmail || "",
         storePhone: settings.storePhone || "",
         storeAddress: settings.storeAddress || "",
@@ -251,6 +256,86 @@ export default function SettingsSection() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Store Logo Upload */}
+              <div className="space-y-3">
+                <Label>Store Logo</Label>
+                <div className="flex items-start gap-4">
+                  <div className="relative">
+                    {storeSettings.storeLogo ? (
+                      <div className="relative w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden group">
+                        <img 
+                          src={storeSettings.storeLogo} 
+                          alt="Store Logo" 
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStoreSettings({ ...storeSettings, storeLogo: "" })}
+                          className="absolute top-1 right-1 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid="button-remove-logo"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label 
+                        htmlFor="logo-upload" 
+                        className="w-24 h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <ImagePlus className="w-8 h-8 text-muted-foreground mb-1" />
+                        <span className="text-xs text-muted-foreground">Upload</span>
+                      </label>
+                    )}
+                    <input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast({
+                              title: "File too large",
+                              description: "Logo must be less than 2MB",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            setStoreSettings({ ...storeSettings, storeLogo: result });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      data-testid="input-logo-upload"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Upload your store logo. Recommended size: 200x200 pixels.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Supported formats: PNG, JPG, GIF. Max size: 2MB.
+                    </p>
+                    {!storeSettings.storeLogo && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => document.getElementById('logo-upload')?.click()}
+                        data-testid="button-upload-logo"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose File
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="storeName">Store Name</Label>

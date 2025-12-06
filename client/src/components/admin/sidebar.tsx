@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { 
   BarChart3, 
   Package, 
@@ -16,6 +17,7 @@ import {
   Shield,
   UserCog
 } from "lucide-react";
+import type { StoreSettings } from "@shared/schema";
 
 interface Permission {
   view?: boolean;
@@ -152,6 +154,10 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
   const role = adminUser?.role?.toLowerCase() || '';
   const isAdmin = role === 'admin' || role === 'super_admin' || role.includes('admin');
   
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
   const canAccessSection = (sectionId: string): boolean => {
     if (isAdmin) return true;
     if (sectionId === 'help') return true;
@@ -163,17 +169,28 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
   const visibleAccessControlItems = accessControlItems.filter(item => canAccessSection(item.id));
   const visibleSettingsItems = settingsItems.filter(item => canAccessSection(item.id));
 
+  const storeName = storeSettings?.storeName || 'Eshaal Store';
+  const storeLogo = storeSettings?.storeLogo;
+
   return (
     <div className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border hidden lg:flex flex-col z-50">
       {/* Logo Section */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-lg">E</span>
-          </div>
+          {storeLogo ? (
+            <img 
+              src={storeLogo} 
+              alt={storeName}
+              className="w-10 h-10 rounded-xl object-cover shadow-lg"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-lg">{storeName.charAt(0).toUpperCase()}</span>
+            </div>
+          )}
           <div>
             <h2 className="text-xl font-bold gradient-text" data-testid="text-admin-dashboard">
-              Eshaal Store
+              {storeName}
             </h2>
             <p className="text-xs text-muted-foreground">Admin Panel</p>
           </div>

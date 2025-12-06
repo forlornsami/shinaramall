@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
-import type { User as UserType, CartItem, Category } from "@shared/schema";
+import type { User as UserType, CartItem, Category, StoreSettings } from "@shared/schema";
 import { ShoppingCart, Search, User as UserIcon, LogOut, Menu, X, Heart, Bell, ChevronDown, Package, Settings, HelpCircle } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,6 +34,13 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
     queryKey: ['/api/categories'],
   });
 
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
+  const storeName = storeSettings?.storeName || 'Eshaal Store';
+  const storeLogo = storeSettings?.storeLogo;
+
   const categories = categoriesData?.slice(0, 6).map(cat => ({
     name: cat.name,
     href: `#`,
@@ -47,11 +54,19 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
           {/* Logo */}
           <div className="flex items-center space-x-8">
             <a href="/" className="flex items-center space-x-2 group" data-testid="logo-link">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-                <span className="text-white font-bold text-lg">E</span>
-              </div>
+              {storeLogo ? (
+                <img 
+                  src={storeLogo} 
+                  alt={storeName}
+                  className="w-10 h-10 rounded-xl object-cover shadow-lg group-hover:shadow-xl transition-shadow"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+                  <span className="text-white font-bold text-lg">{storeName.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
               <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent" data-testid="logo-text">
-                Eshaal Store
+                {storeName}
               </span>
             </a>
             

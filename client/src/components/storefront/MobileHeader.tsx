@@ -148,11 +148,19 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
             <div className="flex flex-col h-full">
               <div className="p-6 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-lg">
-                      {storeSettings?.storeName?.charAt(0) || "E"}
-                    </span>
-                  </div>
+                  {storeSettings?.storeLogo ? (
+                    <img 
+                      src={storeSettings.storeLogo} 
+                      alt={storeSettings?.storeName || "Store"}
+                      className="w-10 h-10 rounded-xl object-cover shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+                      <span className="text-white font-bold text-lg">
+                        {storeSettings?.storeName?.charAt(0) || "E"}
+                      </span>
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold gradient-text">
                       {storeSettings?.storeName || "Eshaal Store"}
@@ -227,11 +235,19 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
         </Sheet>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-            <span className="text-white font-bold text-sm">
-              {storeSettings?.storeName?.charAt(0) || "E"}
-            </span>
-          </div>
+          {storeSettings?.storeLogo ? (
+            <img 
+              src={storeSettings.storeLogo} 
+              alt={storeSettings?.storeName || "Store"}
+              className="w-8 h-8 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+              <span className="text-white font-bold text-sm">
+                {storeSettings?.storeName?.charAt(0) || "E"}
+              </span>
+            </div>
+          )}
           <span className="font-bold gradient-text">
             {storeSettings?.storeName || "Eshaal Store"}
           </span>

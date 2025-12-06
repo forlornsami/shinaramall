@@ -204,18 +204,29 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
     );
   };
 
+  const storeName = storeSettings?.storeName || "Eshaal Store";
+  const storeLogo = storeSettings?.storeLogo;
+
   return (
     <div className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border hidden lg:flex flex-col z-50">
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-lg">
-              {storeSettings?.storeName?.charAt(0) || "E"}
-            </span>
-          </div>
+          {storeLogo ? (
+            <img 
+              src={storeLogo} 
+              alt={storeName}
+              className="w-10 h-10 rounded-xl object-cover shadow-lg"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-lg">
+                {storeName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
           <div>
             <h2 className="text-xl font-bold gradient-text" data-testid="text-store-name">
-              {storeSettings?.storeName || "Eshaal Store"}
+              {storeName}
             </h2>
             <p className="text-xs text-muted-foreground">Shop Authentic Products</p>
           </div>

@@ -1197,7 +1197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: Record<string, any> = {};
       
       const allowedFields = [
-        'storeName', 'storeEmail', 'storePhone', 'storeAddress',
+        'storeName', 'storeLogo', 'storeEmail', 'storePhone', 'storeAddress',
         'currency', 'timezone', 'language',
         'orderNotifications', 'stockAlerts', 'customerRegistrations',
         'paymentUpdates', 'marketingEmails'
