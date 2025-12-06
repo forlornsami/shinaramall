@@ -157,8 +157,7 @@ async function handleSendMessage(client: ChatClient, content: string, attachment
     conversationId: client.conversationId,
     senderId: client.userId,
     senderType: client.userType,
-    content: content.trim(),
-    attachments: attachments || null,
+    message: content.trim(),
   });
 
   broadcastToConversation(client.conversationId, {

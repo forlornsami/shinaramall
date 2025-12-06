@@ -1462,7 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversationId: req.params.id,
         senderId: userId,
         senderType: 'customer',
-        content: content.trim(),
+        message: content.trim(),
       });
       
       // Create notification for agent if assigned
@@ -1549,7 +1549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversationId: req.params.id,
         senderId: adminId,
         senderType: 'agent',
-        content: content.trim(),
+        message: content.trim(),
       });
       
       // Create notification for customer

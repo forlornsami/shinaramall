@@ -15,7 +15,8 @@ import {
   HelpCircle,
   ChevronRight,
   Shield,
-  UserCog
+  UserCog,
+  MessageCircle
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
@@ -39,6 +40,7 @@ interface Permissions {
   users?: Permission;
   roles?: Permission;
   settings?: Permission;
+  chat?: Permission;
 }
 
 interface AdminSidebarProps {
@@ -71,6 +73,7 @@ const sectionToPermissionKey: Record<string, string> = {
   roles: 'roles',
   settings: 'settings',
   help: 'help',
+  chat: 'chat',
 };
 
 const sidebarItems = [
@@ -116,6 +119,12 @@ const sidebarItems = [
     label: "Payments",
     icon: CreditCard,
     color: "from-emerald-500 to-emerald-600",
+  },
+  {
+    id: "chat",
+    label: "Chat Support",
+    icon: MessageCircle,
+    color: "from-violet-500 to-violet-600",
   },
 ];
 

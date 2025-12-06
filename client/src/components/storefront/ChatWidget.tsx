@@ -229,9 +229,9 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
                         : 'bg-muted'
                     }`}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    <p className="text-sm">{msg.message}</p>
                     <p className={`text-xs mt-1 ${msg.senderType === 'customer' ? 'opacity-70' : 'text-muted-foreground'}`}>
-                      {format(new Date(msg.createdAt), 'h:mm a')}
+                      {msg.createdAt ? format(new Date(msg.createdAt), 'h:mm a') : ''}
                     </p>
                   </div>
                   {msg.senderType === 'customer' && (

@@ -449,6 +449,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "order_placed",
   "order_status_update",
   "low_stock",
+  "chat_message",
   "customer_registration",
   "payment_received",
   "payment_failed",
