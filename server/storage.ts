@@ -50,6 +50,7 @@ export interface IStorage {
   getAdminUsers(): Promise<(AdminUser & { roleData?: Role })[]>;
   createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
   updateAdminUser(id: string, user: Partial<InsertAdminUser>): Promise<AdminUser>;
+  updateAdminUserPassword(id: string, passwordHash: string): Promise<AdminUser>;
   deleteAdminUser(id: string): Promise<boolean>;
   updateAdminUserLastLogin(id: string): Promise<AdminUser>;
   
@@ -218,6 +219,18 @@ export class DatabaseStorage implements IStorage {
       .update(adminUsers)
       .set({
         ...userData,
+        updatedAt: new Date(),
+      })
+      .where(eq(adminUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateAdminUserPassword(id: string, passwordHash: string): Promise<AdminUser> {
+    const [user] = await db
+      .update(adminUsers)
+      .set({
+        passwordHash,
         updatedAt: new Date(),
       })
       .where(eq(adminUsers.id, id))

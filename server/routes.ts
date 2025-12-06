@@ -115,6 +115,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize default roles on startup
   storage.initializeDefaultRoles().catch(console.error);
 
+  // Change admin password
+  app.post('/api/admin/change-password', adminAuth, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const adminId = req.adminUser.id;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new password are required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters long" });
+      }
+      
+      const admin = await storage.getAdminUser(adminId);
+      if (!admin) {
+        return res.status(404).json({ message: "Admin user not found" });
+      }
+      
+      const isValidPassword = await bcrypt.compare(currentPassword, admin.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+      
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      await storage.updateAdminUserPassword(adminId, newPasswordHash);
+      
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
   // ==================== ROLE MANAGEMENT ====================
   
   // Get all roles
