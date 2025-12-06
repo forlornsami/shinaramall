@@ -751,6 +751,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return order with items
       const orderWithItems = await storage.getOrderWithItems(order.id);
+      
+      // Create admin notification for new order
+      try {
+        const user = await storage.getUser(userId);
+        const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
+        await storage.createNotification({
+          recipientType: 'admin',
+          type: 'order_placed',
+          title: 'New Order Received',
+          message: `New order #${order.id.slice(-8).toUpperCase()} from ${customerName} for Rs. ${parseFloat(order.total).toLocaleString()}`,
+          data: { orderId: order.id, userId, total: order.total },
+        });
+        
+        // Check for low stock and create notifications
+        for (const cartItem of cartItems) {
+          const updatedProduct = await storage.getProduct(cartItem.productId);
+          if (updatedProduct && updatedProduct.stock <= 10) {
+            await storage.createNotification({
+              recipientType: 'admin',
+              type: 'low_stock',
+              title: 'Low Stock Alert',
+              message: `Product "${updatedProduct.name}" is running low. Only ${updatedProduct.stock} units left.`,
+              data: { productId: updatedProduct.id, currentStock: updatedProduct.stock },
+            });
+          }
+        }
+      } catch (notificationError) {
+        console.error("Error creating order notification:", notificationError);
+      }
+      
       res.json(orderWithItems);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -778,17 +808,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status, paymentStatus } = req.body;
       
+      // Get original order to check for status change
+      const originalOrder = await storage.getOrder(req.params.id);
+      
+      let order;
       // If status is being changed to cancelled, restore inventory
       if (status === 'cancelled') {
-        const order = await storage.cancelOrderAndRestoreInventory(req.params.id);
-        res.json(order);
+        order = await storage.cancelOrderAndRestoreInventory(req.params.id);
       } else {
-        const order = await storage.updateOrder(req.params.id, {
+        order = await storage.updateOrder(req.params.id, {
           status,
           paymentStatus,
         });
-        res.json(order);
       }
+      
+      // Create customer notification for order status update
+      if (originalOrder && order.userId && status && originalOrder.status !== status) {
+        try {
+          const statusMessages: Record<string, string> = {
+            'pending': 'Your order is being reviewed.',
+            'processing': 'Your order is now being processed.',
+            'shipped': 'Great news! Your order has been shipped.',
+            'delivered': 'Your order has been delivered. Enjoy!',
+            'cancelled': 'Your order has been cancelled.',
+          };
+          
+          await storage.createNotification({
+            recipientType: 'customer',
+            recipientId: order.userId,
+            type: 'order_status_update',
+            title: `Order #${order.id.slice(-8).toUpperCase()} Updated`,
+            message: statusMessages[status] || `Your order status changed to ${status}.`,
+            data: { orderId: order.id, status, previousStatus: originalOrder.status },
+          });
+        } catch (notificationError) {
+          console.error("Error creating order update notification:", notificationError);
+        }
+      }
+      
+      // Create customer notification for payment status update
+      if (originalOrder && order.userId && paymentStatus && originalOrder.paymentStatus !== paymentStatus) {
+        try {
+          const paymentMessages: Record<string, string> = {
+            'pending': 'Payment is pending for your order.',
+            'paid': 'Payment received! Thank you for your purchase.',
+            'failed': 'Payment failed. Please try again or contact support.',
+            'refunded': 'Your order payment has been refunded.',
+          };
+          
+          const paymentType = paymentStatus === 'paid' ? 'payment_received' : (paymentStatus === 'failed' ? 'payment_failed' : 'general');
+          
+          await storage.createNotification({
+            recipientType: 'customer',
+            recipientId: order.userId,
+            type: paymentType,
+            title: `Payment Update for Order #${order.id.slice(-8).toUpperCase()}`,
+            message: paymentMessages[paymentStatus] || `Payment status changed to ${paymentStatus}.`,
+            data: { orderId: order.id, paymentStatus, previousPaymentStatus: originalOrder.paymentStatus },
+          });
+        } catch (notificationError) {
+          console.error("Error creating payment update notification:", notificationError);
+        }
+      }
+      
+      res.json(order);
     } catch (error) {
       console.error("Error updating order:", error);
       res.status(500).json({ message: "Failed to update order" });

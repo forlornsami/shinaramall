@@ -144,6 +144,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Check if user already exists
+    const existingUser = await this.getUser(userData.id);
+    const isNewUser = !existingUser;
+    
     const [user] = await db
       .insert(users)
       .values(userData)
@@ -155,6 +159,23 @@ export class DatabaseStorage implements IStorage {
         },
       })
       .returning();
+    
+    // Create notification for new customer registration
+    if (isNewUser) {
+      try {
+        const customerName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.email || 'New Customer');
+        await this.createNotification({
+          recipientType: 'admin',
+          type: 'customer_registration',
+          title: 'New Customer Registration',
+          message: `${customerName} has created an account.`,
+          data: { userId: user.id, email: user.email },
+        });
+      } catch (notificationError) {
+        console.error("Error creating customer registration notification:", notificationError);
+      }
+    }
+    
     return user;
   }
 
