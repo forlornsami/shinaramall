@@ -58,10 +58,31 @@ Preferred communication style: Simple, everyday language.
 - **Security Features**: Password change with bcrypt verification, active session management in admin security settings
 - **RBAC System**: Case-insensitive admin role checking supports various role formats (Super_admin, admin, etc.)
 - **In-App Notification System**: Real-time notifications for both admin and customer users with automatic triggers
+- **Live Chat Support**: Real-time customer support chat with WebSocket messaging, agent assignment, and conversation management
+
+## Live Chat Support System
+- **Database Tables**: 
+  - `chat_conversations`: Tracks conversations with customerId, assignedAgentId, status (open, in_progress, resolved, closed), subject
+  - `chat_messages`: Stores messages with conversationId, senderId, senderType (customer, agent, system), message content, isRead status
+- **WebSocket Server**: Real-time messaging on `/ws/chat` endpoint for instant message delivery
+- **Chat Support Role**: Dedicated admin role with permissions (view, respond) for customer support agents
+- **Customer Features**:
+  - Chat widget in storefront sidebar for authenticated users
+  - Create conversations and send messages to support team
+  - View message history and conversation status
+- **Admin Features**:
+  - Chat Support dashboard with conversation list and filters
+  - Assign agents to conversations, update status
+  - Real-time message view and response
+  - Notification integration for new messages
+- **API Endpoints**:
+  - Customer: GET /api/chat/conversation, GET /api/chat/conversation/:id/messages, POST /api/chat/conversation/:id/messages
+  - Admin: GET /api/admin/chat/conversations, POST /api/admin/chat/conversations/:id/assign, PATCH /api/admin/chat/conversations/:id/status, POST /api/admin/chat/conversations/:id/messages
+- **Notification Integration**: Creates chat_message notifications for offline agents/customers
 
 ## Notification System
 - **Database Table**: `notifications` table stores all notifications with recipientType (admin/customer), type, title, message, and metadata
-- **Notification Types**: order_placed, order_status_update, low_stock, customer_registration, payment_received, payment_failed, general
+- **Notification Types**: order_placed, order_status_update, low_stock, chat_message, customer_registration, payment_received, payment_failed, general
 - **Admin Notifications**: 
   - New order placed (when customer completes checkout)
   - Low stock alerts (when product stock falls to 10 or below)
