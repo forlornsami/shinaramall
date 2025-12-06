@@ -149,7 +149,8 @@ const settingsItems = [
 
 export default function AdminSidebar({ activeSection, onSectionChange, adminUser, onLogout }: AdminSidebarProps) {
   const permissions = adminUser?.permissions;
-  const isAdmin = adminUser?.role === 'admin';
+  const role = adminUser?.role?.toLowerCase() || '';
+  const isAdmin = role === 'admin' || role === 'super_admin' || role.includes('admin');
   
   const canAccessSection = (sectionId: string): boolean => {
     if (isAdmin) return true;

@@ -163,7 +163,8 @@ export default function AdminDashboard() {
   ];
 
   const hasPermission = (section: string): boolean => {
-    if (adminUser?.role === 'admin') return true;
+    const role = adminUser?.role?.toLowerCase() || '';
+    if (role === 'admin' || role === 'super_admin' || role.includes('admin')) return true;
     if (section === 'help') return true;
     
     const permissions = adminUser?.permissions;
