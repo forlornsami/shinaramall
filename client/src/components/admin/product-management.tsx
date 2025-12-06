@@ -147,14 +147,21 @@ export default function ProductManagement() {
       if (!response.ok) throw new Error('Failed to delete product');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       queryClient.invalidateQueries({ queryKey: ['/api/products/featured'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
-      toast({
-        title: "Success",
-        description: "Product deleted successfully",
-      });
+      if (data.softDeleted) {
+        toast({
+          title: "Product Deactivated",
+          description: "This product has order history, so it was deactivated instead of deleted.",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Product deleted successfully",
+        });
+      }
     },
     onError: (error) => {
       toast({

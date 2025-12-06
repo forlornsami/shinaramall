@@ -80,7 +80,7 @@ export interface IStorage {
   getProductBySlug(slug: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product>;
-  deleteProduct(id: string): Promise<boolean>;
+  deleteProduct(id: string): Promise<{ success: boolean; softDeleted?: boolean }>;
   
   // Order operations
   getOrders(userId?: string, limit?: number, offset?: number): Promise<Order[]>;
@@ -475,9 +475,25 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
-  async deleteProduct(id: string): Promise<boolean> {
-    const result = await db.delete(products).where(eq(products.id, id));
-    return result.rowCount > 0;
+  async deleteProduct(id: string): Promise<{ success: boolean; softDeleted?: boolean }> {
+    try {
+      const result = await db.delete(products).where(eq(products.id, id));
+      return { success: (result.rowCount ?? 0) > 0 };
+    } catch (error: any) {
+      if (error.code === '23503') {
+        const [updated] = await db
+          .update(products)
+          .set({ isActive: false })
+          .where(eq(products.id, id))
+          .returning();
+        
+        if (updated) {
+          await db.delete(cartItems).where(eq(cartItems.productId, id));
+          return { success: true, softDeleted: true };
+        }
+      }
+      throw error;
+    }
   }
 
   // Inventory management

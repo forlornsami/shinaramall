@@ -531,11 +531,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/products/:id', adminAuth, async (req, res) => {
     try {
-      const success = await storage.deleteProduct(req.params.id);
-      if (!success) {
+      const result = await storage.deleteProduct(req.params.id);
+      if (!result.success) {
         return res.status(404).json({ message: "Product not found" });
       }
-      res.json({ message: "Product deleted successfully" });
+      if (result.softDeleted) {
+        res.json({ message: "Product has been deactivated (it has order history)", softDeleted: true });
+      } else {
+        res.json({ message: "Product deleted successfully" });
+      }
     } catch (error) {
       console.error("Error deleting product:", error);
       res.status(500).json({ message: "Failed to delete product" });
