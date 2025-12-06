@@ -85,6 +85,21 @@ const accessControlItems = [
   },
 ];
 
+const settingsItems = [
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    color: "from-slate-500 to-slate-600",
+  },
+  {
+    id: "help",
+    label: "Help Center",
+    icon: HelpCircle,
+    color: "from-teal-500 to-teal-600",
+  },
+];
+
 export default function AdminSidebar({ activeSection, onSectionChange, adminUser, onLogout }: AdminSidebarProps) {
   return (
     <div className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border hidden lg:flex flex-col z-50">
@@ -184,26 +199,36 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
             Settings
           </p>
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-12 px-3"
-            data-testid="nav-settings"
-          >
-            <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center mr-3">
-              <Settings className="h-5 w-5 text-muted-foreground" />
-            </div>
-            Settings
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-12 px-3"
-            data-testid="nav-help"
-          >
-            <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center mr-3">
-              <HelpCircle className="h-5 w-5 text-muted-foreground" />
-            </div>
-            Help Center
-          </Button>
+          {settingsItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.id;
+            
+            return (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-sm font-medium transition-all duration-200 rounded-xl h-12 px-3 group",
+                  isActive
+                    ? "bg-primary text-primary-foreground hover:bg-primary shadow-lg"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+                onClick={() => onSectionChange(item.id)}
+                data-testid={`nav-${item.id}`}
+              >
+                <div className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center mr-3 transition-all",
+                  isActive 
+                    ? "bg-white/20" 
+                    : `bg-gradient-to-br ${item.color} opacity-80 group-hover:opacity-100`
+                )}>
+                  <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-white")} />
+                </div>
+                <span className="flex-1 text-left">{item.label}</span>
+                {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
+              </Button>
+            );
+          })}
         </div>
       </nav>
       

@@ -9,6 +9,8 @@ import InventoryManagement from "@/components/admin/inventory-management";
 import PaymentManagement from "@/components/admin/payment-management";
 import UserManagement from "@/components/admin/user-management";
 import RoleManagement from "@/components/admin/role-management";
+import SettingsSection from "@/components/admin/settings";
+import HelpCenterSection from "@/components/admin/help-center";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +29,7 @@ import {
   Activity
 } from "lucide-react";
 
-type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "users" | "roles";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "users" | "roles" | "settings" | "help";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -234,6 +236,10 @@ export default function AdminDashboard() {
         return <UserManagement />;
       case "roles":
         return <RoleManagement />;
+      case "settings":
+        return <SettingsSection />;
+      case "help":
+        return <HelpCenterSection />;
       default:
         return null;
     }
