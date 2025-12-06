@@ -1395,9 +1395,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark all customer notifications as read
-  app.post('/api/notifications/read-all', isAuthenticated, async (req, res) => {
+  app.post('/api/notifications/read-all', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user.claims.sub;
       await storage.markAllNotificationsAsRead('customer', userId);
       res.json({ success: true });
     } catch (error) {
@@ -1409,9 +1409,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============== CUSTOMER CHAT ENDPOINTS ==============
 
   // Get or create customer's active conversation
-  app.get('/api/chat/conversation', isAuthenticated, async (req, res) => {
+  app.get('/api/chat/conversation', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user.claims.sub;
       let conversation = await storage.getCustomerConversation(userId);
       
       if (!conversation) {
@@ -1430,9 +1430,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get messages for a conversation (customer)
-  app.get('/api/chat/conversation/:id/messages', isAuthenticated, async (req, res) => {
+  app.get('/api/chat/conversation/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user.claims.sub;
       const conversation = await storage.getChatConversation(req.params.id);
       
       if (!conversation || conversation.customerId !== userId) {
@@ -1448,9 +1448,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send message (customer) - fallback for when WebSocket is not available
-  app.post('/api/chat/conversation/:id/messages', isAuthenticated, async (req, res) => {
+  app.post('/api/chat/conversation/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user.claims.sub;
       const { content } = req.body;
       
       const conversation = await storage.getChatConversation(req.params.id);
