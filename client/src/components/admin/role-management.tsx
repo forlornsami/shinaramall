@@ -200,6 +200,36 @@ export default function RoleManagement() {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(`/api/admin/roles/${id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update role status");
+      }
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/roles"] });
+      toast({ title: `Role ${variables.isActive ? "activated" : "deactivated"} successfully` });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update role status",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingRole(null);
@@ -359,7 +389,21 @@ export default function RoleManagement() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={role.isActive}
+                        onCheckedChange={(checked) =>
+                          toggleStatusMutation.mutate({ id: role.id, isActive: checked })
+                        }
+                        disabled={toggleStatusMutation.isPending}
+                        data-testid={`switch-role-active-${role.id}`}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {role.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <div className="h-6 w-px bg-border" />
                     <Button
                       variant="ghost"
                       size="icon"

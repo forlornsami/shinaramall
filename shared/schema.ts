@@ -56,6 +56,7 @@ export const roles = pgTable("roles", {
     settings: { view: boolean; edit: boolean };
   }>().notNull(),
   isSystem: boolean("is_system").default(false),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
