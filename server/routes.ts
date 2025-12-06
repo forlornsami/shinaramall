@@ -1406,6 +1406,230 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== CUSTOMER CHAT ENDPOINTS ==============
+
+  // Get or create customer's active conversation
+  app.get('/api/chat/conversation', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      let conversation = await storage.getCustomerConversation(userId);
+      
+      if (!conversation) {
+        conversation = await storage.createChatConversation({
+          customerId: userId,
+          status: 'open',
+        });
+      }
+      
+      const fullConversation = await storage.getChatConversation(conversation.id);
+      res.json(fullConversation);
+    } catch (error) {
+      console.error("Error getting chat conversation:", error);
+      res.status(500).json({ message: "Failed to get conversation" });
+    }
+  });
+
+  // Get messages for a conversation (customer)
+  app.get('/api/chat/conversation/:id/messages', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const conversation = await storage.getChatConversation(req.params.id);
+      
+      if (!conversation || conversation.customerId !== userId) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      const messages = await storage.getChatMessages(req.params.id);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error getting messages:", error);
+      res.status(500).json({ message: "Failed to get messages" });
+    }
+  });
+
+  // Send message (customer) - fallback for when WebSocket is not available
+  app.post('/api/chat/conversation/:id/messages', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { content } = req.body;
+      
+      const conversation = await storage.getChatConversation(req.params.id);
+      if (!conversation || conversation.customerId !== userId) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      const message = await storage.createChatMessage({
+        conversationId: req.params.id,
+        senderId: userId,
+        senderType: 'customer',
+        content: content.trim(),
+      });
+      
+      // Create notification for agent if assigned
+      if (conversation.assignedAgentId) {
+        await storage.createNotification({
+          recipientType: 'admin',
+          recipientId: conversation.assignedAgentId,
+          type: 'chat_message',
+          title: 'New Chat Message',
+          message: `Customer ${conversation.customer?.firstName || 'Customer'} sent a message`,
+          data: { conversationId: req.params.id, messageId: message.id },
+        });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // ============== ADMIN CHAT ENDPOINTS ==============
+
+  // Get all chat conversations (admin)
+  app.get('/api/admin/chat/conversations', adminAuth, async (req: any, res) => {
+    try {
+      const { status, unassigned, agentId } = req.query;
+      const filters: { status?: string; assignedAgentId?: string; unassigned?: boolean } = {};
+      
+      if (status) filters.status = status;
+      if (agentId) filters.assignedAgentId = agentId;
+      if (unassigned === 'true') filters.unassigned = true;
+      
+      const conversations = await storage.getChatConversations(filters);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  // Get single conversation (admin)
+  app.get('/api/admin/chat/conversations/:id', adminAuth, async (req: any, res) => {
+    try {
+      const conversation = await storage.getChatConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error fetching conversation:", error);
+      res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // Get messages for a conversation (admin)
+  app.get('/api/admin/chat/conversations/:id/messages', adminAuth, async (req: any, res) => {
+    try {
+      const messages = await storage.getChatMessages(req.params.id);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  // Send message (admin)
+  app.post('/api/admin/chat/conversations/:id/messages', adminAuth, async (req: any, res) => {
+    try {
+      const { content } = req.body;
+      const adminId = req.admin.id;
+      
+      const conversation = await storage.getChatConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      
+      // Auto-assign agent if not assigned
+      if (!conversation.assignedAgentId) {
+        await storage.assignChatAgent(req.params.id, adminId);
+      }
+      
+      const message = await storage.createChatMessage({
+        conversationId: req.params.id,
+        senderId: adminId,
+        senderType: 'agent',
+        content: content.trim(),
+      });
+      
+      // Create notification for customer
+      await storage.createNotification({
+        recipientType: 'customer',
+        recipientId: conversation.customerId,
+        type: 'chat_message',
+        title: 'New Chat Message',
+        message: 'Support agent responded to your inquiry',
+        data: { conversationId: req.params.id, messageId: message.id },
+      });
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Assign agent to conversation
+  app.post('/api/admin/chat/conversations/:id/assign', adminAuth, async (req: any, res) => {
+    try {
+      const { agentId } = req.body;
+      const conversation = await storage.assignChatAgent(req.params.id, agentId || req.admin.id);
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error assigning agent:", error);
+      res.status(500).json({ message: "Failed to assign agent" });
+    }
+  });
+
+  // Update conversation status
+  app.patch('/api/admin/chat/conversations/:id/status', adminAuth, async (req: any, res) => {
+    try {
+      const { status } = req.body;
+      const validStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+      
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      const conversation = await storage.updateChatConversation(req.params.id, { status });
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
+  // Mark messages as read (admin)
+  app.post('/api/admin/chat/conversations/:id/read', adminAuth, async (req: any, res) => {
+    try {
+      await storage.markMessagesAsRead(req.params.id, 'customer');
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ message: "Failed to mark messages as read" });
+    }
+  });
+
+  // Get unread message count for all conversations (admin)
+  app.get('/api/admin/chat/unread-count', adminAuth, async (req: any, res) => {
+    try {
+      const conversations = await storage.getChatConversations();
+      let totalUnread = 0;
+      for (const conv of conversations) {
+        totalUnread += conv.unreadCount || 0;
+      }
+      res.json({ count: totalUnread });
+    } catch (error) {
+      console.error("Error getting unread count:", error);
+      res.status(500).json({ message: "Failed to get unread count" });
+    }
+  });
+
   const httpServer = createServer(app);
+  
+  // Setup WebSocket for chat
+  const { setupChatWebSocket } = await import('./chatWebSocket');
+  setupChatWebSocket(httpServer);
+  
   return httpServer;
 }
