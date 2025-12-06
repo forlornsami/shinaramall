@@ -1217,6 +1217,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // NOTIFICATION ROUTES
+  // ============================================
+
+  // Get admin notifications
+  app.get('/api/admin/notifications', adminAuth, async (req, res) => {
+    try {
+      const notifications = await storage.getNotifications('admin');
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching admin notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  // Get admin unread notification count
+  app.get('/api/admin/notifications/count', adminAuth, async (req, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount('admin');
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching notification count:", error);
+      res.status(500).json({ message: "Failed to fetch notification count" });
+    }
+  });
+
+  // Mark single admin notification as read
+  app.patch('/api/admin/notifications/:id/read', adminAuth, async (req, res) => {
+    try {
+      const notification = await storage.markNotificationAsRead(req.params.id);
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all admin notifications as read
+  app.post('/api/admin/notifications/read-all', adminAuth, async (req, res) => {
+    try {
+      await storage.markAllNotificationsAsRead('admin');
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Delete admin notification
+  app.delete('/api/admin/notifications/:id', adminAuth, async (req, res) => {
+    try {
+      await storage.deleteNotification(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
+  // Get customer notifications
+  app.get('/api/notifications', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const notifications = await storage.getNotifications('customer', userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching customer notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  // Get customer unread notification count
+  app.get('/api/notifications/count', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const count = await storage.getUnreadNotificationCount('customer', userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching notification count:", error);
+      res.status(500).json({ message: "Failed to fetch notification count" });
+    }
+  });
+
+  // Mark single customer notification as read
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
+    try {
+      const notification = await storage.markNotificationAsRead(req.params.id);
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all customer notifications as read
+  app.post('/api/notifications/read-all', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      await storage.markAllNotificationsAsRead('customer', userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
