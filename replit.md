@@ -57,6 +57,25 @@ Preferred communication style: Simple, everyday language.
 - **Customizable Store Branding**: Admins can upload store logo (base64) and change store name, which dynamically updates across all navigation components
 - **Security Features**: Password change with bcrypt verification, active session management in admin security settings
 - **RBAC System**: Case-insensitive admin role checking supports various role formats (Super_admin, admin, etc.)
+- **In-App Notification System**: Real-time notifications for both admin and customer users with automatic triggers
+
+## Notification System
+- **Database Table**: `notifications` table stores all notifications with recipientType (admin/customer), type, title, message, and metadata
+- **Notification Types**: order_placed, order_status_update, low_stock, customer_registration, payment_received, payment_failed, general
+- **Admin Notifications**: 
+  - New order placed (when customer completes checkout)
+  - Low stock alerts (when product stock falls to 10 or below)
+  - Customer registration (when new customer signs up)
+- **Customer Notifications**:
+  - Order status updates (when admin changes order status)
+  - Payment status updates (when payment is received or fails)
+- **UI Components**:
+  - Admin: Notification bell in dashboard header (AdminNotificationBell)
+  - Customer: Notification bell in storefront sidebar and mobile header (CustomerNotificationBell)
+- **API Endpoints**:
+  - Admin: GET /api/admin/notifications, GET /api/admin/notifications/count, PATCH /api/admin/notifications/:id/read
+  - Customer: GET /api/notifications, GET /api/notifications/count, PATCH /api/notifications/:id/read
+- **Polling**: Notifications refresh every 30 seconds to check for new messages
 
 ## Storefront Architecture
 - **URL-based Navigation**: Query parameters control views (/?view=products, /?view=cart, etc.)
