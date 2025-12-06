@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
   Users,
   Settings
 } from "lucide-react";
+import type { StoreSettings } from "@shared/schema";
 
 const faqItems = [
   {
@@ -73,6 +75,10 @@ const quickLinks = [
 
 export default function HelpCenterSection() {
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
 
   const filteredFAQs = faqItems.filter(
     (item) =>
@@ -180,7 +186,9 @@ export default function HelpCenterSection() {
                 </div>
                 <div>
                   <p className="font-medium text-sm">Email Support</p>
-                  <p className="text-xs text-muted-foreground">support@eshaalstore.pk</p>
+                  <p className="text-xs text-muted-foreground" data-testid="text-admin-help-email">
+                    {storeSettings?.storeEmail || "support@eshaalstore.pk"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 border rounded-lg">
@@ -189,7 +197,9 @@ export default function HelpCenterSection() {
                 </div>
                 <div>
                   <p className="font-medium text-sm">Phone Support</p>
-                  <p className="text-xs text-muted-foreground">+92 300 1234567</p>
+                  <p className="text-xs text-muted-foreground" data-testid="text-admin-help-phone">
+                    {storeSettings?.storePhone || "+92 300 1234567"}
+                  </p>
                 </div>
               </div>
               <Button className="w-full" data-testid="button-contact-support">
