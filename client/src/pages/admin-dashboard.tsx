@@ -66,7 +66,13 @@ const settingsItems = [
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
-  const [adminUser, setAdminUser] = useState<{ username: string; email: string; role: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ 
+    username: string; 
+    email: string; 
+    role: string; 
+    roleId?: string;
+    permissions?: Record<string, boolean | Record<string, boolean>> | null;
+  } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -156,7 +162,61 @@ export default function AdminDashboard() {
     },
   ];
 
+  const hasPermission = (section: string): boolean => {
+    if (adminUser?.role === 'admin') return true;
+    if (section === 'help') return true;
+    
+    const permissions = adminUser?.permissions;
+    if (!permissions) return false;
+    
+    const sectionMap: Record<string, string> = {
+      overview: 'dashboard',
+      products: 'products',
+      categories: 'categories',
+      orders: 'orders',
+      customers: 'customers',
+      inventory: 'inventory',
+      payments: 'payments',
+      users: 'users',
+      roles: 'roles',
+      settings: 'settings',
+    };
+    
+    const permKey = sectionMap[section];
+    if (!permKey) return false;
+    
+    const perm = permissions[permKey];
+    if (typeof perm === 'boolean') return perm;
+    if (typeof perm === 'object' && perm !== null) {
+      return (perm as Record<string, boolean>).view === true;
+    }
+    return false;
+  };
+
+  const renderAccessDenied = () => (
+    <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+      <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
+        <Shield className="w-10 h-10 text-destructive" />
+      </div>
+      <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+      <p className="text-muted-foreground max-w-md">
+        You don't have permission to access this section. Please contact your administrator if you believe this is a mistake.
+      </p>
+      <Button 
+        onClick={() => setActiveSection('overview')} 
+        className="mt-6"
+        variant="outline"
+      >
+        Go to Dashboard
+      </Button>
+    </div>
+  );
+
   const renderContent = () => {
+    if (!hasPermission(activeSection)) {
+      return renderAccessDenied();
+    }
+
     switch (activeSection) {
       case "overview":
         return (

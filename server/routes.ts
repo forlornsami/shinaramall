@@ -92,6 +92,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { expiresIn: '24h' }
       );
 
+      // Get full permissions from role data
+      const permissions = admin.roleData?.permissions || null;
+
       res.json({
         token,
         admin: {
@@ -99,6 +102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: admin.username,
           email: admin.email,
           role: admin.role,
+          roleId: admin.roleId,
+          permissions: permissions,
         }
       });
     } catch (error) {

@@ -45,7 +45,7 @@ export interface IStorage {
   
   // Admin user operations
   getAdminUser(id: string): Promise<AdminUser | undefined>;
-  getAdminUserByUsername(username: string): Promise<AdminUser | undefined>;
+  getAdminUserByUsername(username: string): Promise<(AdminUser & { roleData?: Role }) | undefined>;
   getAdminUserByEmail(email: string): Promise<AdminUser | undefined>;
   getAdminUsers(): Promise<(AdminUser & { roleData?: Role })[]>;
   createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
@@ -161,9 +161,25 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getAdminUserByUsername(username: string): Promise<AdminUser | undefined> {
-    const [user] = await db.select().from(adminUsers).where(eq(adminUsers.username, username));
-    return user;
+  async getAdminUserByUsername(username: string): Promise<(AdminUser & { roleData?: Role }) | undefined> {
+    const result = await db
+      .select({
+        id: adminUsers.id,
+        username: adminUsers.username,
+        email: adminUsers.email,
+        passwordHash: adminUsers.passwordHash,
+        role: adminUsers.role,
+        roleId: adminUsers.roleId,
+        isActive: adminUsers.isActive,
+        lastLoginAt: adminUsers.lastLoginAt,
+        createdAt: adminUsers.createdAt,
+        updatedAt: adminUsers.updatedAt,
+        roleData: roles,
+      })
+      .from(adminUsers)
+      .leftJoin(roles, eq(adminUsers.roleId, roles.id))
+      .where(eq(adminUsers.username, username));
+    return result[0];
   }
 
   async getAdminUserByEmail(email: string): Promise<AdminUser | undefined> {

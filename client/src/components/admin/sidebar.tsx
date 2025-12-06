@@ -17,12 +17,59 @@ import {
   UserCog
 } from "lucide-react";
 
+interface Permission {
+  view?: boolean;
+  create?: boolean;
+  edit?: boolean;
+  delete?: boolean;
+  adjust?: boolean;
+  manage?: boolean;
+}
+
+interface Permissions {
+  dashboard?: boolean;
+  products?: Permission;
+  categories?: Permission;
+  orders?: Permission;
+  customers?: Permission;
+  inventory?: Permission;
+  payments?: Permission;
+  users?: Permission;
+  roles?: Permission;
+  settings?: Permission;
+}
+
 interface AdminSidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
-  adminUser?: { username: string; email: string; role: string } | null;
+  adminUser?: { username: string; email: string; role: string; permissions?: Permissions | null } | null;
   onLogout?: () => void;
 }
+
+const hasPermission = (permissions: Permissions | null | undefined, key: string): boolean => {
+  if (!permissions) return false;
+  
+  const perm = permissions[key as keyof Permissions];
+  if (typeof perm === 'boolean') return perm;
+  if (typeof perm === 'object' && perm !== null) {
+    return perm.view === true;
+  }
+  return false;
+};
+
+const sectionToPermissionKey: Record<string, string> = {
+  overview: 'dashboard',
+  products: 'products',
+  categories: 'categories',
+  orders: 'orders',
+  customers: 'customers',
+  inventory: 'inventory',
+  payments: 'payments',
+  users: 'users',
+  roles: 'roles',
+  settings: 'settings',
+  help: 'help',
+};
 
 const sidebarItems = [
   {
@@ -101,6 +148,20 @@ const settingsItems = [
 ];
 
 export default function AdminSidebar({ activeSection, onSectionChange, adminUser, onLogout }: AdminSidebarProps) {
+  const permissions = adminUser?.permissions;
+  const isAdmin = adminUser?.role === 'admin';
+  
+  const canAccessSection = (sectionId: string): boolean => {
+    if (isAdmin) return true;
+    if (sectionId === 'help') return true;
+    const permKey = sectionToPermissionKey[sectionId];
+    return hasPermission(permissions, permKey);
+  };
+
+  const visibleSidebarItems = sidebarItems.filter(item => canAccessSection(item.id));
+  const visibleAccessControlItems = accessControlItems.filter(item => canAccessSection(item.id));
+  const visibleSettingsItems = settingsItems.filter(item => canAccessSection(item.id));
+
   return (
     <div className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border hidden lg:flex flex-col z-50">
       {/* Logo Section */}
@@ -123,7 +184,7 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
           Main Menu
         </p>
-        {sidebarItems.map((item) => {
+        {visibleSidebarItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
           
@@ -159,11 +220,12 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
           );
         })}
         
+        {visibleAccessControlItems.length > 0 && (
         <div className="pt-4 mt-4 border-t border-border">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
             Access Control
           </p>
-          {accessControlItems.map((item) => {
+          {visibleAccessControlItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
             
@@ -194,12 +256,14 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
             );
           })}
         </div>
+        )}
         
+        {visibleSettingsItems.length > 0 && (
         <div className="pt-4 mt-4 border-t border-border">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
             Settings
           </p>
-          {settingsItems.map((item) => {
+          {visibleSettingsItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
             
@@ -230,6 +294,7 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
             );
           })}
         </div>
+        )}
       </nav>
       
       {/* User Profile Section */}
