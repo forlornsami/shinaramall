@@ -413,3 +413,29 @@ export type PaymentGateway = typeof paymentGateways.$inferSelect;
 export type InsertPaymentGateway = z.infer<typeof insertPaymentGatewaySchema>;
 export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
 export type InsertPaymentTransaction = z.infer<typeof insertPaymentTransactionSchema>;
+
+// Store settings table (singleton - only one row)
+export const storeSettings = pgTable("store_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  storeName: varchar("store_name").notNull().default("Eshaal Store"),
+  storeEmail: varchar("store_email").notNull().default("contact@eshaalstore.pk"),
+  storePhone: varchar("store_phone").notNull().default("+92 300 1234567"),
+  storeAddress: varchar("store_address").default("Lahore, Pakistan"),
+  currency: varchar("currency").default("PKR"),
+  timezone: varchar("timezone").default("PKT"),
+  language: varchar("language").default("en"),
+  orderNotifications: boolean("order_notifications").default(true),
+  stockAlerts: boolean("stock_alerts").default(true),
+  customerRegistrations: boolean("customer_registrations").default(true),
+  paymentUpdates: boolean("payment_updates").default(true),
+  marketingEmails: boolean("marketing_emails").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type StoreSettings = typeof storeSettings.$inferSelect;
+export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
