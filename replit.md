@@ -49,6 +49,8 @@ Preferred communication style: Simple, everyday language.
 - **Shopping Cart**: Session-based cart with quantity management
 - **Order Processing**: Complete order lifecycle from cart to delivery
 - **Admin Dashboard**: Statistics, order management, product management, and customer oversight
+- **Customer Profile Management**: Users can view and edit their profile (firstName, lastName) with secure backend validation
+- **Admin Settings & Help Center**: Store configuration, notifications, security settings, FAQ, and support features
 
 # External Dependencies
 
