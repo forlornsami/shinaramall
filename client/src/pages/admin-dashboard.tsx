@@ -183,6 +183,7 @@ export default function AdminDashboard() {
       users: 'users',
       roles: 'roles',
       settings: 'settings',
+      chat: 'chat',
     };
     
     const permKey = sectionMap[section];
