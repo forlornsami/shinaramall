@@ -12,7 +12,6 @@ import RoleManagement from "@/components/admin/role-management";
 import SettingsSection from "@/components/admin/settings";
 import HelpCenterSection from "@/components/admin/help-center";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -20,7 +19,6 @@ import {
   Package, 
   ShoppingBag, 
   Users, 
-  LogOut, 
   TrendingUp, 
   TrendingDown,
   ArrowUpRight,
@@ -265,15 +263,6 @@ export default function AdminDashboard() {
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <Button 
-              variant="outline"
-              onClick={handleLogout}
-              className="rounded-xl hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
-              data-testid="button-admin-logout"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
           </div>
         </div>
         
