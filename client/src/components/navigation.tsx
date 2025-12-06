@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
-import type { User as UserType, CartItem } from "@shared/schema";
+import type { User as UserType, CartItem, Category } from "@shared/schema";
 import { ShoppingCart, Search, User as UserIcon, LogOut, Menu, X, Heart, Bell, ChevronDown, Package, Settings, HelpCircle } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,12 +30,15 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
 
   const cartItemCount = cartItems?.reduce((sum: number, item: CartItem) => sum + item.quantity, 0) || 0;
 
-  const categories = [
-    { name: "Fashion", href: "#" },
-    { name: "Electronics", href: "#" },
-    { name: "Home & Living", href: "#" },
-    { name: "Beauty", href: "#" },
-  ];
+  const { data: categoriesData } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+
+  const categories = categoriesData?.slice(0, 6).map(cat => ({
+    name: cat.name,
+    href: `#`,
+    slug: cat.slug,
+  })) || [];
 
   return (
     <nav className="sticky top-0 z-50 glass-nav" data-testid="navigation">

@@ -82,6 +82,7 @@ export const categories = pgTable("categories", {
   slug: varchar("slug").notNull().unique(),
   description: text("description"),
   imageUrl: varchar("image_url"),
+  isFeatured: boolean("is_featured").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

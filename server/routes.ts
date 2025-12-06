@@ -402,6 +402,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/categories/featured', async (req, res) => {
+    try {
+      const categories = await storage.getFeaturedCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching featured categories:", error);
+      res.status(500).json({ message: "Failed to fetch featured categories" });
+    }
+  });
+
   app.post('/api/categories', adminAuth, async (req, res) => {
     try {
       const categoryData = insertCategorySchema.parse(req.body);

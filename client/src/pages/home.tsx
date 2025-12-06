@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import ProductGrid from "@/components/product-grid";
 import ShoppingCart from "@/components/shopping-cart";
@@ -7,6 +8,8 @@ import CheckoutModal from "@/components/checkout-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Category } from "@shared/schema";
 import { 
   ShoppingCart as CartIcon, 
   Smartphone, 
@@ -19,13 +22,29 @@ import {
   Zap,
   Gift,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  Tag
 } from "lucide-react";
+
+const categoryGradients = [
+  "from-pink-500/80 to-rose-600/80",
+  "from-blue-500/80 to-indigo-600/80",
+  "from-amber-500/80 to-orange-600/80",
+  "from-green-500/80 to-emerald-600/80",
+  "from-purple-500/80 to-violet-600/80",
+  "from-cyan-500/80 to-teal-600/80",
+];
+
+const defaultCategoryImage = "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600";
 
 export default function Home() {
   const { user } = useAuth();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  const { data: featuredCategories, isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['/api/categories/featured'],
+  });
 
   const trustFeatures = [
     { icon: Shield, title: "Secure Payments", description: "100% Protected" },
@@ -88,7 +107,7 @@ export default function Home() {
               <Button 
                 variant="outline" 
                 size="lg" 
-                className="btn-modern border-2 border-white/30 text-white hover:bg-white/10 px-8 py-6 text-lg gap-2 rounded-2xl backdrop-blur-sm"
+                className="btn-modern border-2 border-white bg-white/10 text-white hover:bg-white hover:text-primary px-8 py-6 text-lg gap-2 rounded-2xl backdrop-blur-sm"
                 onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })}
                 data-testid="button-explore-categories"
               >
@@ -157,52 +176,48 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                title: "Fashion & Textiles",
-                description: "Premium Pakistani fashion and traditional wear",
-                image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600",
-                gradient: "from-pink-500/80 to-rose-600/80"
-              },
-              {
-                title: "Electronics",
-                description: "Latest gadgets and electronic devices",
-                image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600",
-                gradient: "from-blue-500/80 to-indigo-600/80"
-              },
-              {
-                title: "Home & Decor",
-                description: "Beautiful handicrafts and home essentials",
-                image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600",
-                gradient: "from-amber-500/80 to-orange-600/80"
-              }
-            ].map((category, index) => (
-              <Card 
-                key={category.title}
-                className="group card-modern border-0 cursor-pointer"
-                data-testid={`card-category-${index}`}
-              >
-                <div className="relative h-64 overflow-hidden">
-                  <img 
-                    src={category.image}
-                    alt={category.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    data-testid={`img-category-${index}`}
-                  />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${category.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
-                  <div className="absolute inset-0 flex items-end p-6">
-                    <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                      <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-lg" data-testid={`text-category-title-${index}`}>
-                        {category.title}
-                      </h3>
-                      <p className="text-white/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300" data-testid={`text-category-desc-${index}`}>
-                        {category.description}
-                      </p>
+            {categoriesLoading ? (
+              <>
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="group card-modern border-0">
+                    <Skeleton className="h-64 w-full" />
+                  </Card>
+                ))}
+              </>
+            ) : featuredCategories && featuredCategories.length > 0 ? (
+              featuredCategories.slice(0, 6).map((category, index) => (
+                <Card 
+                  key={category.id}
+                  className="group card-modern border-0 cursor-pointer"
+                  data-testid={`card-category-${index}`}
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <img 
+                      src={category.imageUrl || defaultCategoryImage}
+                      alt={category.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      data-testid={`img-category-${index}`}
+                    />
+                    <div className={`absolute inset-0 bg-gradient-to-t ${categoryGradients[index % categoryGradients.length]} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+                    <div className="absolute inset-0 flex items-end p-6">
+                      <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-lg" data-testid={`text-category-title-${index}`}>
+                          {category.name}
+                        </h3>
+                        <p className="text-white/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300" data-testid={`text-category-desc-${index}`}>
+                          {category.description || `Explore ${category.name} products`}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-12">
+                <Tag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No featured categories yet. Add categories from the admin panel.</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
