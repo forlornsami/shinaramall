@@ -100,7 +100,9 @@ export interface IStorage {
   getCartItems(userId: string): Promise<(CartItem & { product: Product })[]>;
   addToCart(cartItem: InsertCartItem): Promise<CartItem>;
   updateCartItem(id: string, quantity: number): Promise<CartItem>;
+  updateCartItemByProductId(userId: string, productId: string, quantity: number): Promise<CartItem>;
   removeFromCart(id: string): Promise<boolean>;
+  removeFromCartByProductId(userId: string, productId: string): Promise<boolean>;
   clearCart(userId: string): Promise<boolean>;
   
   // Payment gateway operations
@@ -706,9 +708,36 @@ export class DatabaseStorage implements IStorage {
     return cartItem;
   }
 
+  async updateCartItemByProductId(userId: string, productId: string, quantity: number): Promise<CartItem> {
+    const [cartItem] = await db
+      .update(cartItems)
+      .set({
+        quantity,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(cartItems.userId, userId),
+          eq(cartItems.productId, productId)
+        )
+      )
+      .returning();
+    return cartItem;
+  }
+
   async removeFromCart(id: string): Promise<boolean> {
     const result = await db.delete(cartItems).where(eq(cartItems.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async removeFromCartByProductId(userId: string, productId: string): Promise<boolean> {
+    const result = await db.delete(cartItems).where(
+      and(
+        eq(cartItems.userId, userId),
+        eq(cartItems.productId, productId)
+      )
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async clearCart(userId: string): Promise<boolean> {

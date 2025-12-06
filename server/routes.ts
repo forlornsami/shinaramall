@@ -573,10 +573,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/cart/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/cart/:productId', isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const { quantity } = req.body;
-      const cartItem = await storage.updateCartItem(req.params.id, quantity);
+      const cartItem = await storage.updateCartItemByProductId(userId, req.params.productId, quantity);
       res.json(cartItem);
     } catch (error) {
       console.error("Error updating cart item:", error);
@@ -584,9 +585,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/cart/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/cart/:productId', isAuthenticated, async (req: any, res) => {
     try {
-      const success = await storage.removeFromCart(req.params.id);
+      const userId = req.user.claims.sub;
+      const success = await storage.removeFromCartByProductId(userId, req.params.productId);
       if (!success) {
         return res.status(404).json({ message: "Cart item not found" });
       }
@@ -605,6 +607,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error clearing cart:", error);
       res.status(500).json({ message: "Failed to clear cart" });
+    }
+  });
+
+  app.post('/api/cart/merge', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { items } = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
+      
+      for (const item of items) {
+        if (item.productId && item.quantity > 0) {
+          const existingItems = await storage.getCartItems(userId);
+          const existing = existingItems.find((ci: any) => ci.productId === item.productId);
+          
+          if (existing) {
+            await storage.updateCartItemByProductId(userId, item.productId, existing.quantity + item.quantity);
+          } else {
+            await storage.addToCart({
+              userId,
+              productId: item.productId,
+              quantity: item.quantity,
+            });
+          }
+        }
+      }
+      
+      const mergedCart = await storage.getCartItems(userId);
+      res.json(mergedCart);
+    } catch (error) {
+      console.error("Error merging cart:", error);
+      res.status(500).json({ message: "Failed to merge cart" });
     }
   });
 
