@@ -109,9 +109,9 @@ export default function Landing() {
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg">P</span>
+                <span className="text-white font-bold text-lg">E</span>
               </div>
-              <h1 className="text-2xl font-bold gradient-text" data-testid="logo-text">PakMart</h1>
+              <h1 className="text-2xl font-bold gradient-text" data-testid="logo-text">Eshaal Store</h1>
             </div>
             <div className="flex items-center gap-4">
               <Button 
@@ -393,9 +393,9 @@ export default function Landing() {
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-xl">P</span>
+                  <span className="text-white font-bold text-xl">E</span>
                 </div>
-                <h3 className="text-2xl font-bold gradient-text">PakMart</h3>
+                <h3 className="text-2xl font-bold gradient-text">Eshaal Store</h3>
               </div>
               <p className="text-muted-foreground mb-6 max-w-sm" data-testid="text-footer-description">
                 Pakistan's premier e-commerce platform offering authentic products with secure local payment methods.
@@ -427,7 +427,7 @@ export default function Landing() {
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  support@pakmart.pk
+                  support@eshaalstore.pk
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="w-4 h-4" />
@@ -443,7 +443,7 @@ export default function Landing() {
           
           <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 PakMart. All rights reserved.
+              © 2024 Eshaal Store. All rights reserved.
             </p>
             <Button 
               variant="ghost" 

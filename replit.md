@@ -1,6 +1,6 @@
 # Overview
 
-This is a Pakistani e-commerce platform called PakMart that allows customers to browse and purchase products using local payment methods like EasyPaisa, JazzCash, and HBL. The application features separate authentication systems for customers (via Replit Auth) and administrators (via JWT), with a comprehensive product catalog management system and order processing capabilities.
+This is a Pakistani e-commerce platform called Eshaal Store that allows customers to browse and purchase products using local payment methods like EasyPaisa, JazzCash, and HBL. The application features separate authentication systems for customers (via Replit Auth) and administrators (via JWT), with a comprehensive product catalog management system and order processing capabilities.
 
 # User Preferences
 

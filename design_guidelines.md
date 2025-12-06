@@ -1,4 +1,4 @@
-# PakMart E-Commerce Design Guidelines
+# Eshaal Store E-Commerce Design Guidelines
 
 ## Design Approach
 Premium e-commerce platform drawing inspiration from Shopify's clean layouts and Stripe's sophisticated aesthetic, elevated with modern glassmorphism treatments. Focus on conversion optimization while maintaining visual luxury.

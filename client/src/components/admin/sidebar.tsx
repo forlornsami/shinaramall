@@ -92,11 +92,11 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-lg">P</span>
+            <span className="text-white font-bold text-lg">E</span>
           </div>
           <div>
             <h2 className="text-xl font-bold gradient-text" data-testid="text-admin-dashboard">
-              PakMart
+              Eshaal Store
             </h2>
             <p className="text-xs text-muted-foreground">Admin Panel</p>
           </div>

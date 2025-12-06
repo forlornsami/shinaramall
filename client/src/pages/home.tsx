@@ -237,7 +237,7 @@ export default function Home() {
           <div className="text-center mb-16">
             <Badge className="mb-4 bg-accent/10 text-accent border-0 px-4 py-1">Why Choose Us</Badge>
             <h2 className="text-4xl font-bold text-foreground mb-4" data-testid="text-why-title">
-              The PakMart Difference
+              The Eshaal Store Difference
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               We're committed to providing the best shopping experience in Pakistan
@@ -320,9 +320,9 @@ export default function Home() {
             <div>
               <div className="flex items-center space-x-2 mb-6">
                 <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg">P</span>
+                  <span className="text-white font-bold text-lg">E</span>
                 </div>
-                <span className="text-2xl font-bold gradient-text">PakMart</span>
+                <span className="text-2xl font-bold gradient-text">Eshaal Store</span>
               </div>
               <p className="text-muted-foreground mb-6">
                 Pakistan's trusted online marketplace for quality products with secure payment options.
@@ -369,7 +369,7 @@ export default function Home() {
           </div>
           
           <div className="border-t border-border mt-12 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 PakMart. All rights reserved. Made with ❤️ in Pakistan</p>
+            <p>&copy; 2024 Eshaal Store. All rights reserved. Made with ❤️ in Pakistan</p>
           </div>
         </div>
       </footer>

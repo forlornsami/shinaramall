@@ -42,10 +42,10 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
           <div className="flex items-center space-x-8">
             <a href="/" className="flex items-center space-x-2 group" data-testid="logo-link">
               <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-                <span className="text-white font-bold text-lg">P</span>
+                <span className="text-white font-bold text-lg">E</span>
               </div>
               <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent" data-testid="logo-text">
-                PakMart
+                Eshaal Store
               </span>
             </a>
             

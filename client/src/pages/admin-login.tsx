@@ -64,7 +64,7 @@ export default function AdminLogin() {
             <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
               <Sparkles className="w-7 h-7 text-white" />
             </div>
-            <span className="text-2xl font-bold">PakMart</span>
+            <span className="text-2xl font-bold">Eshaal Store</span>
           </div>
           
           <h1 className="text-4xl font-bold mb-4">
@@ -101,7 +101,7 @@ export default function AdminLogin() {
               <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold gradient-text">PakMart</span>
+              <span className="text-2xl font-bold gradient-text">Eshaal Store</span>
             </div>
           </div>
           
