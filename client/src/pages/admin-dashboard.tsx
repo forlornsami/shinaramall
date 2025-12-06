@@ -11,6 +11,7 @@ import UserManagement from "@/components/admin/user-management";
 import RoleManagement from "@/components/admin/role-management";
 import SettingsSection from "@/components/admin/settings";
 import HelpCenterSection from "@/components/admin/help-center";
+import { AdminNotificationBell } from "@/components/admin/notification-bell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -530,6 +531,8 @@ export default function AdminDashboard() {
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
+            
+            <AdminNotificationBell />
           </div>
         </div>
         
