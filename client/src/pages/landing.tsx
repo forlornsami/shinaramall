@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Category } from "@shared/schema";
+import type { Category, StoreSettings } from "@shared/schema";
 import { 
   ShoppingCart, 
   Store, 
@@ -43,6 +43,10 @@ const defaultCategoryImage = "https://images.unsplash.com/photo-1441986300917-64
 export default function Landing() {
   const { data: featuredCategories, isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories/featured'],
+  });
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   const features = [
@@ -415,9 +419,9 @@ export default function Landing() {
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-xl">E</span>
+                  <span className="text-white font-bold text-xl">{storeSettings?.storeName?.charAt(0) || "E"}</span>
                 </div>
-                <h3 className="text-2xl font-bold gradient-text">Eshaal Store</h3>
+                <h3 className="text-2xl font-bold gradient-text" data-testid="text-store-name">{storeSettings?.storeName || "Eshaal Store"}</h3>
               </div>
               <p className="text-muted-foreground mb-6 max-w-sm" data-testid="text-footer-description">
                 Pakistan's premier e-commerce platform offering authentic products with secure local payment methods.
@@ -447,17 +451,17 @@ export default function Landing() {
             <div>
               <h4 className="font-semibold text-foreground mb-4">Contact Us</h4>
               <ul className="space-y-3 text-muted-foreground">
-                <li className="flex items-center gap-2">
+                <li className="flex items-center gap-2" data-testid="text-contact-email">
                   <Mail className="w-4 h-4" />
-                  support@eshaalstore.pk
+                  {storeSettings?.storeEmail || "support@eshaalstore.pk"}
                 </li>
-                <li className="flex items-center gap-2">
+                <li className="flex items-center gap-2" data-testid="text-contact-phone">
                   <Phone className="w-4 h-4" />
-                  +92 300 1234567
+                  {storeSettings?.storePhone || "+92 300 1234567"}
                 </li>
-                <li className="flex items-center gap-2">
+                <li className="flex items-center gap-2" data-testid="text-contact-address">
                   <MapPin className="w-4 h-4" />
-                  Lahore, Pakistan
+                  {storeSettings?.storeAddress || "Lahore, Pakistan"}
                 </li>
               </ul>
             </div>

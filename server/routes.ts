@@ -1119,36 +1119,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/admin/store-settings', adminAuth, async (req, res) => {
     try {
-      const {
-        storeName,
-        storeEmail,
-        storePhone,
-        storeAddress,
-        currency,
-        timezone,
-        language,
-        orderNotifications,
-        stockAlerts,
-        customerRegistrations,
-        paymentUpdates,
-        marketingEmails,
-      } = req.body;
+      const updateData: Record<string, any> = {};
+      
+      const allowedFields = [
+        'storeName', 'storeEmail', 'storePhone', 'storeAddress',
+        'currency', 'timezone', 'language',
+        'orderNotifications', 'stockAlerts', 'customerRegistrations',
+        'paymentUpdates', 'marketingEmails'
+      ];
+      
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
 
-      const updated = await storage.updateStoreSettings({
-        storeName,
-        storeEmail,
-        storePhone,
-        storeAddress,
-        currency,
-        timezone,
-        language,
-        orderNotifications,
-        stockAlerts,
-        customerRegistrations,
-        paymentUpdates,
-        marketingEmails,
-      });
-
+      const updated = await storage.updateStoreSettings(updateData);
       res.json(updated);
     } catch (error) {
       console.error("Error updating store settings:", error);
