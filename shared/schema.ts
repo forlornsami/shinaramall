@@ -350,8 +350,10 @@ export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 // Payment gateway configuration table
 export const paymentGateways = pgTable("payment_gateways", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(), // 'easypaisa', 'jazzcash', 'hbl'
+  name: varchar("name").notNull(), // 'easypaisa', 'jazzcash', 'hbl', 'cod'
   displayName: varchar("display_name").notNull(),
+  icon: varchar("icon").default("credit-card"), // Icon name for UI display
+  description: varchar("description"), // Short description of the payment method
   isEnabled: boolean("is_enabled").default(true),
   apiKey: varchar("api_key"),
   apiSecret: varchar("api_secret"),
@@ -382,6 +384,8 @@ export const paymentTransactions = pgTable("payment_transactions", {
 export const insertPaymentGatewaySchema = createInsertSchema(paymentGateways).pick({
   name: true,
   displayName: true,
+  icon: true,
+  description: true,
   isEnabled: true,
   apiKey: true,
   apiSecret: true,

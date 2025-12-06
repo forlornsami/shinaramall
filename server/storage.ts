@@ -104,6 +104,7 @@ export interface IStorage {
   getPaymentGatewayByName(name: string): Promise<PaymentGateway | undefined>;
   createPaymentGateway(gatewayData: InsertPaymentGateway): Promise<PaymentGateway>;
   updatePaymentGateway(id: string, gatewayData: Partial<InsertPaymentGateway>): Promise<PaymentGateway>;
+  deletePaymentGateway(id: string): Promise<boolean>;
   
   // Payment transaction operations
   getPaymentTransactions(filters?: any): Promise<PaymentTransaction[]>;
@@ -710,6 +711,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(paymentGateways.id, id))
       .returning();
     return gateway;
+  }
+
+  async deletePaymentGateway(id: string): Promise<boolean> {
+    const result = await db.delete(paymentGateways).where(eq(paymentGateways.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Payment transaction operations

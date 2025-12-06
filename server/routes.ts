@@ -962,6 +962,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           name: 'easypaisa',
           displayName: 'EasyPaisa',
+          icon: 'smartphone',
+          description: 'Mobile wallet payments',
           isEnabled: true,
           testMode: true,
           configuration: { supportedOperations: ['wallet_payment', 'mobile_account'] },
@@ -969,6 +971,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           name: 'jazzcash',
           displayName: 'JazzCash',
+          icon: 'wallet',
+          description: 'Digital payments made easy',
           isEnabled: true,
           testMode: true,
           configuration: { supportedOperations: ['wallet_payment', 'mobile_account'] },
@@ -976,9 +980,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           name: 'hbl',
           displayName: 'HBL Bank',
+          icon: 'building',
+          description: 'Secure bank transfers',
           isEnabled: true,
           testMode: true,
           configuration: { supportedOperations: ['bank_transfer', 'online_banking'] },
+        },
+        {
+          name: 'cod',
+          displayName: 'Cash on Delivery',
+          icon: 'banknote',
+          description: 'Pay when your order arrives',
+          isEnabled: true,
+          testMode: false,
+          configuration: { supportedOperations: ['cash_payment'] },
         },
       ];
 
@@ -995,6 +1010,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error initializing payment gateways:", error);
       res.status(500).json({ message: "Failed to initialize payment gateways" });
+    }
+  });
+
+  // Create a new payment gateway
+  app.post('/api/admin/payment-gateways', adminAuth, async (req, res) => {
+    try {
+      const { name, displayName, icon, description, isEnabled, testMode, apiKey, apiSecret, webhookUrl, configuration } = req.body;
+      
+      const existing = await storage.getPaymentGatewayByName(name);
+      if (existing) {
+        return res.status(400).json({ message: "Payment gateway with this name already exists" });
+      }
+
+      const gateway = await storage.createPaymentGateway({
+        name,
+        displayName,
+        icon: icon || 'credit-card',
+        description,
+        isEnabled: isEnabled ?? true,
+        testMode: testMode ?? true,
+        apiKey,
+        apiSecret,
+        webhookUrl,
+        configuration,
+      });
+
+      res.status(201).json(gateway);
+    } catch (error) {
+      console.error("Error creating payment gateway:", error);
+      res.status(500).json({ message: "Failed to create payment gateway" });
+    }
+  });
+
+  // Delete a payment gateway
+  app.delete('/api/admin/payment-gateways/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const gateway = await storage.getPaymentGateway(id);
+      if (!gateway) {
+        return res.status(404).json({ message: "Payment gateway not found" });
+      }
+
+      const success = await storage.deletePaymentGateway(id);
+      if (success) {
+        res.json({ message: "Payment gateway deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to delete payment gateway" });
+      }
+    } catch (error) {
+      console.error("Error deleting payment gateway:", error);
+      res.status(500).json({ message: "Failed to delete payment gateway" });
     }
   });
 
