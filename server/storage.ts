@@ -21,6 +21,7 @@ import {
   type InsertProduct,
   type Order,
   type InsertOrder,
+  type UpdateOrder,
   type OrderItem,
   type InsertOrderItem,
   type CartItem,
@@ -84,7 +85,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   getOrderWithItems(id: string): Promise<(Order & { items: (OrderItem & { product: Product })[] }) | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
-  updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order>;
+  updateOrder(id: string, order: UpdateOrder): Promise<Order>;
   
   // Order item operations
   createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
@@ -572,7 +573,7 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
-  async updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order> {
+  async updateOrder(id: string, orderData: UpdateOrder): Promise<Order> {
     const [order] = await db
       .update(orders)
       .set({

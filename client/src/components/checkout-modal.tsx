@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet } from "lucide-react";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,7 +21,7 @@ interface CartItemWithProduct extends CartItem {
   product: Product;
 }
 
-type PaymentMethod = "easypaisa" | "jazzcash" | "hbl";
+type PaymentMethod = "easypaisa" | "jazzcash" | "hbl" | "cod";
 
 const paymentMethods = [
   {
@@ -50,6 +50,15 @@ const paymentMethods = [
     color: "from-blue-600 to-indigo-700",
     bgColor: "bg-blue-50 dark:bg-blue-900/20",
     borderColor: "border-blue-600",
+  },
+  {
+    id: "cod" as PaymentMethod,
+    name: "Cash on Delivery",
+    description: "Pay when your order arrives",
+    icon: Banknote,
+    color: "from-amber-500 to-orange-600",
+    bgColor: "bg-amber-50 dark:bg-amber-900/20",
+    borderColor: "border-amber-500",
   },
 ];
 

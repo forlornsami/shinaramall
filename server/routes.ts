@@ -844,6 +844,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cash on Delivery (COD) payment route
+  app.post('/api/payment/cod', isAuthenticated, async (req, res) => {
+    try {
+      const { orderId, amount } = req.body;
+      
+      // For COD, we just mark the order as confirmed with pending payment
+      const mockResponse = {
+        success: true,
+        transactionId: `COD_${Date.now()}`,
+        status: 'pending',
+        message: 'Cash on Delivery order confirmed. Payment will be collected upon delivery.',
+      };
+      
+      // Update order status (payment will be collected on delivery)
+      await storage.updateOrder(orderId, {
+        paymentStatus: 'pending',
+        paymentDetails: {
+          transactionId: mockResponse.transactionId,
+          method: 'cod',
+          note: 'Payment to be collected on delivery'
+        }
+      });
+
+      res.json(mockResponse);
+    } catch (error) {
+      console.error("COD payment error:", error);
+      res.status(500).json({ message: "COD order processing failed" });
+    }
+  });
+
   // Admin payment gateway management routes
   app.get('/api/admin/payment-gateways', adminAuth, async (req, res) => {
     try {

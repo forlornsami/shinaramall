@@ -38,6 +38,7 @@ export default function Home() {
     { name: "EasyPaisa", color: "from-green-500 to-emerald-600" },
     { name: "JazzCash", color: "from-red-500 to-rose-600" },
     { name: "HBL", color: "from-blue-600 to-indigo-700" },
+    { name: "COD", color: "from-amber-500 to-orange-600" },
   ];
 
   return (
@@ -69,7 +70,7 @@ export default function Home() {
             
             <p className="text-xl lg:text-2xl text-white/80 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in" data-testid="text-hero-subtitle">
               Discover amazing products with <span className="text-yellow-300 font-semibold">secure Pakistani payment methods</span>. 
-              Shop confidently with EasyPaisa, JazzCash & HBL.
+              Shop confidently with EasyPaisa, JazzCash, HBL & Cash on Delivery.
             </p>
             
             {/* CTA Buttons */}

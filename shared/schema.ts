@@ -128,7 +128,8 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 export const paymentMethodEnum = pgEnum("payment_method", [
   "easypaisa",
   "jazzcash",
-  "hbl_bank"
+  "hbl_bank",
+  "cod"
 ]);
 
 // Orders
@@ -336,6 +337,11 @@ export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type UpdateOrder = Partial<InsertOrder> & {
+  status?: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
+  paymentStatus?: "pending" | "processing" | "completed" | "failed" | "refunded";
+  paymentDetails?: { transactionId?: string; gatewayResponse?: any; method?: string; note?: string };
+};
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type CartItem = typeof cartItems.$inferSelect;

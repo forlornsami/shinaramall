@@ -21,7 +21,8 @@ import {
   ChevronRight,
   Mail,
   MapPin,
-  Phone
+  Phone,
+  Banknote
 } from "lucide-react";
 
 export default function Landing() {
@@ -91,6 +92,12 @@ export default function Landing() {
       icon: CreditCard,
       color: "from-blue-600 to-indigo-700",
       description: "Secure bank transfers",
+    },
+    {
+      name: "Cash on Delivery",
+      icon: Banknote,
+      color: "from-amber-500 to-orange-600",
+      description: "Pay when order arrives",
     },
   ];
 
