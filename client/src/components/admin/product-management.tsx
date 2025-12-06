@@ -12,7 +12,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Power, PowerOff } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Product, Category } from "@shared/schema";
 
 export default function ProductManagement() {
@@ -167,6 +168,39 @@ export default function ProductManagement() {
       toast({
         title: "Error",
         description: "Failed to delete product",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle product status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isActive }),
+      });
+      if (!response.ok) throw new Error('Failed to update product status');
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/featured'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      toast({
+        title: "Success",
+        description: variables.isActive ? "Product activated successfully" : "Product deactivated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update product status",
         variant: "destructive",
       });
     },
@@ -561,25 +595,60 @@ export default function ProductManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                          data-testid={`button-edit-${product.id}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(product.id)}
-                          className="text-destructive hover:text-destructive"
-                          data-testid={`button-delete-${product.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <TooltipProvider>
+                        <div className="flex items-center space-x-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(product)}
+                                data-testid={`button-edit-${product.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit product</TooltipContent>
+                          </Tooltip>
+                          
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleStatusMutation.mutate({ 
+                                  id: product.id, 
+                                  isActive: !product.isActive 
+                                })}
+                                className={product.isActive ? "text-orange-500 hover:text-orange-600" : "text-green-500 hover:text-green-600"}
+                                data-testid={`button-toggle-status-${product.id}`}
+                              >
+                                {product.isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {product.isActive ? "Deactivate product" : "Activate product"}
+                            </TooltipContent>
+                          </Tooltip>
+                          
+                          {!product.isActive && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(product.id)}
+                                  className="text-destructive hover:text-destructive"
+                                  data-testid={`button-delete-${product.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete permanently</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))}
