@@ -7,6 +7,8 @@ import CustomerManagement from "@/components/admin/customer-management";
 import CategoryManagement from "@/components/admin/category-management";
 import InventoryManagement from "@/components/admin/inventory-management";
 import PaymentManagement from "@/components/admin/payment-management";
+import UserManagement from "@/components/admin/user-management";
+import RoleManagement from "@/components/admin/role-management";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +27,7 @@ import {
   Activity
 } from "lucide-react";
 
-type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "users" | "roles";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -228,6 +230,10 @@ export default function AdminDashboard() {
         return <InventoryManagement />;
       case "payments":
         return <PaymentManagement />;
+      case "users":
+        return <UserManagement />;
+      case "roles":
+        return <RoleManagement />;
       default:
         return null;
     }
@@ -237,7 +243,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30" data-testid="admin-dashboard">
       <AdminSidebar 
         activeSection={activeSection} 
-        onSectionChange={setActiveSection}
+        onSectionChange={(section) => setActiveSection(section as AdminSection)}
         adminUser={adminUser}
         onLogout={handleLogout}
       />

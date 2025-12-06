@@ -12,7 +12,9 @@ import {
   LogOut,
   Settings,
   HelpCircle,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  UserCog
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -65,6 +67,21 @@ const sidebarItems = [
     label: "Payments",
     icon: CreditCard,
     color: "from-emerald-500 to-emerald-600",
+  },
+];
+
+const accessControlItems = [
+  {
+    id: "users",
+    label: "User Management",
+    icon: UserCog,
+    color: "from-indigo-500 to-indigo-600",
+  },
+  {
+    id: "roles",
+    label: "Roles & Permissions",
+    icon: Shield,
+    color: "from-amber-500 to-amber-600",
   },
 ];
 
@@ -126,6 +143,42 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
             </Button>
           );
         })}
+        
+        <div className="pt-4 mt-4 border-t border-border">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
+            Access Control
+          </p>
+          {accessControlItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.id;
+            
+            return (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-sm font-medium transition-all duration-200 rounded-xl h-12 px-3 group",
+                  isActive
+                    ? "bg-primary text-primary-foreground hover:bg-primary shadow-lg"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+                onClick={() => onSectionChange(item.id)}
+                data-testid={`nav-${item.id}`}
+              >
+                <div className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center mr-3 transition-all",
+                  isActive 
+                    ? "bg-white/20" 
+                    : `bg-gradient-to-br ${item.color} opacity-80 group-hover:opacity-100`
+                )}>
+                  <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-white")} />
+                </div>
+                <span className="flex-1 text-left">{item.label}</span>
+                {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
+              </Button>
+            );
+          })}
+        </div>
         
         <div className="pt-4 mt-4 border-t border-border">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
