@@ -44,14 +44,23 @@ Preferred communication style: Simple, everyday language.
 - **COD Support**: Cash on Delivery option marks orders as confirmed with pending payment collection
 
 ## Key Features
+- **Unified Storefront**: Single consistent UI for both logged-in and guest users with left sidebar navigation
 - **Dual User Roles**: Customer shopping interface and admin management dashboard
 - **Product Management**: Full CRUD operations for products and categories
-- **Featured Categories**: Admin-manageable featured categories displayed on landing/home pages. Admins toggle the Featured switch in category management to show/hide categories on the storefront
-- **Shopping Cart**: Session-based cart with quantity management
+- **Featured Categories**: Admin-manageable featured categories displayed on storefront. Admins toggle the Featured switch in category management to show/hide categories
+- **Smart Cart System**: LocalStorage-based cart for guests, database cart for authenticated users with automatic merge on login
+- **Checkout Auth Guard**: Login modal appears when guests attempt checkout, cart persists and merges after sign-in
 - **Order Processing**: Complete order lifecycle from cart to delivery
 - **Admin Dashboard**: Statistics, order management, product management, and customer oversight
 - **Customer Profile Management**: Users can view and edit their profile (firstName, lastName) with secure backend validation
 - **Admin Settings & Help Center**: Store configuration, notifications, security settings, FAQ, and support features
+
+## Storefront Architecture
+- **URL-based Navigation**: Query parameters control views (/?view=products, /?view=cart, etc.)
+- **Sidebar Sections**: All Products, Categories, Featured, Cart, My Orders, My Account, Help & Support
+- **Dynamic Categories**: Sidebar automatically updates when admin adds/removes categories
+- **Cart Context**: Provides unified cart API (addToCart, removeFromCart, updateQuantity) across app
+- **Cart Merge Endpoint**: POST /api/cart/merge merges guest cart items with user's database cart on login
 
 # External Dependencies
 
