@@ -2,20 +2,21 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
   CreditCard, 
   Settings, 
-  TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   Activity,
   CheckCircle,
@@ -25,19 +26,63 @@ import {
   Plus,
   RefreshCw,
   Smartphone,
-  Building
+  Building,
+  Wallet,
+  Banknote,
+  Pencil,
+  Trash2,
+  Globe,
+  Landmark
 } from "lucide-react";
 import type { PaymentGateway, PaymentTransaction } from "@shared/schema";
+
+const iconOptions = [
+  { value: 'smartphone', label: 'Mobile', icon: Smartphone },
+  { value: 'wallet', label: 'Wallet', icon: Wallet },
+  { value: 'building', label: 'Bank', icon: Building },
+  { value: 'banknote', label: 'Cash', icon: Banknote },
+  { value: 'credit-card', label: 'Card', icon: CreditCard },
+  { value: 'globe', label: 'Online', icon: Globe },
+  { value: 'landmark', label: 'Institution', icon: Landmark },
+];
 
 export default function PaymentManagement() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedGateway, setSelectedGateway] = useState<string>("all");
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingGateway, setEditingGateway] = useState<PaymentGateway | null>(null);
+  const [deletingGateway, setDeletingGateway] = useState<PaymentGateway | null>(null);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    displayName: '',
+    icon: 'credit-card',
+    description: '',
+    isEnabled: true,
+    testMode: true,
+    apiKey: '',
+    apiSecret: '',
+    webhookUrl: '',
+  });
 
-  // Fetch payment gateways
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      displayName: '',
+      icon: 'credit-card',
+      description: '',
+      isEnabled: true,
+      testMode: true,
+      apiKey: '',
+      apiSecret: '',
+      webhookUrl: '',
+    });
+  };
+
   const { data: gateways, isLoading: gatewaysLoading } = useQuery({
     queryKey: ['/api/admin/payment-gateways'],
     queryFn: async () => {
@@ -50,7 +95,6 @@ export default function PaymentManagement() {
     },
   });
 
-  // Fetch payment analytics
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ['/api/admin/payment-analytics'],
     queryFn: async () => {
@@ -63,7 +107,6 @@ export default function PaymentManagement() {
     },
   });
 
-  // Fetch payment transactions
   const { data: transactions, isLoading: transactionsLoading } = useQuery({
     queryKey: ['/api/admin/payment-transactions', { status: selectedStatus, gateway: selectedGateway }],
     queryFn: async () => {
@@ -80,7 +123,6 @@ export default function PaymentManagement() {
     },
   });
 
-  // Initialize payment gateways mutation
   const initializeGatewaysMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem('adminToken');
@@ -92,22 +134,42 @@ export default function PaymentManagement() {
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Payment gateways initialized successfully",
-      });
+      toast({ title: "Success", description: "Payment gateways initialized successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-gateways'] });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to initialize payment gateways",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to initialize payment gateways", variant: "destructive" });
     },
   });
 
-  // Update gateway status mutation
+  const createGatewayMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/payment-gateways', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to create payment gateway');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Payment gateway created successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-gateways'] });
+      setIsAddModalOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create payment gateway", variant: "destructive" });
+    },
+  });
+
   const updateGatewayMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const token = localStorage.getItem('adminToken');
@@ -123,20 +185,55 @@ export default function PaymentManagement() {
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Payment gateway updated successfully",
-      });
+      toast({ title: "Success", description: "Payment gateway updated successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-gateways'] });
+      setIsEditModalOpen(false);
+      setEditingGateway(null);
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update payment gateway",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to update payment gateway", variant: "destructive" });
     },
   });
+
+  const deleteGatewayMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/admin/payment-gateways/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to delete payment gateway');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Payment gateway deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-gateways'] });
+      setIsDeleteDialogOpen(false);
+      setDeletingGateway(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete payment gateway", variant: "destructive" });
+    },
+  });
+
+  const getIconComponent = (iconName: string) => {
+    const iconOption = iconOptions.find(i => i.value === iconName);
+    if (iconOption) {
+      const IconComponent = iconOption.icon;
+      return <IconComponent className="w-5 h-5" />;
+    }
+    return <CreditCard className="w-5 h-5" />;
+  };
+
+  const getIconColor = (name: string) => {
+    switch (name) {
+      case 'easypaisa': return 'text-green-600';
+      case 'jazzcash': return 'text-red-600';
+      case 'hbl': return 'text-blue-600';
+      case 'cod': return 'text-amber-600';
+      default: return 'text-gray-600';
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -156,16 +253,25 @@ export default function PaymentManagement() {
     return <Badge variant={variants[status] || "secondary"}>{status}</Badge>;
   };
 
-  const getGatewayIcon = (name: string) => {
-    switch (name) {
-      case 'easypaisa':
-      case 'jazzcash':
-        return <Smartphone className="w-5 h-5 text-blue-600" />;
-      case 'hbl':
-        return <Building className="w-5 h-5 text-green-600" />;
-      default:
-        return <CreditCard className="w-5 h-5 text-gray-600" />;
-    }
+  const handleEdit = (gateway: PaymentGateway) => {
+    setEditingGateway(gateway);
+    setFormData({
+      name: gateway.name,
+      displayName: gateway.displayName,
+      icon: gateway.icon || 'credit-card',
+      description: gateway.description || '',
+      isEnabled: gateway.isEnabled ?? true,
+      testMode: gateway.testMode ?? true,
+      apiKey: gateway.apiKey || '',
+      apiSecret: gateway.apiSecret || '',
+      webhookUrl: gateway.webhookUrl || '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = (gateway: PaymentGateway) => {
+    setDeletingGateway(gateway);
+    setIsDeleteDialogOpen(true);
   };
 
   const filteredTransactions = transactions?.filter((transaction: PaymentTransaction) => {
@@ -193,7 +299,6 @@ export default function PaymentManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Payment Analytics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card data-testid="card-total-transactions">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -244,49 +349,132 @@ export default function PaymentManagement() {
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="gateways" className="space-y-4">
         <TabsList data-testid="tabs-payment-management">
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="gateways" data-testid="tab-gateways">Payment Gateways</TabsTrigger>
           <TabsTrigger value="transactions" data-testid="tab-transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="gateways" data-testid="tab-gateways">Gateway Settings</TabsTrigger>
+          <TabsTrigger value="overview" data-testid="tab-overview">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          {/* Gateway Performance Stats */}
-          <Card data-testid="card-gateway-performance">
-            <CardHeader>
-              <CardTitle>Payment Gateway Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {analytics?.gatewayStats?.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {analytics.gatewayStats.map((stat: any, index: number) => (
-                    <Card key={index} data-testid={`card-gateway-stat-${index}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-3">
-                          {getGatewayIcon(stat.gateway.toLowerCase())}
-                          <div>
-                            <div className="font-medium" data-testid={`text-gateway-name-${index}`}>
-                              {stat.gateway}
+        <TabsContent value="gateways" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-medium">Payment Gateway Settings</h3>
+              <p className="text-sm text-muted-foreground">
+                Configure and manage your Pakistani payment methods
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => initializeGatewaysMutation.mutate()}
+                disabled={initializeGatewaysMutation.isPending}
+                variant="outline"
+                data-testid="button-initialize-gateways"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {initializeGatewaysMutation.isPending ? "Initializing..." : "Initialize Default"}
+              </Button>
+              <Button 
+                onClick={() => {
+                  resetForm();
+                  setIsAddModalOpen(true);
+                }}
+                data-testid="button-add-gateway"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Gateway
+              </Button>
+            </div>
+          </div>
+
+          <Card data-testid="card-gateway-settings">
+            <CardContent className="p-6">
+              {gateways?.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Gateway</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {gateways.map((gateway: PaymentGateway) => (
+                      <TableRow key={gateway.id} data-testid={`gateway-row-${gateway.id}`}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className={`p-2 rounded-lg bg-muted ${getIconColor(gateway.name)}`}>
+                              {getIconComponent(gateway.icon || 'credit-card')}
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {stat.totalTransactions} transactions
-                            </div>
-                            <div className="text-sm font-medium text-green-600">
-                              {stat.successRate.toFixed(1)}% success rate
-                            </div>
-                            <div className="text-sm font-medium text-blue-600">
-                              Rs. {stat.revenue.toLocaleString()} revenue
+                            <div>
+                              <div className="font-medium" data-testid={`text-gateway-name-${gateway.id}`}>
+                                {gateway.displayName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{gateway.name}</div>
                             </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {gateway.description || '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={gateway.isEnabled ? "default" : "secondary"}
+                            data-testid={`badge-gateway-status-${gateway.id}`}
+                          >
+                            {gateway.isEnabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {gateway.testMode ? "Test" : "Live"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                updateGatewayMutation.mutate({
+                                  id: gateway.id,
+                                  data: { isEnabled: !gateway.isEnabled }
+                                });
+                              }}
+                              data-testid={`button-toggle-gateway-${gateway.id}`}
+                            >
+                              {gateway.isEnabled ? "Disable" : "Enable"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(gateway)}
+                              data-testid={`button-edit-gateway-${gateway.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(gateway)}
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-delete-gateway-${gateway.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  No payment gateway statistics available.
+                  No payment gateways configured. Click "Initialize Default" to set up Pakistani payment methods or "Add Gateway" to create a new one.
                 </div>
               )}
             </CardContent>
@@ -294,7 +482,6 @@ export default function PaymentManagement() {
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-4">
-          {/* Transaction Filters */}
           <Card data-testid="card-transaction-filters">
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-4">
@@ -315,10 +502,10 @@ export default function PaymentManagement() {
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all" data-testid="option-all-status">All Status</SelectItem>
-                    <SelectItem value="completed" data-testid="option-completed">Completed</SelectItem>
-                    <SelectItem value="pending" data-testid="option-pending">Pending</SelectItem>
-                    <SelectItem value="failed" data-testid="option-failed">Failed</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={selectedGateway} onValueChange={setSelectedGateway}>
@@ -326,9 +513,9 @@ export default function PaymentManagement() {
                     <SelectValue placeholder="All Gateways" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all" data-testid="option-all-gateways">All Gateways</SelectItem>
+                    <SelectItem value="all">All Gateways</SelectItem>
                     {gateways?.map((gateway: PaymentGateway) => (
-                      <SelectItem key={gateway.id} value={gateway.id} data-testid={`option-gateway-${gateway.id}`}>
+                      <SelectItem key={gateway.id} value={gateway.id}>
                         {gateway.displayName}
                       </SelectItem>
                     ))}
@@ -338,7 +525,6 @@ export default function PaymentManagement() {
             </CardContent>
           </Card>
 
-          {/* Transactions Table */}
           <Card data-testid="card-transactions-table">
             <CardHeader>
               <CardTitle>Payment Transactions</CardTitle>
@@ -357,43 +543,46 @@ export default function PaymentManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead data-testid="header-transaction-id">Transaction ID</TableHead>
-                      <TableHead data-testid="header-gateway">Gateway</TableHead>
-                      <TableHead data-testid="header-amount">Amount</TableHead>
-                      <TableHead data-testid="header-status">Status</TableHead>
-                      <TableHead data-testid="header-date">Date</TableHead>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Gateway</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTransactions.map((transaction: PaymentTransaction) => (
-                      <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
-                        <TableCell>
-                          <div className="font-mono text-sm" data-testid={`text-transaction-id-${transaction.id}`}>
-                            {transaction.gatewayTransactionId || transaction.id.slice(0, 8)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getGatewayIcon(gateways?.find((g: PaymentGateway) => g.id === transaction.gatewayId)?.name || '')}
-                            <span data-testid={`text-gateway-${transaction.id}`}>
-                              {gateways?.find((g: PaymentGateway) => g.id === transaction.gatewayId)?.displayName}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell data-testid={`text-amount-${transaction.id}`}>
-                          Rs. {parseFloat(transaction.amount).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getStatusIcon(transaction.status)}
-                            {getStatusBadge(transaction.status)}
-                          </div>
-                        </TableCell>
-                        <TableCell data-testid={`text-date-${transaction.id}`}>
-                          {new Date(transaction.createdAt).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredTransactions.map((transaction: PaymentTransaction) => {
+                      const gateway = gateways?.find((g: PaymentGateway) => g.id === transaction.gatewayId);
+                      return (
+                        <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
+                          <TableCell>
+                            <div className="font-mono text-sm">
+                              {transaction.gatewayTransactionId || transaction.id.slice(0, 8)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <span className={getIconColor(gateway?.name || '')}>
+                                {getIconComponent(gateway?.icon || 'credit-card')}
+                              </span>
+                              <span>{gateway?.displayName || 'Unknown'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            Rs. {parseFloat(transaction.amount).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getStatusIcon(transaction.status)}
+                              {getStatusBadge(transaction.status)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(transaction.createdAt!).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -401,76 +590,250 @@ export default function PaymentManagement() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="gateways" className="space-y-4">
-          {/* Gateway Settings Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-medium">Payment Gateway Settings</h3>
-              <p className="text-sm text-muted-foreground">
-                Configure and manage your Pakistani payment methods
-              </p>
-            </div>
-            <Button 
-              onClick={() => initializeGatewaysMutation.mutate()}
-              disabled={initializeGatewaysMutation.isPending}
-              data-testid="button-initialize-gateways"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              {initializeGatewaysMutation.isPending ? "Initializing..." : "Initialize Gateways"}
-            </Button>
-          </div>
-
-          {/* Gateway Settings */}
-          <Card data-testid="card-gateway-settings">
-            <CardContent className="p-6">
-              {gateways?.length > 0 ? (
-                <div className="space-y-4">
-                  {gateways.map((gateway: PaymentGateway) => (
-                    <div key={gateway.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`gateway-setting-${gateway.id}`}>
-                      <div className="flex items-center space-x-4">
-                        {getGatewayIcon(gateway.name)}
-                        <div>
-                          <div className="font-medium" data-testid={`text-gateway-name-${gateway.id}`}>
-                            {gateway.displayName}
+        <TabsContent value="overview" className="space-y-4">
+          <Card data-testid="card-gateway-performance">
+            <CardHeader>
+              <CardTitle>Payment Gateway Performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {analytics?.gatewayStats?.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {analytics.gatewayStats.map((stat: any, index: number) => {
+                    const gateway = gateways?.find((g: PaymentGateway) => 
+                      g.displayName.toLowerCase() === stat.gateway.toLowerCase()
+                    );
+                    return (
+                      <Card key={index} data-testid={`card-gateway-stat-${index}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-3">
+                            <div className={`p-2 rounded-lg bg-muted ${getIconColor(gateway?.name || '')}`}>
+                              {getIconComponent(gateway?.icon || 'credit-card')}
+                            </div>
+                            <div>
+                              <div className="font-medium">{stat.gateway}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {stat.totalTransactions} transactions
+                              </div>
+                              <div className="text-sm font-medium text-green-600">
+                                {stat.successRate.toFixed(1)}% success
+                              </div>
+                              <div className="text-sm font-medium text-blue-600">
+                                Rs. {stat.revenue.toLocaleString()}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {gateway.testMode ? "Test Mode" : "Live Mode"}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <Badge 
-                          variant={gateway.isEnabled ? "default" : "secondary"}
-                          data-testid={`badge-gateway-status-${gateway.id}`}
-                        >
-                          {gateway.isEnabled ? "Enabled" : "Disabled"}
-                        </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            updateGatewayMutation.mutate({
-                              id: gateway.id,
-                              data: { isEnabled: !gateway.isEnabled }
-                            });
-                          }}
-                          data-testid={`button-toggle-gateway-${gateway.id}`}
-                        >
-                          {gateway.isEnabled ? "Disable" : "Enable"}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  No payment gateways configured. Click "Initialize Gateways" to set up Pakistani payment methods.
+                  No payment gateway statistics available.
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Payment Gateway</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Gateway Name (ID)</Label>
+              <Input
+                id="name"
+                placeholder="e.g., paypal, stripe"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value.toLowerCase().replace(/\s/g, '_') })}
+                data-testid="input-gateway-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Display Name</Label>
+              <Input
+                id="displayName"
+                placeholder="e.g., PayPal, Stripe"
+                value={formData.displayName}
+                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                data-testid="input-gateway-display-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="icon">Icon</Label>
+              <Select value={formData.icon} onValueChange={(value) => setFormData({ ...formData, icon: value })}>
+                <SelectTrigger data-testid="select-gateway-icon">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {iconOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex items-center gap-2">
+                        <option.icon className="w-4 h-4" />
+                        {option.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Brief description of this payment method"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                data-testid="input-gateway-description"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="isEnabled">Enable Gateway</Label>
+              <Switch
+                id="isEnabled"
+                checked={formData.isEnabled}
+                onCheckedChange={(checked) => setFormData({ ...formData, isEnabled: checked })}
+                data-testid="switch-gateway-enabled"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="testMode">Test Mode</Label>
+              <Switch
+                id="testMode"
+                checked={formData.testMode}
+                onCheckedChange={(checked) => setFormData({ ...formData, testMode: checked })}
+                data-testid="switch-gateway-test-mode"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => createGatewayMutation.mutate(formData)}
+              disabled={createGatewayMutation.isPending || !formData.name || !formData.displayName}
+              data-testid="button-save-gateway"
+            >
+              {createGatewayMutation.isPending ? "Creating..." : "Create Gateway"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Payment Gateway</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-displayName">Display Name</Label>
+              <Input
+                id="edit-displayName"
+                value={formData.displayName}
+                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                data-testid="input-edit-gateway-display-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-icon">Icon</Label>
+              <Select value={formData.icon} onValueChange={(value) => setFormData({ ...formData, icon: value })}>
+                <SelectTrigger data-testid="select-edit-gateway-icon">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {iconOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex items-center gap-2">
+                        <option.icon className="w-4 h-4" />
+                        {option.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                data-testid="input-edit-gateway-description"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-isEnabled">Enable Gateway</Label>
+              <Switch
+                id="edit-isEnabled"
+                checked={formData.isEnabled}
+                onCheckedChange={(checked) => setFormData({ ...formData, isEnabled: checked })}
+                data-testid="switch-edit-gateway-enabled"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-testMode">Test Mode</Label>
+              <Switch
+                id="edit-testMode"
+                checked={formData.testMode}
+                onCheckedChange={(checked) => setFormData({ ...formData, testMode: checked })}
+                data-testid="switch-edit-gateway-test-mode"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                if (editingGateway) {
+                  updateGatewayMutation.mutate({
+                    id: editingGateway.id,
+                    data: {
+                      displayName: formData.displayName,
+                      icon: formData.icon,
+                      description: formData.description,
+                      isEnabled: formData.isEnabled,
+                      testMode: formData.testMode,
+                    }
+                  });
+                }
+              }}
+              disabled={updateGatewayMutation.isPending}
+              data-testid="button-update-gateway"
+            >
+              {updateGatewayMutation.isPending ? "Updating..." : "Update Gateway"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payment Gateway</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingGateway?.displayName}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingGateway) {
+                  deleteGatewayMutation.mutate(deletingGateway.id);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteGatewayMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
