@@ -440,3 +440,35 @@ export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit(
 
 export type StoreSettings = typeof storeSettings.$inferSelect;
 export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
+
+// Notification type enum
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "order_placed",
+  "order_status_update",
+  "low_stock",
+  "customer_registration",
+  "payment_received",
+  "payment_failed",
+  "general"
+]);
+
+// Notifications table for both admin and customer notifications
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recipientType: varchar("recipient_type").notNull(), // 'admin' or 'customer'
+  recipientId: varchar("recipient_id"), // admin user id or customer user id (null for all admins)
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data").$type<Record<string, any>>(), // Additional data like orderId, productId, etc.
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;

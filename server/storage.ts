@@ -10,6 +10,7 @@ import {
   paymentGateways,
   paymentTransactions,
   storeSettings,
+  notifications,
   type User,
   type UpsertUser,
   type AdminUser,
@@ -33,6 +34,8 @@ import {
   type InsertPaymentTransaction,
   type StoreSettings,
   type InsertStoreSettings,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike } from "drizzle-orm";
@@ -123,6 +126,14 @@ export interface IStorage {
   // Store settings operations
   getStoreSettings(): Promise<StoreSettings>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
+  
+  // Notification operations
+  getNotifications(recipientType: string, recipientId?: string): Promise<Notification[]>;
+  getUnreadNotificationCount(recipientType: string, recipientId?: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<Notification>;
+  markAllNotificationsAsRead(recipientType: string, recipientId?: string): Promise<void>;
+  deleteNotification(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -899,6 +910,96 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated;
+  }
+
+  // Notification operations
+  async getNotifications(recipientType: string, recipientId?: string): Promise<Notification[]> {
+    if (recipientId) {
+      return await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.recipientType, recipientType),
+            eq(notifications.recipientId, recipientId)
+          )
+        )
+        .orderBy(desc(notifications.createdAt))
+        .limit(50);
+    } else {
+      // For admin notifications without specific recipient (broadcast to all admins)
+      return await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.recipientType, recipientType))
+        .orderBy(desc(notifications.createdAt))
+        .limit(50);
+    }
+  }
+
+  async getUnreadNotificationCount(recipientType: string, recipientId?: string): Promise<number> {
+    let query;
+    if (recipientId) {
+      query = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.recipientType, recipientType),
+            eq(notifications.recipientId, recipientId),
+            eq(notifications.isRead, false)
+          )
+        );
+    } else {
+      query = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.recipientType, recipientType),
+            eq(notifications.isRead, false)
+          )
+        );
+    }
+    return query.length;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification> {
+    const [updated] = await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id))
+      .returning();
+    return updated;
+  }
+
+  async markAllNotificationsAsRead(recipientType: string, recipientId?: string): Promise<void> {
+    if (recipientId) {
+      await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(
+          and(
+            eq(notifications.recipientType, recipientType),
+            eq(notifications.recipientId, recipientId)
+          )
+        );
+    } else {
+      await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(eq(notifications.recipientType, recipientType));
+    }
+  }
+
+  async deleteNotification(id: string): Promise<boolean> {
+    const result = await db.delete(notifications).where(eq(notifications.id, id));
+    return true;
   }
 }
 
