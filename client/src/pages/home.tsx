@@ -1,57 +1,155 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/navigation";
-import ProductGrid from "@/components/product-grid";
 import ShoppingCart from "@/components/shopping-cart";
 import CheckoutModal from "@/components/checkout-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Category } from "@shared/schema";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Category, Product } from "@shared/schema";
 import { 
   ShoppingCart as CartIcon, 
-  Smartphone, 
+  Search, 
   Sparkles,
   Star, 
   Shield, 
   Truck, 
   HeadphonesIcon,
-  ArrowRight,
+  Heart,
+  Eye,
+  Filter,
+  X,
+  SlidersHorizontal,
+  Grid3X3,
+  LayoutGrid,
+  ArrowUpDown,
   Zap,
-  Gift,
-  CreditCard,
-  CheckCircle2,
-  Tag
+  TrendingUp,
+  Package,
+  ChevronRight,
+  CreditCard
 } from "lucide-react";
-
-const categoryGradients = [
-  "from-pink-500/80 to-rose-600/80",
-  "from-blue-500/80 to-indigo-600/80",
-  "from-amber-500/80 to-orange-600/80",
-  "from-green-500/80 to-emerald-600/80",
-  "from-purple-500/80 to-violet-600/80",
-  "from-cyan-500/80 to-teal-600/80",
-];
-
-const defaultCategoryImage = "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600";
 
 export default function Home() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
+  const [sortBy, setSortBy] = useState("featured");
+  const [showFilters, setShowFilters] = useState(false);
+  const [gridView, setGridView] = useState<"large" | "small">("large");
 
-  const { data: featuredCategories, isLoading: categoriesLoading } = useQuery<Category[]>({
-    queryKey: ['/api/categories/featured'],
+  const { data: categories } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
   });
 
-  const trustFeatures = [
-    { icon: Shield, title: "Secure Payments", description: "100% Protected" },
-    { icon: Truck, title: "Fast Delivery", description: "Nationwide" },
-    { icon: Gift, title: "Easy Returns", description: "7-Day Policy" },
-    { icon: HeadphonesIcon, title: "24/7 Support", description: "Always Here" },
-  ];
+  const { data: featuredProducts, isLoading: featuredLoading } = useQuery<Product[]>({
+    queryKey: ['/api/products/featured'],
+  });
+
+  const { data: allProducts, isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+    queryFn: async () => {
+      const response = await fetch('/api/products?isActive=true&limit=100');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
+  });
+
+  const maxPrice = useMemo(() => {
+    if (!allProducts || allProducts.length === 0) return 100000;
+    const max = Math.max(...allProducts.map(p => parseFloat(p.price)));
+    return Math.ceil(max / 1000) * 1000;
+  }, [allProducts]);
+
+  const filteredProducts = useMemo(() => {
+    if (!allProducts) return [];
+    
+    let filtered = [...allProducts];
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(query) ||
+        p.description?.toLowerCase().includes(query) ||
+        p.shortDescription?.toLowerCase().includes(query)
+      );
+    }
+    
+    if (selectedCategory) {
+      filtered = filtered.filter(p => p.categoryId === selectedCategory);
+    }
+    
+    filtered = filtered.filter(p => {
+      const price = parseFloat(p.price);
+      return price >= priceRange[0] && price <= priceRange[1];
+    });
+    
+    switch (sortBy) {
+      case "price-low":
+        filtered.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+        break;
+      case "price-high":
+        filtered.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+        break;
+      case "newest":
+        filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        break;
+      case "featured":
+        filtered.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+        break;
+      case "name":
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+    }
+    
+    return filtered;
+  }, [allProducts, searchQuery, selectedCategory, priceRange, sortBy]);
+
+  const addToCartMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      await apiRequest('POST', '/api/cart', { productId, quantity: 1 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      toast({
+        title: "Added to Cart",
+        description: "Product added to your cart successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add product to cart",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory(null);
+    setPriceRange([0, maxPrice]);
+    setSortBy("featured");
+  };
+
+  const hasActiveFilters = searchQuery || selectedCategory || priceRange[0] > 0 || priceRange[1] < maxPrice;
 
   const paymentMethods = [
     { name: "EasyPaisa", color: "from-green-500 to-emerald-600" },
@@ -64,328 +162,379 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Navigation onCartToggle={() => setIsCartOpen(!isCartOpen)} />
       
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Animated Background */}
-        <div className="absolute inset-0 gradient-hero">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-accent/20 rounded-full blur-3xl translate-x-1/4 translate-y-1/4"></div>
-          <div className="absolute top-1/2 left-1/2 w-72 h-72 bg-secondary/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-        </div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
-          <div className="text-center">
-            {/* Welcome Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 animate-fade-in" data-testid="badge-welcome">
-              <Sparkles className="w-4 h-4 text-yellow-300" />
-              <span className="text-white/90 text-sm font-medium">Pakistan's Premier Online Shopping Destination</span>
+      {/* Welcome Header with Search */}
+      <section className="pt-20 pb-8 bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Welcome Message */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground" data-testid="text-welcome">
+                Welcome back, <span className="text-primary">{user?.firstName || 'Shopper'}</span>!
+              </h1>
+              <p className="text-muted-foreground mt-1">Discover amazing products at great prices</p>
             </div>
-            
-            {/* Main Headline */}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up" data-testid="text-hero-welcome">
-              Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-yellow-400">{user?.firstName || 'Shopper'}</span>!
-            </h1>
-            
-            <p className="text-xl lg:text-2xl text-white/80 mb-10 max-w-3xl mx-auto leading-relaxed animate-fade-in" data-testid="text-hero-subtitle">
-              Discover amazing products with <span className="text-yellow-300 font-semibold">secure Pakistani payment methods</span>. 
-              Shop confidently with EasyPaisa, JazzCash, HBL & Cash on Delivery.
-            </p>
-            
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up">
-              <Button 
-                size="lg" 
-                className="btn-modern bg-white text-primary hover:bg-white/90 px-8 py-6 text-lg gap-3 rounded-2xl"
-                onClick={() => document.getElementById('featured-products')?.scrollIntoView({ behavior: 'smooth' })}
-                data-testid="button-browse-products"
-              >
-                <CartIcon className="w-5 h-5" />
-                Start Shopping
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="btn-modern border-2 border-white bg-white/10 text-white hover:bg-white hover:text-primary px-8 py-6 text-lg gap-2 rounded-2xl backdrop-blur-sm"
-                onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })}
-                data-testid="button-explore-categories"
-              >
-                Explore Categories
-              </Button>
-            </div>
-            
-            {/* Trust Indicators */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto animate-fade-in">
-              {trustFeatures.map((feature, index) => (
-                <div 
-                  key={feature.title}
-                  className="glass rounded-2xl p-4 text-center hover:bg-white/20 transition-all duration-300 hover:-translate-y-1"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                  data-testid={`trust-feature-${index}`}
+            <div className="hidden md:flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CreditCard className="w-4 h-4" />
+                <span>Secure Payments:</span>
+              </div>
+              {paymentMethods.map((method) => (
+                <Badge 
+                  key={method.name}
+                  className={`bg-gradient-to-r ${method.color} text-white border-0 text-xs`}
                 >
-                  <feature.icon className="w-8 h-8 text-yellow-300 mx-auto mb-2" />
-                  <h3 className="text-white font-semibold text-sm">{feature.title}</h3>
-                  <p className="text-white/60 text-xs">{feature.description}</p>
-                </div>
+                  {method.name}
+                </Badge>
               ))}
             </div>
           </div>
-        </div>
-        
-        {/* Wave Divider */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-            <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="hsl(var(--background))"/>
-          </svg>
-        </div>
-      </section>
 
-      {/* Payment Methods Banner */}
-      <section className="py-8 bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-center gap-6">
-            <span className="text-muted-foreground font-medium flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Secure Payments with:
-            </span>
-            {paymentMethods.map((method) => (
-              <div 
-                key={method.name}
-                className={`px-6 py-2 rounded-xl bg-gradient-to-r ${method.color} text-white font-semibold shadow-lg hover:shadow-xl transition-shadow`}
-                data-testid={`payment-badge-${method.name.toLowerCase()}`}
-              >
-                {method.name}
+          {/* Main Search Bar */}
+          <div className="relative max-w-4xl mx-auto">
+            <div className="glass-card rounded-2xl p-2 shadow-xl border border-border/50">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search for products, categories, brands..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-12 h-14 text-lg border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                    data-testid="input-main-search"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-xl md:hidden"
+                  onClick={() => setShowFilters(!showFilters)}
+                  data-testid="button-toggle-filters"
+                >
+                  <SlidersHorizontal className="w-5 h-5" />
+                </Button>
+                <Button className="h-12 px-8 rounded-xl btn-modern hidden md:flex" data-testid="button-search">
+                  <Search className="w-4 h-4 mr-2" />
+                  Search
+                </Button>
               </div>
+            </div>
+          </div>
+
+          {/* Category Pills */}
+          <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            <Button
+              variant={selectedCategory === null ? "default" : "outline"}
+              size="sm"
+              className="rounded-full shrink-0"
+              onClick={() => setSelectedCategory(null)}
+              data-testid="button-category-all"
+            >
+              All Products
+            </Button>
+            {categories?.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.id ? "default" : "outline"}
+                size="sm"
+                className="rounded-full shrink-0"
+                onClick={() => setSelectedCategory(category.id)}
+                data-testid={`button-category-${category.slug}`}
+              >
+                {category.name}
+              </Button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Featured Categories */}
-      <section id="categories" className="py-20 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <Badge className="mb-4 bg-primary/10 text-primary border-0 px-4 py-1">Shop by Category</Badge>
-            <h2 className="text-4xl font-bold text-foreground mb-4" data-testid="text-categories-title">
-              Featured Categories
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Explore our wide range of products across popular categories
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {categoriesLoading ? (
-              <>
-                {[1, 2, 3].map((i) => (
-                  <Card key={i} className="group card-modern border-0">
-                    <Skeleton className="h-64 w-full" />
+      {/* Featured Products Section */}
+      {featuredProducts && featuredProducts.length > 0 && (
+        <section className="py-12 bg-background">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground" data-testid="text-featured-title">Featured Products</h2>
+                  <p className="text-sm text-muted-foreground">Handpicked items just for you</p>
+                </div>
+              </div>
+              <Button variant="ghost" className="gap-2" data-testid="button-view-all-featured">
+                View All <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {featuredLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="overflow-hidden">
+                    <Skeleton className="h-48 w-full" />
+                    <CardContent className="p-4">
+                      <Skeleton className="h-4 w-3/4 mb-2" />
+                      <Skeleton className="h-6 w-1/2" />
+                    </CardContent>
                   </Card>
                 ))}
-              </>
-            ) : featuredCategories && featuredCategories.length > 0 ? (
-              featuredCategories.map((category, index) => (
-                <Card 
-                  key={category.id}
-                  className="group card-modern border-0 cursor-pointer"
-                  data-testid={`card-category-${index}`}
-                >
-                  <div className="relative h-64 overflow-hidden">
-                    <img 
-                      src={category.imageUrl || defaultCategoryImage}
-                      alt={category.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      data-testid={`img-category-${index}`}
-                    />
-                    <div className={`absolute inset-0 bg-gradient-to-t ${categoryGradients[index % categoryGradients.length]} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
-                    <div className="absolute inset-0 flex items-end p-6">
-                      <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                        <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-lg" data-testid={`text-category-title-${index}`}>
-                          {category.name}
-                        </h3>
-                        <p className="text-white/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300" data-testid={`text-category-desc-${index}`}>
-                          {category.description || `Explore ${category.name} products`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))
+              </div>
             ) : (
-              <div className="col-span-3 text-center py-12">
-                <Tag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No featured categories yet. Add categories from the admin panel.</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {featuredProducts.slice(0, 4).map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAddToCart={() => addToCartMutation.mutate(product.id)}
+                    isAddingToCart={addToCartMutation.isPending}
+                    size="medium"
+                  />
+                ))}
               </div>
             )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* Featured Products */}
-      <section id="featured-products" className="py-20 bg-muted/30">
+      {/* Main Products Section */}
+      <section className="py-8 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-12">
-            <div>
-              <Badge className="mb-4 bg-secondary/10 text-secondary border-0 px-4 py-1">
-                <Zap className="w-3 h-3 mr-1" />
-                Hot Products
+          {/* Filters Bar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-semibold text-foreground" data-testid="text-all-products-title">
+                  All Products
+                </h2>
+              </div>
+              <Badge variant="secondary" className="rounded-full">
+                {filteredProducts.length} items
               </Badge>
-              <h2 className="text-4xl font-bold text-foreground mb-2" data-testid="text-featured-title">
-                Featured Products
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                Discover our most popular items loved by customers
-              </p>
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive gap-1"
+                  onClick={clearFilters}
+                  data-testid="button-clear-all-filters"
+                >
+                  <X className="w-4 h-4" />
+                  Clear filters
+                </Button>
+              )}
             </div>
-            <Button variant="outline" className="mt-4 md:mt-0 rounded-xl" data-testid="button-view-all">
-              View All Products
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-          <ProductGrid />
-        </div>
-      </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <Badge className="mb-4 bg-accent/10 text-accent border-0 px-4 py-1">Why Choose Us</Badge>
-            <h2 className="text-4xl font-bold text-foreground mb-4" data-testid="text-why-title">
-              The Eshaal Store Difference
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              We're committed to providing the best shopping experience in Pakistan
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              {
-                icon: Shield,
-                title: "Secure Payments",
-                description: "All transactions are encrypted and secured with Pakistani payment gateways",
-                color: "from-blue-500 to-blue-600"
-              },
-              {
-                icon: Truck,
-                title: "Fast Delivery",
-                description: "Nationwide delivery with real-time tracking across Pakistan",
-                color: "from-green-500 to-green-600"
-              },
-              {
-                icon: CheckCircle2,
-                title: "Quality Assured",
-                description: "All products are verified and quality checked before shipping",
-                color: "from-purple-500 to-purple-600"
-              },
-              {
-                icon: HeadphonesIcon,
-                title: "24/7 Support",
-                description: "Our team is available around the clock to assist you",
-                color: "from-orange-500 to-orange-600"
-              }
-            ].map((feature, index) => (
-              <Card 
-                key={feature.title}
-                className="card-modern border-0 text-center p-8 group"
-                data-testid={`feature-card-${index}`}
-              >
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-8 h-8 text-white" />
+            <div className="flex items-center gap-3">
+              {/* Desktop Filters */}
+              <div className="hidden lg:flex items-center gap-3">
+                {/* Price Range */}
+                <div className="flex items-center gap-2 bg-background rounded-xl px-4 py-2 border">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">Price:</span>
+                  <span className="text-sm font-medium whitespace-nowrap">
+                    Rs. {priceRange[0].toLocaleString()} - Rs. {priceRange[1].toLocaleString()}
+                  </span>
+                  <div className="w-32">
+                    <Slider
+                      value={priceRange}
+                      onValueChange={(value) => setPriceRange(value as [number, number])}
+                      max={maxPrice}
+                      step={500}
+                      className="cursor-pointer"
+                      data-testid="slider-price-range"
+                    />
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </Card>
-            ))}
+
+                {/* Sort */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-44 rounded-xl" data-testid="select-sort">
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="featured">Featured</SelectItem>
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="price-low">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="name">Name A-Z</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Grid Toggle */}
+              <div className="flex items-center gap-1 bg-background rounded-xl p-1 border">
+                <Button
+                  variant={gridView === "large" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8 rounded-lg"
+                  onClick={() => setGridView("large")}
+                  data-testid="button-grid-large"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={gridView === "small" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8 rounded-lg"
+                  onClick={() => setGridView("small")}
+                  data-testid="button-grid-small"
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Mobile Filter Toggle */}
+              <Button
+                variant="outline"
+                className="lg:hidden gap-2 rounded-xl"
+                onClick={() => setShowFilters(!showFilters)}
+                data-testid="button-show-filters-mobile"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+              </Button>
+            </div>
           </div>
+
+          {/* Mobile Filters Panel */}
+          {showFilters && (
+            <div className="lg:hidden mb-6 p-4 bg-background rounded-2xl border space-y-4 animate-in slide-in-from-top-2">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Filters</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowFilters(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              {/* Price Range */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Price Range</label>
+                <div className="px-2">
+                  <Slider
+                    value={priceRange}
+                    onValueChange={(value) => setPriceRange(value as [number, number])}
+                    max={maxPrice}
+                    step={500}
+                    data-testid="slider-price-range-mobile"
+                  />
+                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                    <span>Rs. {priceRange[0].toLocaleString()}</span>
+                    <span>Rs. {priceRange[1].toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sort */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Sort By</label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="rounded-xl" data-testid="select-sort-mobile">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="featured">Featured</SelectItem>
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="price-low">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="name">Name A-Z</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button className="w-full rounded-xl" onClick={() => setShowFilters(false)}>
+                Apply Filters
+              </Button>
+            </div>
+          )}
+
+          {/* Products Grid */}
+          {productsLoading ? (
+            <div className={`grid gap-4 ${gridView === "large" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "grid-cols-3 md:grid-cols-4 lg:grid-cols-6"}`}>
+              {[...Array(12)].map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <Skeleton className={gridView === "large" ? "h-56" : "h-36"} />
+                  <CardContent className="p-4">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-5 w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+                <Search className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground mb-2">No products found</h3>
+              <p className="text-muted-foreground mb-6">Try adjusting your search or filters</p>
+              <Button variant="outline" onClick={clearFilters} className="rounded-xl" data-testid="button-clear-filters-empty">
+                Clear all filters
+              </Button>
+            </div>
+          ) : (
+            <div className={`grid gap-4 ${gridView === "large" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "grid-cols-3 md:grid-cols-4 lg:grid-cols-6"}`}>
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={() => addToCartMutation.mutate(product.id)}
+                  isAddingToCart={addToCartMutation.isPending}
+                  size={gridView === "large" ? "medium" : "small"}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Newsletter Section */}
-      <section className="py-20 gradient-hero relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-accent/20 rounded-full blur-3xl"></div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4" data-testid="text-newsletter-title">
-            Stay Updated
-          </h2>
-          <p className="text-white/80 text-lg mb-8 max-w-2xl mx-auto">
-            Subscribe to our newsletter for exclusive deals, new arrivals, and special offers
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="flex-1 px-6 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 backdrop-blur-sm"
-              data-testid="input-newsletter-email"
-            />
-            <Button className="btn-modern bg-white text-primary hover:bg-white/90 px-8 py-4 rounded-xl" data-testid="button-subscribe">
-              Subscribe
-            </Button>
+      {/* Trust Features */}
+      <section className="py-12 bg-background border-t">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { icon: Shield, title: "Secure Payments", description: "100% Protected", color: "text-blue-600" },
+              { icon: Truck, title: "Fast Delivery", description: "Nationwide", color: "text-green-600" },
+              { icon: TrendingUp, title: "Best Prices", description: "Guaranteed", color: "text-purple-600" },
+              { icon: HeadphonesIcon, title: "24/7 Support", description: "Always Here", color: "text-orange-600" },
+            ].map((feature) => (
+              <div key={feature.title} className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
+                <div className={`p-2 rounded-lg bg-background ${feature.color}`}>
+                  <feature.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground text-sm">{feature.title}</h4>
+                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-card border-t border-border py-16">
+      <footer className="bg-card border-t py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
-                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg">E</span>
-                </div>
-                <span className="text-2xl font-bold gradient-text">Eshaal Store</span>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                <span className="text-white font-bold text-sm">E</span>
               </div>
-              <p className="text-muted-foreground mb-6">
-                Pakistan's trusted online marketplace for quality products with secure payment options.
-              </p>
-              <div className="flex gap-4">
-                {paymentMethods.map((method) => (
-                  <div 
-                    key={method.name}
-                    className={`px-3 py-1 rounded-lg bg-gradient-to-r ${method.color} text-white text-xs font-medium`}
-                  >
-                    {method.name}
-                  </div>
-                ))}
-              </div>
+              <span className="font-bold gradient-text">Eshaal Store</span>
             </div>
-            
-            {[
-              {
-                title: "Shop",
-                links: ["All Products", "Categories", "Deals", "New Arrivals"]
-              },
-              {
-                title: "Support",
-                links: ["Help Center", "Track Order", "Returns", "Contact Us"]
-              },
-              {
-                title: "Company",
-                links: ["About Us", "Careers", "Blog", "Privacy Policy"]
-              }
-            ].map((section) => (
-              <div key={section.title}>
-                <h4 className="font-semibold text-foreground mb-4">{section.title}</h4>
-                <ul className="space-y-3">
-                  {section.links.map((link) => (
-                    <li key={link}>
-                      <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-          
-          <div className="border-t border-border mt-12 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 Eshaal Store. All rights reserved. Made with ❤️ in Pakistan</p>
+            <p className="text-sm text-muted-foreground text-center">
+              © 2024 Eshaal Store. Pakistan's trusted online marketplace.
+            </p>
+            <div className="flex gap-2">
+              {paymentMethods.map((method) => (
+                <Badge 
+                  key={method.name}
+                  className={`bg-gradient-to-r ${method.color} text-white border-0 text-xs`}
+                >
+                  {method.name}
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
       </footer>
@@ -406,5 +555,146 @@ export default function Home() {
         onClose={() => setIsCheckoutOpen(false)} 
       />
     </div>
+  );
+}
+
+interface ProductCardProps {
+  product: Product;
+  onAddToCart: () => void;
+  isAddingToCart: boolean;
+  size: "small" | "medium";
+}
+
+function ProductCard({ product, onAddToCart, isAddingToCart, size }: ProductCardProps) {
+  const isSmall = size === "small";
+  
+  return (
+    <Card 
+      className="group overflow-hidden border-0 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer bg-background"
+      data-testid={`card-product-${product.id}`}
+    >
+      <div className={`relative overflow-hidden ${isSmall ? "h-32" : "h-48 md:h-56"}`}>
+        <img 
+          src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"} 
+          alt={product.name} 
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          data-testid={`img-product-${product.id}`}
+        />
+        
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
+        {/* Badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {product.isFeatured && (
+            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 text-[10px] px-2 py-0.5">
+              <Sparkles className="w-3 h-3 mr-0.5" /> Featured
+            </Badge>
+          )}
+          {product.compareAtPrice && (
+            <Badge className="bg-gradient-to-r from-red-500 to-rose-500 text-white border-0 text-[10px] px-2 py-0.5">
+              {Math.round((1 - parseFloat(product.price) / parseFloat(product.compareAtPrice)) * 100)}% OFF
+            </Badge>
+          )}
+          {product.stock > 0 && product.stock <= 5 && (
+            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-2 py-0.5">
+              Only {product.stock} left
+            </Badge>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+          <Button
+            variant="secondary"
+            size="icon"
+            className={`bg-white/90 hover:bg-white shadow-md backdrop-blur-sm ${isSmall ? "h-7 w-7" : "h-8 w-8"} rounded-lg`}
+            data-testid={`button-wishlist-${product.id}`}
+          >
+            <Heart className={isSmall ? "h-3 w-3" : "h-4 w-4"} />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className={`bg-white/90 hover:bg-white shadow-md backdrop-blur-sm ${isSmall ? "h-7 w-7" : "h-8 w-8"} rounded-lg`}
+            data-testid={`button-quick-view-${product.id}`}
+          >
+            <Eye className={isSmall ? "h-3 w-3" : "h-4 w-4"} />
+          </Button>
+        </div>
+
+        {/* Quick Add */}
+        {!isSmall && (
+          <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
+            <Button
+              className="w-full btn-modern rounded-lg bg-white text-primary hover:bg-white/90 shadow-lg h-9 text-sm"
+              disabled={product.stock === 0 || isAddingToCart}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCart();
+              }}
+              data-testid={`button-quick-add-${product.id}`}
+            >
+              <CartIcon className="h-4 w-4 mr-1.5" />
+              {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
+            </Button>
+          </div>
+        )}
+      </div>
+      
+      <CardContent className={isSmall ? "p-2.5" : "p-4"}>
+        <h3 
+          className={`font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors ${isSmall ? "text-xs mb-1" : "text-sm mb-2"}`}
+          data-testid={`text-product-name-${product.id}`}
+        >
+          {product.name}
+        </h3>
+        
+        {!isSmall && (
+          <div className="flex items-center gap-1 mb-2">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+            ))}
+            <span className="text-xs text-muted-foreground ml-1">(4.8)</span>
+          </div>
+        )}
+        
+        <div className="flex items-end justify-between">
+          <div>
+            <span 
+              className={`font-bold text-primary ${isSmall ? "text-sm" : "text-lg"}`}
+              data-testid={`text-product-price-${product.id}`}
+            >
+              Rs. {parseFloat(product.price).toLocaleString()}
+            </span>
+            {product.compareAtPrice && (
+              <span className={`text-muted-foreground line-through ml-1.5 ${isSmall ? "text-xs" : "text-sm"}`}>
+                Rs. {parseFloat(product.compareAtPrice).toLocaleString()}
+              </span>
+            )}
+          </div>
+          {isSmall && (
+            <Button
+              size="icon"
+              className="h-7 w-7 rounded-lg btn-modern"
+              disabled={product.stock === 0 || isAddingToCart}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCart();
+              }}
+              data-testid={`button-add-cart-small-${product.id}`}
+            >
+              <CartIcon className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        
+        {!isSmall && (
+          <p className={`text-muted-foreground mt-1 ${isSmall ? "text-[10px]" : "text-xs"}`}>
+            {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
