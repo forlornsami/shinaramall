@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ interface NavigationProps {
 }
 
 export default function Navigation({ onCartToggle }: NavigationProps) {
+  const [, setLocation] = useLocation();
   const { user } = useAuth() as { user: UserType | null };
   const { cartItems } = useCart() as { cartItems: CartItem[] | undefined };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -171,7 +173,11 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2" />
-                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-my-orders">
+                <DropdownMenuItem 
+                  className="rounded-lg cursor-pointer" 
+                  onClick={() => setLocation('/profile?tab=orders')}
+                  data-testid="menu-my-orders"
+                >
                   <Package className="w-4 h-4 mr-3" />
                   My Orders
                 </DropdownMenuItem>
@@ -179,13 +185,21 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
                   <Heart className="w-4 h-4 mr-3" />
                   Wishlist
                 </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-settings">
+                <DropdownMenuItem 
+                  className="rounded-lg cursor-pointer" 
+                  onClick={() => setLocation('/profile?tab=settings')}
+                  data-testid="menu-settings"
+                >
                   <Settings className="w-4 h-4 mr-3" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-lg cursor-pointer" data-testid="menu-help">
-                  <HelpCircle className="w-4 h-4 mr-3" />
-                  Help Center
+                <DropdownMenuItem 
+                  className="rounded-lg cursor-pointer" 
+                  onClick={() => setLocation('/profile')}
+                  data-testid="menu-profile"
+                >
+                  <UserIcon className="w-4 h-4 mr-3" />
+                  My Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-2" />
                 <DropdownMenuItem 

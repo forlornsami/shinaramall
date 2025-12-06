@@ -44,6 +44,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile update route
+  app.patch('/api/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName } = req.body;
+      
+      // Only allow updating firstName and lastName - whitelist approach
+      const allowedUpdates: { firstName?: string; lastName?: string; updatedAt: Date } = {
+        updatedAt: new Date(),
+      };
+      
+      if (typeof firstName === 'string') {
+        allowedUpdates.firstName = firstName.trim().slice(0, 100);
+      }
+      if (typeof lastName === 'string') {
+        allowedUpdates.lastName = lastName.trim().slice(0, 100);
+      }
+      
+      const updatedUser = await storage.updateUser(userId, allowedUpdates);
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // Admin auth routes
   app.post('/api/admin/login', async (req, res) => {
     try {
