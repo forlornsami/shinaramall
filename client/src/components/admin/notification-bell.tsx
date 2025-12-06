@@ -60,7 +60,7 @@ export function AdminNotificationBell() {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/admin/notifications/${id}/read`, { method: 'PATCH' });
+      return apiRequest('PATCH', `/api/admin/notifications/${id}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
@@ -70,7 +70,7 @@ export function AdminNotificationBell() {
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('/api/admin/notifications/read-all', { method: 'POST' });
+      return apiRequest('POST', '/api/admin/notifications/read-all');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
@@ -80,7 +80,7 @@ export function AdminNotificationBell() {
 
   const deleteNotificationMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/admin/notifications/${id}`, { method: 'DELETE' });
+      return apiRequest('DELETE', `/api/admin/notifications/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
