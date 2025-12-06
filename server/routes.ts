@@ -1106,6 +1106,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Store Settings API (public GET for landing page, admin PUT for updates)
+  app.get('/api/store-settings', async (req, res) => {
+    try {
+      const settings = await storage.getStoreSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching store settings:", error);
+      res.status(500).json({ message: "Failed to fetch store settings" });
+    }
+  });
+
+  app.put('/api/admin/store-settings', adminAuth, async (req, res) => {
+    try {
+      const {
+        storeName,
+        storeEmail,
+        storePhone,
+        storeAddress,
+        currency,
+        timezone,
+        language,
+        orderNotifications,
+        stockAlerts,
+        customerRegistrations,
+        paymentUpdates,
+        marketingEmails,
+      } = req.body;
+
+      const updated = await storage.updateStoreSettings({
+        storeName,
+        storeEmail,
+        storePhone,
+        storeAddress,
+        currency,
+        timezone,
+        language,
+        orderNotifications,
+        stockAlerts,
+        customerRegistrations,
+        paymentUpdates,
+        marketingEmails,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating store settings:", error);
+      res.status(500).json({ message: "Failed to update store settings" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

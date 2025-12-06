@@ -9,6 +9,7 @@ import {
   cartItems,
   paymentGateways,
   paymentTransactions,
+  storeSettings,
   type User,
   type UpsertUser,
   type AdminUser,
@@ -30,6 +31,8 @@ import {
   type InsertPaymentGateway,
   type PaymentTransaction,
   type InsertPaymentTransaction,
+  type StoreSettings,
+  type InsertStoreSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike } from "drizzle-orm";
@@ -113,6 +116,10 @@ export interface IStorage {
   getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined>;
   createPaymentTransaction(transactionData: InsertPaymentTransaction): Promise<PaymentTransaction>;
   updatePaymentTransaction(id: string, transactionData: Partial<InsertPaymentTransaction>): Promise<PaymentTransaction>;
+  
+  // Store settings operations
+  getStoreSettings(): Promise<StoreSettings>;
+  updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -805,6 +812,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(paymentTransactions.id, id))
       .returning();
     return transaction;
+  }
+
+  // Store settings operations (singleton pattern - always returns/updates single row)
+  async getStoreSettings(): Promise<StoreSettings> {
+    const [settings] = await db.select().from(storeSettings).limit(1);
+    
+    if (!settings) {
+      // Create default settings if none exist
+      const [newSettings] = await db.insert(storeSettings).values({}).returning();
+      return newSettings;
+    }
+    
+    return settings;
+  }
+
+  async updateStoreSettings(settingsData: Partial<InsertStoreSettings>): Promise<StoreSettings> {
+    // First ensure settings exist
+    const existing = await this.getStoreSettings();
+    
+    const [updated] = await db
+      .update(storeSettings)
+      .set({
+        ...settingsData,
+        updatedAt: new Date(),
+      })
+      .where(eq(storeSettings.id, existing.id))
+      .returning();
+    
+    return updated;
   }
 }
 
