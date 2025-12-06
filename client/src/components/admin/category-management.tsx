@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -21,13 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Tag } from "lucide-react";
+import { Plus, Edit, Trash2, Tag, Star } from "lucide-react";
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   description?: string;
+  imageUrl?: string;
+  isFeatured: boolean;
 }
 
 export default function CategoryManagement() {
@@ -37,6 +41,8 @@ export default function CategoryManagement() {
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     description: "",
+    imageUrl: "",
+    isFeatured: false,
   });
 
   // Fetch categories
@@ -51,7 +57,7 @@ export default function CategoryManagement() {
 
   // Create category mutation
   const createCategoryMutation = useMutation({
-    mutationFn: async (categoryData: { name: string; description?: string }) => {
+    mutationFn: async (categoryData: { name: string; description?: string; imageUrl?: string; isFeatured?: boolean }) => {
       const token = localStorage.getItem('adminToken');
       const response = await fetch('/api/categories', {
         method: 'POST',
@@ -69,6 +75,7 @@ export default function CategoryManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories/featured'] });
       resetForm();
       setIsAddModalOpen(false);
       toast({
@@ -87,7 +94,7 @@ export default function CategoryManagement() {
 
   // Update category mutation
   const updateCategoryMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { name: string; description?: string } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { name: string; description?: string; imageUrl?: string; isFeatured?: boolean } }) => {
       const token = localStorage.getItem('adminToken');
       const response = await fetch(`/api/categories/${id}`, {
         method: 'PATCH',
@@ -105,6 +112,7 @@ export default function CategoryManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories/featured'] });
       resetForm();
       setEditingCategory(null);
       setIsAddModalOpen(false);
@@ -149,10 +157,44 @@ export default function CategoryManagement() {
     },
   });
 
+  // Toggle featured mutation
+  const toggleFeaturedMutation = useMutation({
+    mutationFn: async ({ id, isFeatured }: { id: string; isFeatured: boolean }) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/categories/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isFeatured }),
+      });
+      if (!response.ok) throw new Error('Failed to update category');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories/featured'] });
+      toast({
+        title: "Success",
+        description: "Category updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update category",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setCategoryForm({
       name: "",
       description: "",
+      imageUrl: "",
+      isFeatured: false,
     });
   };
 
@@ -171,6 +213,8 @@ export default function CategoryManagement() {
     setCategoryForm({
       name: category.name,
       description: category.description || "",
+      imageUrl: category.imageUrl || "",
+      isFeatured: category.isFeatured || false,
     });
     setIsAddModalOpen(true);
   };
@@ -198,11 +242,13 @@ export default function CategoryManagement() {
           <h2 className="text-2xl font-bold text-foreground">Category Management</h2>
           <p className="text-muted-foreground">Manage your product categories</p>
         </div>
-        <Dialog open={isAddModalOpen} onOpenChange={handleCloseModal}>
+        <Dialog open={isAddModalOpen} onOpenChange={(open) => {
+          if (!open) handleCloseModal();
+          else setIsAddModalOpen(true);
+        }}>
           <DialogTrigger asChild>
             <Button 
               className="bg-primary hover:bg-primary/90"
-              onClick={() => setIsAddModalOpen(true)}
               data-testid="button-add-category"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -240,6 +286,31 @@ export default function CategoryManagement() {
                   onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                   data-testid="input-category-description"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="imageUrl" data-testid="label-category-image">Image URL</Label>
+                <Input
+                  id="imageUrl"
+                  type="url"
+                  placeholder="https://example.com/image.jpg (optional)"
+                  value={categoryForm.imageUrl}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, imageUrl: e.target.value })}
+                  data-testid="input-category-image"
+                />
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <Switch
+                  id="isFeatured"
+                  checked={categoryForm.isFeatured}
+                  onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, isFeatured: checked })}
+                  data-testid="switch-category-featured"
+                />
+                <Label htmlFor="isFeatured" className="flex items-center gap-2 cursor-pointer">
+                  <Star className="w-4 h-4 text-yellow-500" />
+                  Featured on Homepage
+                </Label>
               </div>
 
               <div className="flex justify-end space-x-2">
@@ -296,6 +367,7 @@ export default function CategoryManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead className="w-[100px]">Featured</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -303,13 +375,39 @@ export default function CategoryManagement() {
                 {categories?.map((category: Category) => (
                   <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
                     <TableCell className="font-medium">
-                      {category.name}
+                      <div className="flex items-center gap-2">
+                        {category.imageUrl && (
+                          <img 
+                            src={category.imageUrl} 
+                            alt={category.name}
+                            className="w-8 h-8 rounded object-cover"
+                          />
+                        )}
+                        {category.name}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {category.slug}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {category.description || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={category.isFeatured}
+                          onCheckedChange={(checked) => 
+                            toggleFeaturedMutation.mutate({ id: category.id, isFeatured: checked })
+                          }
+                          data-testid={`switch-featured-${category.id}`}
+                        />
+                        {category.isFeatured && (
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                            <Star className="w-3 h-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">

@@ -1,6 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Category } from "@shared/schema";
 import { 
   ShoppingCart, 
   Store, 
@@ -22,10 +25,26 @@ import {
   Mail,
   MapPin,
   Phone,
-  Banknote
+  Banknote,
+  Tag
 } from "lucide-react";
 
+const categoryGradients = [
+  "from-pink-500/80 to-rose-600/80",
+  "from-blue-500/80 to-indigo-600/80",
+  "from-amber-500/80 to-orange-600/80",
+  "from-green-500/80 to-emerald-600/80",
+  "from-purple-500/80 to-violet-600/80",
+  "from-cyan-500/80 to-teal-600/80",
+];
+
+const defaultCategoryImage = "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600";
+
 export default function Landing() {
+  const { data: featuredCategories, isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['/api/categories/featured'],
+  });
+
   const features = [
     {
       icon: Shield,
@@ -50,27 +69,6 @@ export default function Landing() {
       title: "Quick Checkout",
       description: "Seamless checkout with Pakistani payment methods",
       color: "from-orange-500 to-amber-600",
-    },
-  ];
-
-  const categories = [
-    {
-      name: "Fashion & Textiles",
-      description: "Premium Pakistani fashion and traditional wear",
-      image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600",
-      products: "500+ Products",
-    },
-    {
-      name: "Electronics",
-      description: "Latest gadgets and electronic devices",
-      image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600",
-      products: "300+ Products",
-    },
-    {
-      name: "Home & Decor",
-      description: "Beautiful handicrafts and home essentials",
-      image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600",
-      products: "400+ Products",
     },
   ];
 
@@ -286,36 +284,53 @@ export default function Landing() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {categories.map((category, index) => (
-              <Card 
-                key={index}
-                className="card-modern border-0 overflow-hidden group cursor-pointer"
-                onClick={() => window.location.href = '/api/login'}
-                data-testid={`card-category-${index}`}
-              >
-                <div className="relative overflow-hidden">
-                  <img 
-                    src={category.image} 
-                    alt={category.name} 
-                    className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                  <Badge className="absolute top-4 left-4 bg-white/90 text-foreground border-0">
-                    {category.products}
-                  </Badge>
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                    {category.name}
-                  </h3>
-                  <p className="text-muted-foreground mb-4">{category.description}</p>
-                  <div className="flex items-center text-primary font-medium group-hover:gap-2 transition-all">
-                    <span>Browse Collection</span>
-                    <ChevronRight className="w-4 h-4" />
+            {categoriesLoading ? (
+              <>
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="card-modern border-0 overflow-hidden">
+                    <Skeleton className="h-56 w-full" />
+                    <CardContent className="p-6">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full mb-4" />
+                      <Skeleton className="h-4 w-1/3" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            ) : featuredCategories && featuredCategories.length > 0 ? (
+              featuredCategories.map((category, index) => (
+                <Card 
+                  key={category.id}
+                  className="card-modern border-0 overflow-hidden group cursor-pointer"
+                  onClick={() => window.location.href = '/api/login'}
+                  data-testid={`card-category-${index}`}
+                >
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={category.imageUrl || defaultCategoryImage} 
+                      alt={category.name} 
+                      className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className={`absolute inset-0 bg-gradient-to-t ${categoryGradients[index % categoryGradients.length]} opacity-30 group-hover:opacity-50 transition-opacity`}></div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <CardContent className="p-6">
+                    <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                      {category.name}
+                    </h3>
+                    <p className="text-muted-foreground mb-4">{category.description || `Explore ${category.name} products`}</p>
+                    <div className="flex items-center text-primary font-medium group-hover:gap-2 transition-all">
+                      <span>Browse Collection</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-12">
+                <Tag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No featured categories yet. Check back soon!</p>
+              </div>
+            )}
           </div>
         </div>
       </section>

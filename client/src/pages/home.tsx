@@ -185,7 +185,7 @@ export default function Home() {
                 ))}
               </>
             ) : featuredCategories && featuredCategories.length > 0 ? (
-              featuredCategories.slice(0, 6).map((category, index) => (
+              featuredCategories.map((category, index) => (
                 <Card 
                   key={category.id}
                   className="group card-modern border-0 cursor-pointer"

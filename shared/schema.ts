@@ -270,6 +270,7 @@ export const insertCategorySchema = createInsertSchema(categories).pick({
   slug: true,
   description: true,
   imageUrl: true,
+  isFeatured: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({

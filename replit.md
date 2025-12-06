@@ -46,6 +46,7 @@ Preferred communication style: Simple, everyday language.
 ## Key Features
 - **Dual User Roles**: Customer shopping interface and admin management dashboard
 - **Product Management**: Full CRUD operations for products and categories
+- **Featured Categories**: Admin-manageable featured categories displayed on landing/home pages. Admins toggle the Featured switch in category management to show/hide categories on the storefront
 - **Shopping Cart**: Session-based cart with quantity management
 - **Order Processing**: Complete order lifecycle from cart to delivery
 - **Admin Dashboard**: Statistics, order management, product management, and customer oversight
