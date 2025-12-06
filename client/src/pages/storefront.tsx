@@ -8,7 +8,9 @@ import CartView from "@/components/storefront/CartView";
 import OrdersView from "@/components/storefront/OrdersView";
 import AccountView from "@/components/storefront/AccountView";
 import HelpView from "@/components/storefront/HelpView";
+import { ChatWidget } from "@/components/storefront/ChatWidget";
 import { CartProvider } from "@/contexts/CartContext";
+import { useAuth } from "@/hooks/useAuth";
 
 function parseSection(search: string): StorefrontSection {
   const params = new URLSearchParams(search);
@@ -33,6 +35,7 @@ function isValidSection(section: string): section is StorefrontSection {
 
 export default function Storefront() {
   const [location, setLocation] = useLocation();
+  const { user, isAuthenticated } = useAuth();
   const [activeSection, setActiveSection] = useState<StorefrontSection>(() => {
     const search = window.location.search;
     return parseSection(search);
@@ -96,6 +99,13 @@ export default function Storefront() {
             {renderContent()}
           </div>
         </main>
+
+        {isAuthenticated && user && (
+          <ChatWidget 
+            userId={user.id} 
+            userName={user.firstName || user.email || 'Customer'} 
+          />
+        )}
       </div>
     </CartProvider>
   );
