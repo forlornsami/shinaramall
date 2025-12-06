@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { 
   Settings, 
   Store, 
@@ -16,18 +18,19 @@ import {
   Globe, 
   Palette,
   Save,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from "lucide-react";
+import type { StoreSettings } from "@shared/schema";
 
 export default function SettingsSection() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
   
   const [storeSettings, setStoreSettings] = useState({
-    storeName: "Eshaal Store",
-    storeEmail: "contact@eshaalstore.pk",
-    storePhone: "+92 300 1234567",
-    storeAddress: "Lahore, Pakistan",
+    storeName: "",
+    storeEmail: "",
+    storePhone: "",
+    storeAddress: "",
     currency: "PKR",
   });
 
@@ -39,15 +42,73 @@ export default function SettingsSection() {
     marketingEmails: false,
   });
 
+  const { data: settings, isLoading: settingsLoading } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setStoreSettings({
+        storeName: settings.storeName || "",
+        storeEmail: settings.storeEmail || "",
+        storePhone: settings.storePhone || "",
+        storeAddress: settings.storeAddress || "",
+        currency: settings.currency || "PKR",
+      });
+      setNotifications({
+        orderNotifications: settings.orderNotifications ?? true,
+        stockAlerts: settings.stockAlerts ?? true,
+        customerRegistrations: settings.customerRegistrations ?? true,
+        paymentUpdates: settings.paymentUpdates ?? true,
+        marketingEmails: settings.marketingEmails ?? false,
+      });
+    }
+  }, [settings]);
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (data: Partial<StoreSettings>) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/store-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to save settings');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/store-settings'] });
+      toast({
+        title: "Settings Saved",
+        description: "Your settings have been saved successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveSettings = async () => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    toast({
-      title: "Settings Saved",
-      description: "Your settings have been saved successfully.",
+    saveSettingsMutation.mutate({
+      ...storeSettings,
+      ...notifications,
     });
   };
+
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" data-testid="section-settings">
@@ -61,15 +122,15 @@ export default function SettingsSection() {
         </div>
         <Button 
           onClick={handleSaveSettings} 
-          disabled={isLoading}
+          disabled={saveSettingsMutation.isPending}
           data-testid="button-save-settings"
         >
-          {isLoading ? (
+          {saveSettingsMutation.isPending ? (
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          {isLoading ? "Saving..." : "Save Changes"}
+          {saveSettingsMutation.isPending ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
@@ -97,7 +158,7 @@ export default function SettingsSection() {
                 Store Information
               </CardTitle>
               <CardDescription>
-                Basic information about your store
+                Basic information about your store (displayed on the website)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
