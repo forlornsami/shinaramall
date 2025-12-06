@@ -804,6 +804,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending orders count for sidebar badge
+  app.get('/api/admin/orders/pending-count', adminAuth, async (req, res) => {
+    try {
+      const count = await storage.getPendingOrdersCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching pending orders count:", error);
+      res.status(500).json({ message: "Failed to fetch pending orders count" });
+    }
+  });
+
   app.patch('/api/admin/orders/:id', adminAuth, async (req, res) => {
     try {
       const { status, paymentStatus } = req.body;

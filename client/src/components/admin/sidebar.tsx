@@ -100,7 +100,6 @@ const sidebarItems = [
     label: "Orders",
     icon: ShoppingBag,
     color: "from-orange-500 to-orange-600",
-    badge: "3",
   },
   {
     id: "customers",
@@ -165,6 +164,19 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
   
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
+  });
+
+  const { data: pendingOrdersCount } = useQuery<{ count: number }>({
+    queryKey: ['/api/admin/orders/pending-count'],
+    queryFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/orders/pending-count', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return { count: 0 };
+      return response.json();
+    },
+    refetchInterval: 30000,
   });
 
   const canAccessSection = (sectionId: string): boolean => {
@@ -237,9 +249,9 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
                 <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-white")} />
               </div>
               <span className="flex-1 text-left">{item.label}</span>
-              {item.badge && (
+              {item.id === 'orders' && pendingOrdersCount && pendingOrdersCount.count > 0 && (
                 <Badge className="bg-destructive text-white border-0 h-5 min-w-5 flex items-center justify-center text-xs">
-                  {item.badge}
+                  {pendingOrdersCount.count}
                 </Badge>
               )}
               {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
