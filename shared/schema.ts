@@ -37,6 +37,29 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Roles table for access control
+export const roles = pgTable("roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  displayName: varchar("display_name").notNull(),
+  description: text("description"),
+  permissions: jsonb("permissions").$type<{
+    dashboard: boolean;
+    products: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+    categories: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+    orders: { view: boolean; edit: boolean };
+    customers: { view: boolean };
+    inventory: { view: boolean; adjust: boolean };
+    payments: { view: boolean; manage: boolean };
+    users: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+    roles: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+    settings: { view: boolean; edit: boolean };
+  }>().notNull(),
+  isSystem: boolean("is_system").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Admin users table (separate from customer users)
 export const adminUsers = pgTable("admin_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -44,6 +67,9 @@ export const adminUsers = pgTable("admin_users", {
   email: varchar("email").notNull().unique(),
   passwordHash: varchar("password_hash").notNull(),
   role: varchar("role").notNull().default("admin"),
+  roleId: varchar("role_id").references(() => roles.id),
+  isActive: boolean("is_active").default(true),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -157,6 +183,17 @@ export const usersRelations = relations(users, ({ many }) => ({
   cartItems: many(cartItems),
 }));
 
+export const rolesRelations = relations(roles, ({ many }) => ({
+  adminUsers: many(adminUsers),
+}));
+
+export const adminUsersRelations = relations(adminUsers, ({ one }) => ({
+  roleData: one(roles, {
+    fields: [adminUsers.roleId],
+    references: [roles.id],
+  }),
+}));
+
 export const categoriesRelations = relations(categories, ({ many }) => ({
   products: many(products),
 }));
@@ -208,11 +245,21 @@ export const insertUserSchema = createInsertSchema(users).pick({
   profileImageUrl: true,
 });
 
+export const insertRoleSchema = createInsertSchema(roles).pick({
+  name: true,
+  displayName: true,
+  description: true,
+  permissions: true,
+  isSystem: true,
+});
+
 export const insertAdminUserSchema = createInsertSchema(adminUsers).pick({
   username: true,
   email: true,
   passwordHash: true,
   role: true,
+  roleId: true,
+  isActive: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).pick({
@@ -264,8 +311,24 @@ export const insertCartItemSchema = createInsertSchema(cartItems).pick({
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = z.infer<typeof insertRoleSchema>;
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+
+// Permission types
+export type RolePermissions = {
+  dashboard: boolean;
+  products: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  categories: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  orders: { view: boolean; edit: boolean };
+  customers: { view: boolean };
+  inventory: { view: boolean; adjust: boolean };
+  payments: { view: boolean; manage: boolean };
+  users: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  roles: { view: boolean; create: boolean; edit: boolean; delete: boolean };
+  settings: { view: boolean; edit: boolean };
+};
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Product = typeof products.$inferSelect;

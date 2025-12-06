@@ -80,13 +80,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/register', async (req, res) => {
+  // Initialize default roles on startup
+  storage.initializeDefaultRoles().catch(console.error);
+
+  // ==================== ROLE MANAGEMENT ====================
+  
+  // Get all roles
+  app.get('/api/admin/roles', adminAuth, async (req, res) => {
     try {
-      const { username, email, password } = req.body;
+      const roles = await storage.getRoles();
+      res.json(roles);
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+      res.status(500).json({ message: "Failed to fetch roles" });
+    }
+  });
+
+  // Get single role
+  app.get('/api/admin/roles/:id', adminAuth, async (req, res) => {
+    try {
+      const role = await storage.getRole(req.params.id);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+      res.json(role);
+    } catch (error) {
+      console.error("Error fetching role:", error);
+      res.status(500).json({ message: "Failed to fetch role" });
+    }
+  });
+
+  // Create role
+  app.post('/api/admin/roles', adminAuth, async (req, res) => {
+    try {
+      const { name, displayName, description, permissions } = req.body;
       
-      // Check if admin already exists
-      const existingAdmin = await storage.getAdminUserByUsername(username);
-      if (existingAdmin) {
+      const existing = await storage.getRoleByName(name);
+      if (existing) {
+        return res.status(400).json({ message: "Role name already exists" });
+      }
+
+      const role = await storage.createRole({
+        name,
+        displayName,
+        description,
+        permissions,
+        isSystem: false,
+      });
+      res.json(role);
+    } catch (error) {
+      console.error("Error creating role:", error);
+      res.status(500).json({ message: "Failed to create role" });
+    }
+  });
+
+  // Update role
+  app.patch('/api/admin/roles/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const roleData = req.body;
+      
+      const existingRole = await storage.getRole(id);
+      if (!existingRole) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (existingRole.isSystem && roleData.name && roleData.name !== existingRole.name) {
+        return res.status(400).json({ message: "Cannot change name of system role" });
+      }
+
+      const role = await storage.updateRole(id, roleData);
+      res.json(role);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
+  // Delete role
+  app.delete('/api/admin/roles/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const existingRole = await storage.getRole(id);
+      if (!existingRole) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (existingRole.isSystem) {
+        return res.status(400).json({ message: "Cannot delete system role" });
+      }
+
+      const deleted = await storage.deleteRole(id);
+      res.json({ message: "Role deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting role:", error);
+      res.status(500).json({ message: "Failed to delete role" });
+    }
+  });
+
+  // ==================== USER MANAGEMENT ====================
+  
+  // Get all admin users
+  app.get('/api/admin/users', adminAuth, async (req, res) => {
+    try {
+      const users = await storage.getAdminUsers();
+      const safeUsers = users.map(u => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        roleId: u.roleId,
+        roleData: u.roleData,
+        isActive: u.isActive,
+        lastLoginAt: u.lastLoginAt,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+      }));
+      res.json(safeUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Get single admin user
+  app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
+    try {
+      const user = await storage.getAdminUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        roleId: user.roleId,
+        isActive: user.isActive,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      });
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Create admin user
+  app.post('/api/admin/users', adminAuth, async (req, res) => {
+    try {
+      const { username, email, password, roleId, isActive = true } = req.body;
+      
+      const existingUsername = await storage.getAdminUserByUsername(username);
+      if (existingUsername) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
@@ -97,31 +245,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const passwordHash = await bcrypt.hash(password, 10);
       
-      const admin = await storage.createAdminUser({
+      let roleName = 'staff';
+      if (roleId) {
+        const role = await storage.getRole(roleId);
+        if (role) {
+          roleName = role.name;
+        }
+      }
+      
+      const user = await storage.createAdminUser({
         username,
         email,
         passwordHash,
-        role: 'admin',
+        role: roleName,
+        roleId,
+        isActive,
       });
-
-      const token = jwt.sign(
-        { adminId: admin.id, username: admin.username },
-        process.env.JWT_SECRET || 'admin-secret',
-        { expiresIn: '24h' }
-      );
 
       res.json({
-        token,
-        admin: {
-          id: admin.id,
-          username: admin.username,
-          email: admin.email,
-          role: admin.role,
-        }
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        roleId: user.roleId,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
       });
     } catch (error) {
-      console.error("Admin registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Update admin user
+  app.patch('/api/admin/users/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { username, email, password, roleId, isActive } = req.body;
+
+      const existingUser = await storage.getAdminUser(id);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updateData: any = {};
+
+      if (username && username !== existingUser.username) {
+        const existingUsername = await storage.getAdminUserByUsername(username);
+        if (existingUsername) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+        updateData.username = username;
+      }
+
+      if (email && email !== existingUser.email) {
+        const existingEmail = await storage.getAdminUserByEmail(email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
+        updateData.email = email;
+      }
+
+      if (password) {
+        updateData.passwordHash = await bcrypt.hash(password, 10);
+      }
+
+      if (roleId !== undefined) {
+        updateData.roleId = roleId;
+        if (roleId) {
+          const role = await storage.getRole(roleId);
+          if (role) {
+            updateData.role = role.name;
+          }
+        }
+      }
+
+      if (isActive !== undefined) {
+        updateData.isActive = isActive;
+      }
+
+      const user = await storage.updateAdminUser(id, updateData);
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        roleId: user.roleId,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      });
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Delete admin user
+  app.delete('/api/admin/users/:id', adminAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      if (req.admin.id === id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const existingUser = await storage.getAdminUser(id);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const deleted = await storage.deleteAdminUser(id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 

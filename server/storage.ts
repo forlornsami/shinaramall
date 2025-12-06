@@ -1,6 +1,7 @@
 import {
   users,
   adminUsers,
+  roles,
   categories,
   products,
   orders,
@@ -12,6 +13,8 @@ import {
   type UpsertUser,
   type AdminUser,
   type InsertAdminUser,
+  type Role,
+  type InsertRole,
   type Category,
   type InsertCategory,
   type Product,
@@ -39,7 +42,20 @@ export interface IStorage {
   getAdminUser(id: string): Promise<AdminUser | undefined>;
   getAdminUserByUsername(username: string): Promise<AdminUser | undefined>;
   getAdminUserByEmail(email: string): Promise<AdminUser | undefined>;
+  getAdminUsers(): Promise<(AdminUser & { roleData?: Role })[]>;
   createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
+  updateAdminUser(id: string, user: Partial<InsertAdminUser>): Promise<AdminUser>;
+  deleteAdminUser(id: string): Promise<boolean>;
+  updateAdminUserLastLogin(id: string): Promise<AdminUser>;
+  
+  // Role operations
+  getRoles(): Promise<Role[]>;
+  getRole(id: string): Promise<Role | undefined>;
+  getRoleByName(name: string): Promise<Role | undefined>;
+  createRole(role: InsertRole): Promise<Role>;
+  updateRole(id: string, role: Partial<InsertRole>): Promise<Role>;
+  deleteRole(id: string): Promise<boolean>;
+  initializeDefaultRoles(): Promise<void>;
   
   // Category operations
   getCategories(): Promise<Category[]>;
@@ -136,6 +152,180 @@ export class DatabaseStorage implements IStorage {
   async createAdminUser(userData: InsertAdminUser): Promise<AdminUser> {
     const [user] = await db.insert(adminUsers).values(userData).returning();
     return user;
+  }
+
+  async getAdminUsers(): Promise<(AdminUser & { roleData?: Role })[]> {
+    const result = await db
+      .select({
+        id: adminUsers.id,
+        username: adminUsers.username,
+        email: adminUsers.email,
+        passwordHash: adminUsers.passwordHash,
+        role: adminUsers.role,
+        roleId: adminUsers.roleId,
+        isActive: adminUsers.isActive,
+        lastLoginAt: adminUsers.lastLoginAt,
+        createdAt: adminUsers.createdAt,
+        updatedAt: adminUsers.updatedAt,
+        roleData: roles,
+      })
+      .from(adminUsers)
+      .leftJoin(roles, eq(adminUsers.roleId, roles.id))
+      .orderBy(desc(adminUsers.createdAt));
+    return result;
+  }
+
+  async updateAdminUser(id: string, userData: Partial<InsertAdminUser>): Promise<AdminUser> {
+    const [user] = await db
+      .update(adminUsers)
+      .set({
+        ...userData,
+        updatedAt: new Date(),
+      })
+      .where(eq(adminUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  async deleteAdminUser(id: string): Promise<boolean> {
+    const result = await db.delete(adminUsers).where(eq(adminUsers.id, id));
+    return result.rowCount > 0;
+  }
+
+  async updateAdminUserLastLogin(id: string): Promise<AdminUser> {
+    const [user] = await db
+      .update(adminUsers)
+      .set({
+        lastLoginAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(adminUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  // Role operations
+  async getRoles(): Promise<Role[]> {
+    return await db.select().from(roles).orderBy(roles.name);
+  }
+
+  async getRole(id: string): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.id, id));
+    return role;
+  }
+
+  async getRoleByName(name: string): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.name, name));
+    return role;
+  }
+
+  async createRole(roleData: InsertRole): Promise<Role> {
+    const [role] = await db.insert(roles).values({
+      ...roleData,
+      updatedAt: new Date(),
+    }).returning();
+    return role;
+  }
+
+  async updateRole(id: string, roleData: Partial<InsertRole>): Promise<Role> {
+    const [role] = await db
+      .update(roles)
+      .set({
+        ...roleData,
+        updatedAt: new Date(),
+      })
+      .where(eq(roles.id, id))
+      .returning();
+    return role;
+  }
+
+  async deleteRole(id: string): Promise<boolean> {
+    const result = await db.delete(roles).where(eq(roles.id, id));
+    return result.rowCount > 0;
+  }
+
+  async initializeDefaultRoles(): Promise<void> {
+    const defaultRoles = [
+      {
+        name: 'super_admin',
+        displayName: 'Super Admin',
+        description: 'Full access to all features',
+        isSystem: true,
+        permissions: {
+          dashboard: true,
+          products: { view: true, create: true, edit: true, delete: true },
+          categories: { view: true, create: true, edit: true, delete: true },
+          orders: { view: true, edit: true },
+          customers: { view: true },
+          inventory: { view: true, adjust: true },
+          payments: { view: true, manage: true },
+          users: { view: true, create: true, edit: true, delete: true },
+          roles: { view: true, create: true, edit: true, delete: true },
+          settings: { view: true, edit: true },
+        },
+      },
+      {
+        name: 'admin',
+        displayName: 'Admin',
+        description: 'Manage products, orders, and customers',
+        isSystem: true,
+        permissions: {
+          dashboard: true,
+          products: { view: true, create: true, edit: true, delete: true },
+          categories: { view: true, create: true, edit: true, delete: true },
+          orders: { view: true, edit: true },
+          customers: { view: true },
+          inventory: { view: true, adjust: true },
+          payments: { view: true, manage: false },
+          users: { view: false, create: false, edit: false, delete: false },
+          roles: { view: false, create: false, edit: false, delete: false },
+          settings: { view: true, edit: false },
+        },
+      },
+      {
+        name: 'manager',
+        displayName: 'Manager',
+        description: 'View and manage orders and inventory',
+        isSystem: true,
+        permissions: {
+          dashboard: true,
+          products: { view: true, create: false, edit: true, delete: false },
+          categories: { view: true, create: false, edit: false, delete: false },
+          orders: { view: true, edit: true },
+          customers: { view: true },
+          inventory: { view: true, adjust: true },
+          payments: { view: true, manage: false },
+          users: { view: false, create: false, edit: false, delete: false },
+          roles: { view: false, create: false, edit: false, delete: false },
+          settings: { view: false, edit: false },
+        },
+      },
+      {
+        name: 'staff',
+        displayName: 'Staff',
+        description: 'View products and process orders',
+        isSystem: true,
+        permissions: {
+          dashboard: true,
+          products: { view: true, create: false, edit: false, delete: false },
+          categories: { view: true, create: false, edit: false, delete: false },
+          orders: { view: true, edit: true },
+          customers: { view: true },
+          inventory: { view: true, adjust: false },
+          payments: { view: false, manage: false },
+          users: { view: false, create: false, edit: false, delete: false },
+          roles: { view: false, create: false, edit: false, delete: false },
+          settings: { view: false, edit: false },
+        },
+      },
+    ];
+
+    for (const roleData of defaultRoles) {
+      const existing = await this.getRoleByName(roleData.name);
+      if (!existing) {
+        await this.createRole(roleData);
+      }
+    }
   }
 
   // Category operations
