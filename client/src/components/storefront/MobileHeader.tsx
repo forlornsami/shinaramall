@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/contexts/CartContext";
+import { CustomerNotificationBell } from "./NotificationBell";
 import type { Category, StoreSettings } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import {
@@ -210,6 +211,7 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
                         </p>
                         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
+                      <CustomerNotificationBell />
                     </div>
                     <Button
                       variant="outline"
