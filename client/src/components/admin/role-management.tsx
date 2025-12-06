@@ -44,6 +44,7 @@ interface Permission {
   delete?: boolean;
   adjust?: boolean;
   manage?: boolean;
+  respond?: boolean;
 }
 
 interface Role {
@@ -69,6 +70,7 @@ const defaultPermissions: Record<string, boolean | Permission> = {
   users: { view: false, create: false, edit: false, delete: false },
   roles: { view: false, create: false, edit: false, delete: false },
   settings: { view: false, edit: false },
+  chat: { view: false, respond: false },
 };
 
 const permissionLabels: Record<string, string> = {
@@ -82,6 +84,7 @@ const permissionLabels: Record<string, string> = {
   users: "User Management",
   roles: "Role Management",
   settings: "Settings Access",
+  chat: "Chat Support",
 };
 
 export default function RoleManagement() {
