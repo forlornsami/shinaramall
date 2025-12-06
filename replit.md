@@ -37,9 +37,11 @@ Preferred communication style: Simple, everyday language.
 - **Session Storage**: Dedicated sessions table for authentication persistence
 
 ## Payment Integration
-- **Pakistani Payment Methods**: EasyPaisa, JazzCash, and HBL bank support
+- **Pakistani Payment Methods**: EasyPaisa, JazzCash, HBL bank, and Cash on Delivery (COD) support
+- **Payment Gateway Management**: Full CRUD operations for payment gateways with icons and descriptions
 - **Order Processing**: Structured checkout flow with shipping address collection
 - **Payment Status Tracking**: Order status management (pending, processing, shipped, delivered)
+- **COD Support**: Cash on Delivery option marks orders as confirmed with pending payment collection
 
 ## Key Features
 - **Dual User Roles**: Customer shopping interface and admin management dashboard
