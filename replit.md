@@ -54,6 +54,9 @@ Preferred communication style: Simple, everyday language.
 - **Admin Dashboard**: Statistics, order management, product management, and customer oversight
 - **Customer Profile Management**: Users can view and edit their profile (firstName, lastName) with secure backend validation
 - **Admin Settings & Help Center**: Store configuration, notifications, security settings, FAQ, and support features
+- **Customizable Store Branding**: Admins can upload store logo (base64) and change store name, which dynamically updates across all navigation components
+- **Security Features**: Password change with bcrypt verification, active session management in admin security settings
+- **RBAC System**: Case-insensitive admin role checking supports various role formats (Super_admin, admin, etc.)
 
 ## Storefront Architecture
 - **URL-based Navigation**: Query parameters control views (/?view=products, /?view=cart, etc.)
