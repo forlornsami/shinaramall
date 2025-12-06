@@ -13,6 +13,8 @@ import SettingsSection from "@/components/admin/settings";
 import HelpCenterSection from "@/components/admin/help-center";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
 import { 
   BarChart3, 
@@ -24,15 +26,48 @@ import {
   ArrowUpRight,
   Sparkles,
   DollarSign,
-  Activity
+  Activity,
+  Menu,
+  X,
+  Warehouse,
+  CreditCard,
+  Tag,
+  LogOut,
+  Settings,
+  HelpCircle,
+  ChevronRight,
+  Shield,
+  UserCog
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "users" | "roles" | "settings" | "help";
+
+const sidebarItems = [
+  { id: "overview", label: "Dashboard", icon: BarChart3, color: "from-blue-500 to-blue-600" },
+  { id: "products", label: "Products", icon: Package, color: "from-purple-500 to-purple-600" },
+  { id: "categories", label: "Categories", icon: Tag, color: "from-pink-500 to-pink-600" },
+  { id: "orders", label: "Orders", icon: ShoppingBag, color: "from-orange-500 to-orange-600", badge: "3" },
+  { id: "customers", label: "Customers", icon: Users, color: "from-green-500 to-green-600" },
+  { id: "inventory", label: "Inventory", icon: Warehouse, color: "from-cyan-500 to-cyan-600" },
+  { id: "payments", label: "Payments", icon: CreditCard, color: "from-emerald-500 to-emerald-600" },
+];
+
+const accessControlItems = [
+  { id: "users", label: "User Management", icon: UserCog, color: "from-indigo-500 to-indigo-600" },
+  { id: "roles", label: "Roles & Permissions", icon: Shield, color: "from-amber-500 to-amber-600" },
+];
+
+const settingsItems = [
+  { id: "settings", label: "Settings", icon: Settings, color: "from-slate-500 to-slate-600" },
+  { id: "help", label: "Help Center", icon: HelpCircle, color: "from-teal-500 to-teal-600" },
+];
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const [adminUser, setAdminUser] = useState<{ username: string; email: string; role: string } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -253,13 +288,184 @@ export default function AdminDashboard() {
       />
       <main className="lg:ml-72 min-h-screen">
         {/* Top Bar */}
-        <div className="sticky top-0 z-40 glass-nav px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="sticky top-0 z-40 glass-nav px-4 lg:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Mobile Menu Button */}
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="lg:hidden h-10 w-10 rounded-xl"
+                  data-testid="button-mobile-menu"
+                >
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80 p-0 border-r">
+                <div className="flex flex-col h-full">
+                  {/* Logo Section */}
+                  <div className="p-6 border-b border-border">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold text-lg">E</span>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold gradient-text">Eshaal Store</h2>
+                        <p className="text-xs text-muted-foreground">Admin Panel</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Navigation */}
+                  <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Main Menu</p>
+                    {sidebarItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeSection === item.id;
+                      return (
+                        <Button
+                          key={item.id}
+                          variant="ghost"
+                          className={cn(
+                            "w-full justify-start text-sm font-medium transition-all duration-200 rounded-xl h-12 px-3 group",
+                            isActive
+                              ? "bg-primary text-primary-foreground hover:bg-primary shadow-lg"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                          )}
+                          onClick={() => {
+                            setActiveSection(item.id as AdminSection);
+                            setMobileMenuOpen(false);
+                          }}
+                          data-testid={`mobile-nav-${item.id}`}
+                        >
+                          <div className={cn(
+                            "w-9 h-9 rounded-xl flex items-center justify-center mr-3 transition-all",
+                            isActive ? "bg-white/20" : `bg-gradient-to-br ${item.color} opacity-80 group-hover:opacity-100`
+                          )}>
+                            <Icon className="h-5 w-5 text-white" />
+                          </div>
+                          <span className="flex-1 text-left">{item.label}</span>
+                          {item.badge && (
+                            <Badge className="bg-destructive text-white border-0 h-5 min-w-5 flex items-center justify-center text-xs">
+                              {item.badge}
+                            </Badge>
+                          )}
+                          {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
+                        </Button>
+                      );
+                    })}
+                    
+                    <div className="pt-4 mt-4 border-t border-border">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Access Control</p>
+                      {accessControlItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeSection === item.id;
+                        return (
+                          <Button
+                            key={item.id}
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-start text-sm font-medium transition-all duration-200 rounded-xl h-12 px-3 group",
+                              isActive
+                                ? "bg-primary text-primary-foreground hover:bg-primary shadow-lg"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            )}
+                            onClick={() => {
+                              setActiveSection(item.id as AdminSection);
+                              setMobileMenuOpen(false);
+                            }}
+                            data-testid={`mobile-nav-${item.id}`}
+                          >
+                            <div className={cn(
+                              "w-9 h-9 rounded-xl flex items-center justify-center mr-3 transition-all",
+                              isActive ? "bg-white/20" : `bg-gradient-to-br ${item.color} opacity-80 group-hover:opacity-100`
+                            )}>
+                              <Icon className="h-5 w-5 text-white" />
+                            </div>
+                            <span className="flex-1 text-left">{item.label}</span>
+                            {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <div className="pt-4 mt-4 border-t border-border">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Settings</p>
+                      {settingsItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeSection === item.id;
+                        return (
+                          <Button
+                            key={item.id}
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-start text-sm font-medium transition-all duration-200 rounded-xl h-12 px-3 group",
+                              isActive
+                                ? "bg-primary text-primary-foreground hover:bg-primary shadow-lg"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            )}
+                            onClick={() => {
+                              setActiveSection(item.id as AdminSection);
+                              setMobileMenuOpen(false);
+                            }}
+                            data-testid={`mobile-nav-${item.id}`}
+                          >
+                            <div className={cn(
+                              "w-9 h-9 rounded-xl flex items-center justify-center mr-3 transition-all",
+                              isActive ? "bg-white/20" : `bg-gradient-to-br ${item.color} opacity-80 group-hover:opacity-100`
+                            )}>
+                              <Icon className="h-5 w-5 text-white" />
+                            </div>
+                            <span className="flex-1 text-left">{item.label}</span>
+                            {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </nav>
+                  
+                  {/* User Profile Section */}
+                  {adminUser && (
+                    <div className="p-4 border-t border-border">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                          <span className="text-white font-semibold text-sm">
+                            {adminUser.username.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{adminUser.username}</p>
+                          <p className="text-xs text-muted-foreground truncate">{adminUser.email}</p>
+                        </div>
+                        <Badge className="bg-primary/10 text-primary border-0 text-xs capitalize">
+                          {adminUser.role}
+                        </Badge>
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-sm font-medium rounded-xl h-11 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
+                        onClick={() => {
+                          handleLogout();
+                          setMobileMenuOpen(false);
+                        }}
+                        data-testid="mobile-sidebar-logout"
+                      >
+                        <LogOut className="h-4 w-4 mr-3" />
+                        Log out
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            <div className="flex-1">
               <h2 className="text-xl font-semibold text-foreground capitalize">
                 {activeSection === "overview" ? "Dashboard" : activeSection.replace("-", " ")}
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground hidden sm:block">
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
