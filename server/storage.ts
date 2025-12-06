@@ -11,6 +11,8 @@ import {
   paymentTransactions,
   storeSettings,
   notifications,
+  chatConversations,
+  chatMessages,
   type User,
   type UpsertUser,
   type AdminUser,
@@ -36,9 +38,14 @@ import {
   type InsertStoreSettings,
   type Notification,
   type InsertNotification,
+  type ChatConversation,
+  type InsertChatConversation,
+  type ChatMessage,
+  type InsertChatMessage,
+  type ChatConversationWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, like, ilike } from "drizzle-orm";
+import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -134,6 +141,20 @@ export interface IStorage {
   markNotificationAsRead(id: string): Promise<Notification>;
   markAllNotificationsAsRead(recipientType: string, recipientId?: string): Promise<void>;
   deleteNotification(id: string): Promise<boolean>;
+  
+  // Chat operations
+  getChatConversations(filters?: { status?: string; assignedAgentId?: string; unassigned?: boolean }): Promise<ChatConversationWithDetails[]>;
+  getChatConversation(id: string): Promise<ChatConversationWithDetails | undefined>;
+  getCustomerConversation(customerId: string): Promise<ChatConversation | undefined>;
+  createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation>;
+  updateChatConversation(id: string, data: Partial<InsertChatConversation>): Promise<ChatConversation>;
+  assignChatAgent(conversationId: string, agentId: string): Promise<ChatConversation>;
+  
+  // Chat message operations
+  getChatMessages(conversationId: string): Promise<ChatMessage[]>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  markMessagesAsRead(conversationId: string, senderType: string): Promise<void>;
+  getUnreadMessageCount(conversationId: string, senderType: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -345,6 +366,7 @@ export class DatabaseStorage implements IStorage {
           users: { view: true, create: true, edit: true, delete: true },
           roles: { view: true, create: true, edit: true, delete: true },
           settings: { view: true, edit: true },
+          chat: { view: true, respond: true },
         },
       },
       {
@@ -363,6 +385,7 @@ export class DatabaseStorage implements IStorage {
           users: { view: false, create: false, edit: false, delete: false },
           roles: { view: false, create: false, edit: false, delete: false },
           settings: { view: true, edit: false },
+          chat: { view: true, respond: true },
         },
       },
       {
@@ -399,6 +422,25 @@ export class DatabaseStorage implements IStorage {
           users: { view: false, create: false, edit: false, delete: false },
           roles: { view: false, create: false, edit: false, delete: false },
           settings: { view: false, edit: false },
+        },
+      },
+      {
+        name: 'chat_support',
+        displayName: 'Chat Support',
+        description: 'Handle customer chat support and live chat inquiries',
+        isSystem: true,
+        permissions: {
+          dashboard: true,
+          products: { view: true, create: false, edit: false, delete: false },
+          categories: { view: true, create: false, edit: false, delete: false },
+          orders: { view: true, edit: false },
+          customers: { view: true },
+          inventory: { view: false, adjust: false },
+          payments: { view: false, manage: false },
+          users: { view: false, create: false, edit: false, delete: false },
+          roles: { view: false, create: false, edit: false, delete: false },
+          settings: { view: false, edit: false },
+          chat: { view: true, respond: true },
         },
       },
     ];
@@ -1021,6 +1063,162 @@ export class DatabaseStorage implements IStorage {
   async deleteNotification(id: string): Promise<boolean> {
     const result = await db.delete(notifications).where(eq(notifications.id, id));
     return true;
+  }
+
+  // Chat operations
+  async getChatConversations(filters?: { status?: string; assignedAgentId?: string; unassigned?: boolean }): Promise<ChatConversationWithDetails[]> {
+    let conditions: any[] = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(chatConversations.status, filters.status as any));
+    }
+    if (filters?.assignedAgentId) {
+      conditions.push(eq(chatConversations.assignedAgentId, filters.assignedAgentId));
+    }
+    if (filters?.unassigned) {
+      conditions.push(isNull(chatConversations.assignedAgentId));
+    }
+    
+    const conversations = await db
+      .select()
+      .from(chatConversations)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(chatConversations.lastMessageAt));
+    
+    // Fetch customer and agent details for each conversation
+    const conversationsWithDetails: ChatConversationWithDetails[] = [];
+    for (const conv of conversations) {
+      const customer = await this.getUser(conv.customerId);
+      const agent = conv.assignedAgentId ? await this.getAdminUser(conv.assignedAgentId) : null;
+      
+      // Get unread count for agent (messages from customer that are unread)
+      const unreadCount = await this.getUnreadMessageCount(conv.id, 'customer');
+      
+      if (customer) {
+        conversationsWithDetails.push({
+          ...conv,
+          customer,
+          assignedAgent: agent,
+          unreadCount,
+        });
+      }
+    }
+    
+    return conversationsWithDetails;
+  }
+
+  async getChatConversation(id: string): Promise<ChatConversationWithDetails | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(chatConversations)
+      .where(eq(chatConversations.id, id));
+    
+    if (!conversation) return undefined;
+    
+    const customer = await this.getUser(conversation.customerId);
+    const agent = conversation.assignedAgentId ? await this.getAdminUser(conversation.assignedAgentId) : null;
+    const messages = await this.getChatMessages(id);
+    
+    if (!customer) return undefined;
+    
+    return {
+      ...conversation,
+      customer,
+      assignedAgent: agent,
+      messages,
+    };
+  }
+
+  async getCustomerConversation(customerId: string): Promise<ChatConversation | undefined> {
+    // Get the most recent open or in-progress conversation for the customer
+    const [conversation] = await db
+      .select()
+      .from(chatConversations)
+      .where(
+        and(
+          eq(chatConversations.customerId, customerId),
+          sql`${chatConversations.status} IN ('open', 'in_progress')`
+        )
+      )
+      .orderBy(desc(chatConversations.createdAt))
+      .limit(1);
+    
+    return conversation;
+  }
+
+  async createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation> {
+    const [created] = await db.insert(chatConversations).values(conversation).returning();
+    return created;
+  }
+
+  async updateChatConversation(id: string, data: Partial<InsertChatConversation>): Promise<ChatConversation> {
+    const [updated] = await db
+      .update(chatConversations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(chatConversations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async assignChatAgent(conversationId: string, agentId: string): Promise<ChatConversation> {
+    const [updated] = await db
+      .update(chatConversations)
+      .set({ 
+        assignedAgentId: agentId, 
+        status: 'in_progress',
+        updatedAt: new Date() 
+      })
+      .where(eq(chatConversations.id, conversationId))
+      .returning();
+    return updated;
+  }
+
+  // Chat message operations
+  async getChatMessages(conversationId: string): Promise<ChatMessage[]> {
+    return db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.conversationId, conversationId))
+      .orderBy(chatMessages.createdAt);
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [created] = await db.insert(chatMessages).values(message).returning();
+    
+    // Update the conversation's lastMessageAt
+    await db
+      .update(chatConversations)
+      .set({ lastMessageAt: new Date() })
+      .where(eq(chatConversations.id, message.conversationId));
+    
+    return created;
+  }
+
+  async markMessagesAsRead(conversationId: string, senderType: string): Promise<void> {
+    // Mark all messages from the specified sender type as read
+    await db
+      .update(chatMessages)
+      .set({ isRead: true })
+      .where(
+        and(
+          eq(chatMessages.conversationId, conversationId),
+          eq(chatMessages.senderType, senderType as any)
+        )
+      );
+  }
+
+  async getUnreadMessageCount(conversationId: string, senderType: string): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.conversationId, conversationId),
+          eq(chatMessages.senderType, senderType as any),
+          eq(chatMessages.isRead, false)
+        )
+      );
+    return result[0]?.count || 0;
   }
 }
 

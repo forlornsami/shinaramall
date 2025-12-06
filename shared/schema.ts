@@ -54,6 +54,7 @@ export const roles = pgTable("roles", {
     users: { view: boolean; create: boolean; edit: boolean; delete: boolean };
     roles: { view: boolean; create: boolean; edit: boolean; delete: boolean };
     settings: { view: boolean; edit: boolean };
+    chat?: { view: boolean; respond: boolean };
   }>().notNull(),
   isSystem: boolean("is_system").default(false),
   isActive: boolean("is_active").default(true),
@@ -333,6 +334,7 @@ export type RolePermissions = {
   users: { view: boolean; create: boolean; edit: boolean; delete: boolean };
   roles: { view: boolean; create: boolean; edit: boolean; delete: boolean };
   settings: { view: boolean; edit: boolean };
+  chat?: { view: boolean; respond: boolean };
 };
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
@@ -473,3 +475,87 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Chat conversation status enum
+export const chatConversationStatusEnum = pgEnum("chat_conversation_status", [
+  "open",
+  "in_progress",
+  "resolved",
+  "closed"
+]);
+
+// Chat sender type enum
+export const chatSenderTypeEnum = pgEnum("chat_sender_type", [
+  "customer",
+  "agent",
+  "system"
+]);
+
+// Chat conversations table
+export const chatConversations = pgTable("chat_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  assignedAgentId: varchar("assigned_agent_id").references(() => adminUsers.id, { onDelete: "set null" }),
+  status: chatConversationStatusEnum("status").notNull().default("open"),
+  subject: varchar("subject"),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Chat messages table
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => chatConversations.id, { onDelete: "cascade" }).notNull(),
+  senderType: chatSenderTypeEnum("sender_type").notNull(),
+  senderId: varchar("sender_id"), // customer user id or admin user id
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Chat relations
+export const chatConversationsRelations = relations(chatConversations, ({ one, many }) => ({
+  customer: one(users, {
+    fields: [chatConversations.customerId],
+    references: [users.id],
+  }),
+  assignedAgent: one(adminUsers, {
+    fields: [chatConversations.assignedAgentId],
+    references: [adminUsers.id],
+  }),
+  messages: many(chatMessages),
+}));
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  conversation: one(chatConversations, {
+    fields: [chatMessages.conversationId],
+    references: [chatConversations.id],
+  }),
+}));
+
+// Chat insert schemas
+export const insertChatConversationSchema = createInsertSchema(chatConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Chat types
+export type ChatConversation = typeof chatConversations.$inferSelect;
+export type InsertChatConversation = z.infer<typeof insertChatConversationSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
+// Extended chat types with relations
+export type ChatConversationWithDetails = ChatConversation & {
+  customer: User;
+  assignedAgent?: AdminUser | null;
+  messages?: ChatMessage[];
+  unreadCount?: number;
+};
