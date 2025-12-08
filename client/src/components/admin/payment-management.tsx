@@ -570,19 +570,19 @@ export default function PaymentManagement() {
       </div>
 
       <Tabs defaultValue="verification" className="space-y-4">
-        <TabsList data-testid="tabs-payment-management">
-          <TabsTrigger value="verification" data-testid="tab-verification" className="relative">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1" data-testid="tabs-payment-management">
+          <TabsTrigger value="verification" data-testid="tab-verification" className="relative text-xs sm:text-sm px-2 sm:px-3">
             Verification
             {pendingVerificationOrders && pendingVerificationOrders.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+              <span className="ml-1 sm:ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 sm:px-2 py-0.5">
                 {pendingVerificationOrders.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="accounts" data-testid="tab-accounts">Payment Accounts</TabsTrigger>
-          <TabsTrigger value="gateways" data-testid="tab-gateways">Payment Gateways</TabsTrigger>
-          <TabsTrigger value="transactions" data-testid="tab-transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="overview" data-testid="tab-overview">Analytics</TabsTrigger>
+          <TabsTrigger value="accounts" data-testid="tab-accounts" className="text-xs sm:text-sm px-2 sm:px-3">Accounts</TabsTrigger>
+          <TabsTrigger value="gateways" data-testid="tab-gateways" className="text-xs sm:text-sm px-2 sm:px-3">Gateways</TabsTrigger>
+          <TabsTrigger value="transactions" data-testid="tab-transactions" className="text-xs sm:text-sm px-2 sm:px-3">Transactions</TabsTrigger>
+          <TabsTrigger value="overview" data-testid="tab-overview" className="text-xs sm:text-sm px-2 sm:px-3">Analytics</TabsTrigger>
         </TabsList>
 
         {/* Payment Verification Tab */}
