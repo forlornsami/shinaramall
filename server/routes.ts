@@ -1149,6 +1149,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get orders pending payment verification (must be before :id route)
+  app.get('/api/admin/orders/pending-verification', adminAuth, async (req, res) => {
+    try {
+      const orders = await storage.getOrdersPendingVerification();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching pending verification orders:", error);
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
   // Get single order details for admin
   app.get('/api/admin/orders/:id', adminAuth, async (req, res) => {
     try {
@@ -1850,17 +1861,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error uploading payment proof:", error);
       res.status(500).json({ message: "Failed to upload payment proof" });
-    }
-  });
-
-  // Admin: Get orders pending payment verification
-  app.get('/api/admin/orders/pending-verification', adminAuth, async (req, res) => {
-    try {
-      const orders = await storage.getOrdersPendingVerification();
-      res.json(orders);
-    } catch (error) {
-      console.error("Error fetching pending verification orders:", error);
-      res.status(500).json({ message: "Failed to fetch orders" });
     }
   });
 
