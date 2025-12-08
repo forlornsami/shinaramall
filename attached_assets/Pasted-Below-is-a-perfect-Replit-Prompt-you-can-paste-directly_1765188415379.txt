@@ -1,0 +1,177 @@
+Below is a perfect Replit Prompt you can paste directly into Replit AI (Ghostwriter) to make it replace Replit Auth with your own internal authentication system using email / phone + password, stored in your own database (PostgreSQL / MySQL / SQLite etc.).
+
+This prompt tells Replit exactly what to generate and how to migrate away from Replit Auth.
+
+
+---
+
+✅ Your Ready-Made Prompt for Replit AI
+
+Copy–paste this entire prompt into Replit:
+
+
+---
+
+🔥 PROMPT FOR REPLIT (Replace Replit Auth With Internal Auth System)
+
+I want to remove Replit Authentication completely from my project.
+Right now, my store uses “Replit Auth” which forces customers to log in using Replit accounts.
+I want a fully internal authentication system that uses my own database, not Replit's login.
+
+Please do the following:
+
+1. Remove all Replit Auth code
+
+Delete import ReplitAuth or any Replit OAuth
+
+Remove any session logic that depends on Replit user ID
+
+Replace any req.user or ctx.user from Replit with my own user model
+
+
+
+2. Create an Internal User Auth System
+
+Backend: Node.js + Express (or match existing backend)
+
+Database: PostgreSQL (or match my current DB)
+
+Use bcrypt to hash passwords
+
+Create users table with:
+
+id (uuid)
+
+name
+
+email
+
+phone
+
+password (hashed)
+
+created_at
+
+updated_at
+
+
+
+
+3. Create Login & Registration Endpoints POST /auth/register
+
+Validate inputs
+
+Hash password using bcrypt
+
+Check if email already exists
+
+Save user to DB
+
+Return a session cookie or JWT
+
+
+POST /auth/login
+
+Find user by email
+
+Compare password with bcrypt
+
+Return session cookie or JWT
+
+
+
+4. Create Protected Route Middleware
+
+Authenticate using:
+
+JWT in header, OR
+
+Session cookie stored in cookie-parser
+
+
+Middleware: authMiddleware
+
+Attach user info to req.user
+
+
+
+5. Update Frontend (React/Vite) Auth
+
+Replace Replit Login button with:
+
+Email input
+
+Password input
+
+Login API call
+
+Register API call
+
+
+Store token in localStorage or HttpOnly cookie
+
+Update context (AuthContext) to keep user logged in
+
+
+
+6. Ensure Cart System Works With Internal Auth
+
+If user is not logged in → allow guest cart
+
+After login → merge guest cart → user cart
+
+Maintain same UI for guest and logged-in users
+
+
+
+7. Update All User References
+
+Replace replit_id with user.id
+
+Replace user.username with user.name or user.email
+
+
+
+8. Make Entire System Independent of Replit Auth
+
+No more Replit login popup
+
+No requirement for users to have Replit accounts
+
+Authentication must now be 100% internal
+
+
+
+
+Please generate:
+
+Updated backend code
+
+Updated frontend login/register UI
+
+Updated middleware
+
+Database migration code
+
+Clear explanation of all changes
+
+
+
+---
+
+✅ Want me to generate the backend code + database schema right now?
+
+I can generate:
+
+✔ Full Express auth system
+✔ PostgreSQL schema (Drizzle ORM / Prisma / raw SQL)
+✔ React login/register pages with form validation
+✔ Token-based sessions
+✔ Guest-to-user cart merge logic
+
+Just tell me:
+
+Which stack is your store using?
+Node + Express + PostgreSQL?
+Or Python?
+Or something else inside Replit?

@@ -98,13 +98,17 @@ export function setupChatWebSocket(server: Server) {
 async function handleAuth(ws: WebSocket, message: any): Promise<ChatClient | null> {
   try {
     if (message.userType === 'customer') {
-      const userId = message.userId;
-      if (!userId) return null;
+      const token = message.token;
+      if (!token) return null;
       
-      const user = await storage.getUser(userId);
-      if (!user) return null;
+      // Verify customer JWT token
+      const JWT_SECRET = process.env.SESSION_SECRET || "eshaal-store-secret-key-change-in-production";
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      
+      const user = await storage.getUser(decoded.userId);
+      if (!user || !user.isActive) return null;
 
-      return { ws, userId, userType: 'customer' };
+      return { ws, userId: user.id, userType: 'customer' };
     } else if (message.userType === 'agent') {
       const token = message.token;
       if (!token) return null;

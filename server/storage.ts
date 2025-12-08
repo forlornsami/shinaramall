@@ -14,7 +14,8 @@ import {
   chatConversations,
   chatMessages,
   type User,
-  type UpsertUser,
+  type InsertUser,
+  type SafeUser,
   type AdminUser,
   type InsertAdminUser,
   type Role,
@@ -48,10 +49,12 @@ import { db } from "./db";
 import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (mandatory for Replit Auth)
+  // User operations (Internal Auth)
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string }): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
+  getAllCustomers(): Promise<SafeUser[]>;
   
   // Admin user operations
   getAdminUser(id: string): Promise<AdminUser | undefined>;
@@ -160,43 +163,42 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations
+  // User operations (Internal Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    // Check if user already exists
-    const existingUser = await this.getUser(userData.id);
-    const isNewUser = !existingUser;
-    
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    return user;
+  }
+
+  async createUser(userData: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string }): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
+      .values({
+        email: userData.email.toLowerCase(),
+        passwordHash: userData.passwordHash,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        mobile: userData.mobile,
+        isActive: true,
       })
       .returning();
     
     // Create notification for new customer registration
-    if (isNewUser) {
-      try {
-        const customerName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.email || 'New Customer');
-        await this.createNotification({
-          recipientType: 'admin',
-          type: 'customer_registration',
-          title: 'New Customer Registration',
-          message: `${customerName} has created an account.`,
-          data: { userId: user.id, email: user.email },
-        });
-      } catch (notificationError) {
-        console.error("Error creating customer registration notification:", notificationError);
-      }
+    try {
+      const customerName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email;
+      await this.createNotification({
+        recipientType: 'admin',
+        type: 'customer_registration',
+        title: 'New Customer Registration',
+        message: `${customerName} has created an account.`,
+        data: { userId: user.id, email: user.email },
+      });
+    } catch (notificationError) {
+      console.error("Error creating customer registration notification:", notificationError);
     }
     
     return user;
@@ -205,10 +207,29 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, data: Partial<User>): Promise<User> {
     const [user] = await db
       .update(users)
-      .set(data)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async getAllCustomers(): Promise<SafeUser[]> {
+    const result = await db.select({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      mobile: users.mobile,
+      shippingAddress: users.shippingAddress,
+      profileImageUrl: users.profileImageUrl,
+      isActive: users.isActive,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    }).from(users).orderBy(desc(users.createdAt));
+    return result;
   }
 
   // Admin user operations

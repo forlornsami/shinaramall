@@ -1,10 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateToken, toSafeUser } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
 
 // Admin JWT middleware
 const adminAuth = async (req: any, res: any, next: any) => {
@@ -29,15 +29,96 @@ const adminAuth = async (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup Replit Auth for customers
-  await setupAuth(app);
+  // ==================== CUSTOMER AUTH ROUTES ====================
+  
+  // Register new customer
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const validation = registerUserSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid input", 
+          errors: validation.error.errors 
+        });
+      }
 
-  // Customer auth routes
+      const { email, password, firstName, lastName, mobile } = validation.data;
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Hash password and create user
+      const passwordHash = await hashPassword(password);
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+        mobile,
+      });
+
+      // Generate token
+      const token = generateToken({ userId: user.id, email: user.email });
+
+      res.status(201).json({
+        token,
+        user: toSafeUser(user),
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Login customer
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const validation = loginUserSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid input", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { email, password } = validation.data;
+
+      // Find user
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is inactive" });
+      }
+
+      // Compare password
+      const isValidPassword = await comparePassword(password, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Generate token
+      const token = generateToken({ userId: user.id, email: user.email });
+
+      res.json({
+        token,
+        user: toSafeUser(user),
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Get current user
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      res.json(req.user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -47,11 +128,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile update route
   app.patch('/api/profile', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const { firstName, lastName } = req.body;
+      const userId = req.user.id;
+      const { firstName, lastName, mobile, shippingAddress } = req.body;
       
-      // Only allow updating firstName and lastName - whitelist approach
-      const allowedUpdates: { firstName?: string; lastName?: string; updatedAt: Date } = {
+      // Whitelist allowed updates
+      const allowedUpdates: any = {
         updatedAt: new Date(),
       };
       
@@ -61,10 +142,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof lastName === 'string') {
         allowedUpdates.lastName = lastName.trim().slice(0, 100);
       }
+      if (typeof mobile === 'string') {
+        allowedUpdates.mobile = mobile.trim().slice(0, 20);
+      }
+      if (shippingAddress && typeof shippingAddress === 'object') {
+        allowedUpdates.shippingAddress = shippingAddress;
+      }
       
       const updatedUser = await storage.updateUser(userId, allowedUpdates);
       
-      res.json(updatedUser);
+      res.json(toSafeUser(updatedUser));
     } catch (error) {
       console.error("Error updating profile:", error);
       res.status(500).json({ message: "Failed to update profile" });
@@ -588,7 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart routes
   app.get('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const cartItems = await storage.getCartItems(userId);
       res.json(cartItems);
     } catch (error) {
@@ -599,7 +686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const cartItemData = insertCartItemSchema.parse({
         ...req.body,
         userId,
@@ -614,7 +701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/cart/:productId', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { quantity } = req.body;
       const cartItem = await storage.updateCartItemByProductId(userId, req.params.productId, quantity);
       res.json(cartItem);
@@ -626,7 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/cart/:productId', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const success = await storage.removeFromCartByProductId(userId, req.params.productId);
       if (!success) {
         return res.status(404).json({ message: "Cart item not found" });
@@ -640,7 +727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       await storage.clearCart(userId);
       res.json({ message: "Cart cleared" });
     } catch (error) {
@@ -651,7 +738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/cart/merge', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { items } = req.body;
       
       if (!Array.isArray(items)) {
@@ -686,7 +773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.get('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const orders = await storage.getOrders(userId);
       res.json(orders);
     } catch (error) {
@@ -698,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get customer's pending orders count for sidebar badge
   app.get('/api/orders/pending-count', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const count = await storage.getCustomerPendingOrdersCount(userId);
       res.json({ count });
     } catch (error) {
@@ -722,7 +809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const orderData = insertOrderSchema.parse({
         ...req.body,
         userId,
@@ -1420,7 +1507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mark all customer notifications as read
   app.post('/api/notifications/read-all', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       await storage.markAllNotificationsAsRead('customer', userId);
       res.json({ success: true });
     } catch (error) {
@@ -1434,7 +1521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get or create customer's active conversation
   app.get('/api/chat/conversation', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       let conversation = await storage.getCustomerConversation(userId);
       
       if (!conversation) {
@@ -1455,7 +1542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get messages for a conversation (customer)
   app.get('/api/chat/conversation/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const conversation = await storage.getChatConversation(req.params.id);
       
       if (!conversation || conversation.customerId !== userId) {
@@ -1473,7 +1560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Send message (customer) - fallback for when WebSocket is not available
   app.post('/api/chat/conversation/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { content } = req.body;
       
       const conversation = await storage.getChatConversation(req.params.id);
