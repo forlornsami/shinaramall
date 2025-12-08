@@ -49,7 +49,7 @@ const sidebarItems = [
   { id: "overview", label: "Dashboard", icon: BarChart3, color: "from-blue-500 to-blue-600" },
   { id: "products", label: "Products", icon: Package, color: "from-purple-500 to-purple-600" },
   { id: "categories", label: "Categories", icon: Tag, color: "from-pink-500 to-pink-600" },
-  { id: "orders", label: "Orders", icon: ShoppingBag, color: "from-orange-500 to-orange-600", badge: "3" },
+  { id: "orders", label: "Orders", icon: ShoppingBag, color: "from-orange-500 to-orange-600" },
   { id: "customers", label: "Customers", icon: Users, color: "from-green-500 to-green-600" },
   { id: "inventory", label: "Inventory", icon: Warehouse, color: "from-cyan-500 to-cyan-600" },
   { id: "payments", label: "Payments", icon: CreditCard, color: "from-emerald-500 to-emerald-600" },
@@ -102,6 +102,22 @@ export default function AdminDashboard() {
       return response.json();
     },
     enabled: !!adminUser,
+  });
+
+  const { data: pendingOrdersCount } = useQuery<{ count: number }>({
+    queryKey: ['/api/admin/orders/pending-count'],
+    queryFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/orders/pending-count', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch pending orders count');
+      return response.json();
+    },
+    enabled: !!adminUser,
+    refetchInterval: 30000,
   });
 
   const handleLogout = () => {
@@ -415,9 +431,9 @@ export default function AdminDashboard() {
                             <Icon className="h-5 w-5 text-white" />
                           </div>
                           <span className="flex-1 text-left">{item.label}</span>
-                          {item.badge && (
+                          {item.id === 'orders' && pendingOrdersCount && pendingOrdersCount.count > 0 && (
                             <Badge className="bg-destructive text-white border-0 h-5 min-w-5 flex items-center justify-center text-xs">
-                              {item.badge}
+                              {pendingOrdersCount.count}
                             </Badge>
                           )}
                           {isActive && <ChevronRight className="h-4 w-4 ml-2" />}
