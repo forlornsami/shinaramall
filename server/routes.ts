@@ -807,6 +807,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer order cancellation
+  app.post('/api/orders/:id/cancel', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orderId = req.params.id;
+      
+      // Get the order
+      const order = await storage.getOrder(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      // Verify the order belongs to this user
+      if (order.userId !== userId) {
+        return res.status(403).json({ message: "You can only cancel your own orders" });
+      }
+      
+      // Check if order can be cancelled (only pending or processing)
+      if (order.status !== 'pending' && order.status !== 'processing') {
+        return res.status(400).json({ 
+          message: "This order cannot be cancelled. Orders can only be cancelled before shipping." 
+        });
+      }
+      
+      // Update order status to cancelled
+      const updatedOrder = await storage.updateOrder(orderId, { status: 'cancelled' });
+      
+      // If payment was completed, mark for refund
+      if (order.paymentStatus === 'completed') {
+        await storage.updateOrder(orderId, { paymentStatus: 'refunded' });
+        
+        // Update the transaction status to refunded
+        const transactions = await storage.getPaymentTransactions({ orderId });
+        if (transactions.length > 0) {
+          await storage.updatePaymentTransaction(transactions[0].id, { status: 'refunded' });
+        }
+      }
+      
+      // Restore product stock
+      const orderItems = await storage.getOrderItems(orderId);
+      for (const item of orderItems) {
+        await storage.increaseProductStock(item.productId, item.quantity);
+      }
+      
+      // Create admin notification
+      const user = await storage.getUser(userId);
+      const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
+      await storage.createNotification({
+        recipientType: 'admin',
+        type: 'order_status_update',
+        title: 'Order Cancelled by Customer',
+        message: `Order #${order.id.slice(-8).toUpperCase()} was cancelled by ${customerName}`,
+        data: { orderId, userId, reason: 'customer_requested' },
+      });
+      
+      res.json({ success: true, message: "Order cancelled successfully" });
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      res.status(500).json({ message: "Failed to cancel order" });
+    }
+  });
+
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;

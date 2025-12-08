@@ -1,9 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@shared/schema";
 import {
   ClipboardList,
@@ -14,6 +18,8 @@ import {
   XCircle,
   ChevronRight,
   ShoppingBag,
+  Ban,
+  Loader2,
 } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -26,11 +32,53 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
 
 export default function OrdersView() {
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
     enabled: isAuthenticated,
   });
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      return apiRequest('POST', `/api/orders/${orderId}/cancel`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Order Cancelled",
+        description: "Your order has been cancelled successfully. If you paid online, a refund will be processed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      setShowCancelDialog(false);
+      setCancellingOrderId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cannot Cancel Order",
+        description: error.message || "Failed to cancel order. Please contact support.",
+        variant: "destructive",
+      });
+      setShowCancelDialog(false);
+      setCancellingOrderId(null);
+    },
+  });
+
+  const canCancelOrder = (status: string) => {
+    return status === 'pending' || status === 'processing';
+  };
+
+  const handleCancelClick = (orderId: string) => {
+    setCancellingOrderId(orderId);
+    setShowCancelDialog(true);
+  };
+
+  const confirmCancelOrder = () => {
+    if (cancellingOrderId) {
+      cancelOrderMutation.mutate(cancellingOrderId);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -163,7 +211,24 @@ export default function OrdersView() {
                         <span>{order.shippingAddress?.city}</span>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      {canCancelOrder(order.status) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelClick(order.id);
+                          }}
+                          data-testid={`button-cancel-order-${order.id}`}
+                        >
+                          <Ban className="w-4 h-4 mr-1" />
+                          Cancel Order
+                        </Button>
+                      )}
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -171,6 +236,43 @@ export default function OrdersView() {
           })}
         </div>
       )}
+
+      {/* Cancel Order Confirmation Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this order? This action cannot be undone.
+              {cancellingOrderId && orders?.find(o => o.id === cancellingOrderId)?.paymentStatus === 'completed' && (
+                <span className="block mt-2 text-green-600">
+                  Since you've already paid, a refund will be processed to your original payment method.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCancellingOrderId(null)} data-testid="button-cancel-dialog-no">
+              No, Keep Order
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelOrder}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={cancelOrderMutation.isPending}
+              data-testid="button-cancel-dialog-yes"
+            >
+              {cancelOrderMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                "Yes, Cancel Order"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
