@@ -5,6 +5,7 @@ import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateT
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
+import { createBinancePayService } from "./binancePay";
 
 // Admin JWT middleware
 const adminAuth = async (req: any, res: any, next: any) => {
@@ -1770,14 +1771,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // In production, generate QR code for wallet address payment
         paymentData.paymentUrl = `tron:${walletAddress}?amount=${cryptoAmount}&token=USDT`;
       } else if (gatewayName === 'binance_pay') {
-        // For Binance Pay, we would call the Binance API to create an order
-        // In production, this would make an actual API call to Binance
         paymentData.network = 'binance';
         paymentData.cryptoCurrency = cryptoCurrency || 'USDT';
         
-        // Simulated Binance Pay checkout URL (in production, call Binance API)
-        paymentData.paymentUrl = `https://pay.binance.com/checkout/${externalOrderId}`;
-        paymentData.qrCode = `https://qrservice.binance.com/en/qr/${externalOrderId}.jpg`;
+        const binancePayService = createBinancePayService();
+        
+        if (binancePayService) {
+          try {
+            const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+              : process.env.BASE_URL || 'http://localhost:5000';
+            
+            const binanceOrder = await binancePayService.createOrder({
+              merchantTradeNo: externalOrderId,
+              orderAmount: orderAmount,
+              currency: paymentData.cryptoCurrency,
+              description: `Eshaal Store Order #${orderId.slice(0, 8)}`,
+              goodsDetails: [{
+                goodsType: '01',
+                goodsCategory: 'D000',
+                referenceGoodsId: orderId,
+                goodsName: 'Eshaal Store Purchase',
+                goodsDetail: `Order total: ${orderAmount} USDT`
+              }],
+              returnUrl: `${baseUrl}/?view=orders`,
+              cancelUrl: `${baseUrl}/?view=cart`,
+              webhookUrl: `${baseUrl}/api/webhooks/binance`
+            });
+            
+            if (binanceOrder.data) {
+              paymentData.paymentUrl = binanceOrder.data.checkoutUrl;
+              paymentData.qrCode = binanceOrder.data.qrcodeLink || binanceOrder.data.qrContent;
+              paymentData.binancePrepayId = binanceOrder.data.prepayId;
+            }
+          } catch (apiError) {
+            console.error('Binance Pay API error:', apiError);
+            return res.status(500).json({ 
+              message: "Failed to create Binance Pay order. Please check API credentials or try another payment method."
+            });
+          }
+        } else {
+          return res.status(500).json({ 
+            message: "Binance Pay is not configured. Please contact the store administrator."
+          });
+        }
       }
 
       // Create the crypto payment record
