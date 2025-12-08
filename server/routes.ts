@@ -158,6 +158,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer profile picture upload (base64)
+  app.post('/api/profile/picture', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { imageData } = req.body;
+      
+      if (!imageData || typeof imageData !== 'string') {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+      
+      // Validate base64 image format (data:image/xxx;base64,...)
+      if (!imageData.startsWith('data:image/')) {
+        return res.status(400).json({ message: "Invalid image format" });
+      }
+      
+      // Check file size (max 2MB for base64)
+      const base64Size = imageData.length * 0.75;
+      if (base64Size > 2 * 1024 * 1024) {
+        return res.status(400).json({ message: "Image size must be less than 2MB" });
+      }
+      
+      const updatedUser = await storage.updateUser(userId, {
+        profileImageUrl: imageData,
+        updatedAt: new Date(),
+      });
+      
+      res.json({ success: true, profileImageUrl: updatedUser.profileImageUrl });
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      res.status(500).json({ message: "Failed to upload profile picture" });
+    }
+  });
+
+  // Customer profile picture delete
+  app.delete('/api/profile/picture', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      
+      await storage.updateUser(userId, {
+        profileImageUrl: null,
+        updatedAt: new Date(),
+      });
+      
+      res.json({ success: true, message: "Profile picture deleted" });
+    } catch (error) {
+      console.error("Error deleting profile picture:", error);
+      res.status(500).json({ message: "Failed to delete profile picture" });
+    }
+  });
+
   // Admin auth routes
   app.post('/api/admin/login', async (req, res) => {
     try {
@@ -233,6 +283,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error changing password:", error);
       res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // Get admin profile
+  app.get('/api/admin/profile', adminAuth, async (req: any, res) => {
+    try {
+      const adminId = req.adminUser.id;
+      const admin = await storage.getAdminUser(adminId);
+      
+      if (!admin) {
+        return res.status(404).json({ message: "Admin user not found" });
+      }
+      
+      res.json({
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        roleId: admin.roleId,
+        profilePicture: admin.profilePicture,
+      });
+    } catch (error) {
+      console.error("Error fetching admin profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  // Update admin profile
+  app.patch('/api/admin/profile', adminAuth, async (req: any, res) => {
+    try {
+      const adminId = req.adminUser.id;
+      const { username, email } = req.body;
+      
+      const updates: any = { updatedAt: new Date() };
+      
+      if (typeof username === 'string' && username.trim()) {
+        updates.username = username.trim().slice(0, 50);
+      }
+      if (typeof email === 'string' && email.trim()) {
+        updates.email = email.trim().slice(0, 100);
+      }
+      
+      const updatedAdmin = await storage.updateAdminUser(adminId, updates);
+      
+      res.json({
+        id: updatedAdmin.id,
+        username: updatedAdmin.username,
+        email: updatedAdmin.email,
+        role: updatedAdmin.role,
+        profilePicture: updatedAdmin.profilePicture,
+      });
+    } catch (error) {
+      console.error("Error updating admin profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Admin profile picture upload (base64)
+  app.post('/api/admin/profile/picture', adminAuth, async (req: any, res) => {
+    try {
+      const adminId = req.adminUser.id;
+      const { imageData } = req.body;
+      
+      if (!imageData || typeof imageData !== 'string') {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+      
+      // Validate base64 image format (data:image/xxx;base64,...)
+      if (!imageData.startsWith('data:image/')) {
+        return res.status(400).json({ message: "Invalid image format" });
+      }
+      
+      // Check file size (max 2MB for base64)
+      const base64Size = imageData.length * 0.75;
+      if (base64Size > 2 * 1024 * 1024) {
+        return res.status(400).json({ message: "Image size must be less than 2MB" });
+      }
+      
+      const updatedAdmin = await storage.updateAdminUser(adminId, {
+        profilePicture: imageData,
+        updatedAt: new Date(),
+      });
+      
+      res.json({ success: true, profilePicture: updatedAdmin.profilePicture });
+    } catch (error) {
+      console.error("Error uploading admin profile picture:", error);
+      res.status(500).json({ message: "Failed to upload profile picture" });
+    }
+  });
+
+  // Admin profile picture delete
+  app.delete('/api/admin/profile/picture', adminAuth, async (req: any, res) => {
+    try {
+      const adminId = req.adminUser.id;
+      
+      await storage.updateAdminUser(adminId, {
+        profilePicture: null,
+        updatedAt: new Date(),
+      });
+      
+      res.json({ success: true, message: "Profile picture deleted" });
+    } catch (error) {
+      console.error("Error deleting admin profile picture:", error);
+      res.status(500).json({ message: "Failed to delete profile picture" });
     }
   });
 

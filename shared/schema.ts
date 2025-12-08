@@ -68,6 +68,7 @@ export const adminUsers = pgTable("admin_users", {
   passwordHash: varchar("password_hash").notNull(),
   role: varchar("role").notNull().default("admin"),
   roleId: varchar("role_id").references(() => roles.id),
+  profilePicture: text("profile_picture"),
   isActive: boolean("is_active").default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
