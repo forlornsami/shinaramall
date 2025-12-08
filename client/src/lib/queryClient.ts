@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const TOKEN_KEY = "eshaal_store_token";
+const ADMIN_TOKEN_KEY = "adminToken";
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -14,11 +15,32 @@ export function removeToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-function getAuthHeaders(): HeadersInit {
-  const token = getToken();
+export function getAdminToken(): string | null {
+  return localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function setAdminToken(token: string): void {
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
+
+export function removeAdminToken(): void {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+}
+
+function getAuthHeaders(url?: string): HeadersInit {
   const headers: HeadersInit = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  
+  // Use admin token for admin routes, customer token for others
+  if (url && url.includes('/api/admin/')) {
+    const adminToken = getAdminToken();
+    if (adminToken) {
+      headers["Authorization"] = `Bearer ${adminToken}`;
+    }
+  } else {
+    const token = getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
   }
   return headers;
 }
@@ -36,7 +58,7 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const headers: HeadersInit = {
-    ...getAuthHeaders(),
+    ...getAuthHeaders(url),
   };
   
   if (data) {
@@ -60,9 +82,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey[0] as string;
+    const res = await fetch(url, {
       credentials: "include",
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(url),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

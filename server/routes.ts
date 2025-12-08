@@ -1875,7 +1875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      const updated = await storage.verifyOrderPayment(orderId, req.user.id, approved, note);
+      const updated = await storage.verifyOrderPayment(orderId, req.admin.id, approved, note);
 
       // Create admin notification about the verification
       await storage.createNotification({
