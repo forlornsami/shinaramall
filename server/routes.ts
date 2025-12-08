@@ -2619,9 +2619,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   
-  // Setup WebSocket for chat
+  // Setup WebSocket for customer support chat
   const { setupChatWebSocket } = await import('./chatWebSocket');
   setupChatWebSocket(httpServer);
+  
+  // Setup WebSocket for team chat
+  const { setupTeamChatWebSocket } = await import('./teamChatWebSocket');
+  setupTeamChatWebSocket(httpServer);
   
   return httpServer;
 }
