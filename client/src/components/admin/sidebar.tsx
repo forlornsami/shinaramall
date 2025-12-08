@@ -166,16 +166,20 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
     queryKey: ['/api/store-settings'],
   });
 
+  const adminToken = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+  
   const { data: pendingOrdersCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/orders/pending-count'],
     queryFn: async () => {
       const token = localStorage.getItem('adminToken');
+      if (!token) return { count: 0 };
       const response = await fetch('/api/admin/orders/pending-count', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) return { count: 0 };
       return response.json();
     },
+    enabled: !!adminToken,
     refetchInterval: 30000,
   });
 
