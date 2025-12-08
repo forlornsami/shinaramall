@@ -118,6 +118,15 @@ export default function OrderManagement() {
     }
   };
 
+  const getPaymentStatusLabel = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'Paid';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -209,8 +218,23 @@ export default function OrderManagement() {
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
-                          {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
+                          {getPaymentStatusLabel(order.paymentStatus)}
                         </Badge>
+                        <Select
+                          value={order.paymentStatus}
+                          onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, paymentStatus: value })}
+                        >
+                          <SelectTrigger className="w-28 h-8" data-testid={`select-payment-status-${order.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending" data-testid="option-payment-pending">Pending</SelectItem>
+                            <SelectItem value="processing" data-testid="option-payment-processing">Processing</SelectItem>
+                            <SelectItem value="completed" data-testid="option-payment-completed">Paid</SelectItem>
+                            <SelectItem value="failed" data-testid="option-payment-failed">Failed</SelectItem>
+                            <SelectItem value="refunded" data-testid="option-payment-refunded">Refunded</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <div className="text-xs text-muted-foreground" data-testid={`text-payment-method-${order.id}`}>
                           {order.paymentMethod?.toUpperCase()}
                         </div>
@@ -269,7 +293,7 @@ export default function OrderManagement() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Payment Status:</span>
                       <Badge className={getPaymentStatusColor(orderDetails.paymentStatus)} data-testid="badge-detail-payment">
-                        {orderDetails.paymentStatus.charAt(0).toUpperCase() + orderDetails.paymentStatus.slice(1)}
+                        {getPaymentStatusLabel(orderDetails.paymentStatus)}
                       </Badge>
                     </div>
                     <div className="flex justify-between">
