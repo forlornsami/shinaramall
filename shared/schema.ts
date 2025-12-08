@@ -664,3 +664,124 @@ export type ChatConversationWithDetails = ChatConversation & {
   messages?: ChatMessage[];
   unreadCount?: number;
 };
+
+// ==================== TEAM CHAT (Employee Internal Chat) ====================
+
+// Team chat conversation type enum (direct = 1-on-1, group = multiple members)
+export const teamChatTypeEnum = pgEnum("team_chat_type", [
+  "direct",
+  "group"
+]);
+
+// Team chat conversations table
+export const teamChatConversations = pgTable("team_chat_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: teamChatTypeEnum("type").notNull().default("direct"),
+  title: varchar("title"), // Only used for group chats
+  description: text("description"), // Group description
+  createdById: varchar("created_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Team chat participants (members of conversations)
+export const teamChatParticipants = pgTable("team_chat_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => teamChatConversations.id, { onDelete: "cascade" }).notNull(),
+  adminUserId: varchar("admin_user_id").references(() => adminUsers.id, { onDelete: "cascade" }).notNull(),
+  isAdmin: boolean("is_admin").default(false), // Group admin (can add/remove members)
+  lastReadMessageId: varchar("last_read_message_id"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+  mutedUntil: timestamp("muted_until"),
+});
+
+// Team chat messages
+export const teamChatMessages = pgTable("team_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => teamChatConversations.id, { onDelete: "cascade" }).notNull(),
+  senderId: varchar("sender_id").references(() => adminUsers.id, { onDelete: "set null" }),
+  message: text("message").notNull(),
+  messageType: varchar("message_type").default("text"), // text, image, file, system
+  attachments: jsonb("attachments").$type<{ name: string; url: string; type: string }[]>(),
+  replyToMessageId: varchar("reply_to_message_id"),
+  isEdited: boolean("is_edited").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  editedAt: timestamp("edited_at"),
+});
+
+// Team chat relations
+export const teamChatConversationsRelations = relations(teamChatConversations, ({ one, many }) => ({
+  createdBy: one(adminUsers, {
+    fields: [teamChatConversations.createdById],
+    references: [adminUsers.id],
+  }),
+  participants: many(teamChatParticipants),
+  messages: many(teamChatMessages),
+}));
+
+export const teamChatParticipantsRelations = relations(teamChatParticipants, ({ one }) => ({
+  conversation: one(teamChatConversations, {
+    fields: [teamChatParticipants.conversationId],
+    references: [teamChatConversations.id],
+  }),
+  adminUser: one(adminUsers, {
+    fields: [teamChatParticipants.adminUserId],
+    references: [adminUsers.id],
+  }),
+}));
+
+export const teamChatMessagesRelations = relations(teamChatMessages, ({ one }) => ({
+  conversation: one(teamChatConversations, {
+    fields: [teamChatMessages.conversationId],
+    references: [teamChatConversations.id],
+  }),
+  sender: one(adminUsers, {
+    fields: [teamChatMessages.senderId],
+    references: [adminUsers.id],
+  }),
+  replyToMessage: one(teamChatMessages, {
+    fields: [teamChatMessages.replyToMessageId],
+    references: [teamChatMessages.id],
+  }),
+}));
+
+// Team chat insert schemas
+export const insertTeamChatConversationSchema = createInsertSchema(teamChatConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastMessageAt: true,
+});
+
+export const insertTeamChatParticipantSchema = createInsertSchema(teamChatParticipants).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export const insertTeamChatMessageSchema = createInsertSchema(teamChatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Team chat types
+export type TeamChatConversation = typeof teamChatConversations.$inferSelect;
+export type InsertTeamChatConversation = z.infer<typeof insertTeamChatConversationSchema>;
+export type TeamChatParticipant = typeof teamChatParticipants.$inferSelect;
+export type InsertTeamChatParticipant = z.infer<typeof insertTeamChatParticipantSchema>;
+export type TeamChatMessage = typeof teamChatMessages.$inferSelect;
+export type InsertTeamChatMessage = z.infer<typeof insertTeamChatMessageSchema>;
+
+// Extended team chat types with relations
+export type TeamChatConversationWithDetails = TeamChatConversation & {
+  createdBy?: AdminUser | null;
+  participants: (TeamChatParticipant & { adminUser: AdminUser })[];
+  messages?: TeamChatMessage[];
+  unreadCount?: number;
+  lastMessage?: TeamChatMessage | null;
+};
+
+export type TeamChatMessageWithSender = TeamChatMessage & {
+  sender?: AdminUser | null;
+  replyToMessage?: TeamChatMessage | null;
+};

@@ -15,6 +15,9 @@ import {
   notifications,
   chatConversations,
   chatMessages,
+  teamChatConversations,
+  teamChatParticipants,
+  teamChatMessages,
   type User,
   type InsertUser,
   type SafeUser,
@@ -50,6 +53,14 @@ import {
   type ChatMessage,
   type InsertChatMessage,
   type ChatConversationWithDetails,
+  type TeamChatConversation,
+  type InsertTeamChatConversation,
+  type TeamChatParticipant,
+  type InsertTeamChatParticipant,
+  type TeamChatMessage,
+  type InsertTeamChatMessage,
+  type TeamChatConversationWithDetails,
+  type TeamChatMessageWithSender,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
@@ -166,6 +177,29 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   markMessagesAsRead(conversationId: string, senderType: string): Promise<void>;
   getUnreadMessageCount(conversationId: string, senderType: string): Promise<number>;
+  
+  // Team chat operations (employee internal chat)
+  getTeamChatConversations(userId: string): Promise<TeamChatConversationWithDetails[]>;
+  getTeamChatConversation(id: string): Promise<TeamChatConversationWithDetails | undefined>;
+  findDirectConversation(userId1: string, userId2: string): Promise<TeamChatConversation | undefined>;
+  createTeamChatConversation(conversation: InsertTeamChatConversation): Promise<TeamChatConversation>;
+  updateTeamChatConversation(id: string, data: Partial<InsertTeamChatConversation>): Promise<TeamChatConversation>;
+  deleteTeamChatConversation(id: string): Promise<boolean>;
+  
+  // Team chat participant operations
+  addTeamChatParticipant(participant: InsertTeamChatParticipant): Promise<TeamChatParticipant>;
+  removeTeamChatParticipant(conversationId: string, userId: string): Promise<boolean>;
+  getTeamChatParticipants(conversationId: string): Promise<(TeamChatParticipant & { adminUser: AdminUser })[]>;
+  updateTeamChatParticipant(id: string, data: Partial<InsertTeamChatParticipant>): Promise<TeamChatParticipant>;
+  isTeamChatParticipant(conversationId: string, userId: string): Promise<boolean>;
+  
+  // Team chat message operations
+  getTeamChatMessages(conversationId: string, limit?: number, before?: string): Promise<TeamChatMessageWithSender[]>;
+  createTeamChatMessage(message: InsertTeamChatMessage): Promise<TeamChatMessage>;
+  updateTeamChatMessage(id: string, message: string): Promise<TeamChatMessage>;
+  deleteTeamChatMessage(id: string): Promise<boolean>;
+  markTeamChatMessagesRead(conversationId: string, userId: string, lastMessageId: string): Promise<void>;
+  getTeamChatUnreadCount(userId: string): Promise<number>;
   
   // Crypto payment operations (deprecated - kept for backward compatibility)
   getCryptoPayments(orderId?: string): Promise<CryptoPayment[]>;
@@ -1422,6 +1456,325 @@ export class DatabaseStorage implements IStorage {
     }
     
     return updated;
+  }
+
+  // ==================== TEAM CHAT OPERATIONS ====================
+
+  async getTeamChatConversations(userId: string): Promise<TeamChatConversationWithDetails[]> {
+    // Get all conversations where user is a participant
+    const userParticipations = await db
+      .select()
+      .from(teamChatParticipants)
+      .where(eq(teamChatParticipants.adminUserId, userId));
+
+    const conversationIds = userParticipations.map(p => p.conversationId);
+    
+    if (conversationIds.length === 0) {
+      return [];
+    }
+
+    const conversations = await db
+      .select()
+      .from(teamChatConversations)
+      .where(sql`${teamChatConversations.id} IN (${sql.join(conversationIds.map(id => sql`${id}`), sql`, `)})`)
+      .orderBy(desc(teamChatConversations.lastMessageAt));
+
+    // Fetch details for each conversation
+    const conversationsWithDetails: TeamChatConversationWithDetails[] = [];
+
+    for (const conv of conversations) {
+      // Get participants with user details
+      const participants = await this.getTeamChatParticipants(conv.id);
+      
+      // Get last message
+      const [lastMessage] = await db
+        .select()
+        .from(teamChatMessages)
+        .where(eq(teamChatMessages.conversationId, conv.id))
+        .orderBy(desc(teamChatMessages.createdAt))
+        .limit(1);
+
+      // Get unread count for this user
+      const userParticipant = userParticipations.find(p => p.conversationId === conv.id);
+      let unreadCount = 0;
+      if (userParticipant) {
+        const result = await db
+          .select({ count: count() })
+          .from(teamChatMessages)
+          .where(
+            and(
+              eq(teamChatMessages.conversationId, conv.id),
+              userParticipant.lastReadMessageId 
+                ? sql`${teamChatMessages.createdAt} > (SELECT created_at FROM team_chat_messages WHERE id = ${userParticipant.lastReadMessageId})`
+                : sql`1=1`
+            )
+          );
+        unreadCount = result[0]?.count || 0;
+      }
+
+      // Get creator details
+      let createdBy = null;
+      if (conv.createdById) {
+        createdBy = await this.getAdminUser(conv.createdById);
+      }
+
+      conversationsWithDetails.push({
+        ...conv,
+        createdBy: createdBy || null,
+        participants,
+        lastMessage: lastMessage || null,
+        unreadCount,
+      });
+    }
+
+    return conversationsWithDetails;
+  }
+
+  async getTeamChatConversation(id: string): Promise<TeamChatConversationWithDetails | undefined> {
+    const [conv] = await db
+      .select()
+      .from(teamChatConversations)
+      .where(eq(teamChatConversations.id, id));
+
+    if (!conv) return undefined;
+
+    const participants = await this.getTeamChatParticipants(id);
+    
+    let createdBy = null;
+    if (conv.createdById) {
+      createdBy = await this.getAdminUser(conv.createdById);
+    }
+
+    const [lastMessage] = await db
+      .select()
+      .from(teamChatMessages)
+      .where(eq(teamChatMessages.conversationId, id))
+      .orderBy(desc(teamChatMessages.createdAt))
+      .limit(1);
+
+    return {
+      ...conv,
+      createdBy: createdBy || null,
+      participants,
+      lastMessage: lastMessage || null,
+      unreadCount: 0,
+    };
+  }
+
+  async findDirectConversation(userId1: string, userId2: string): Promise<TeamChatConversation | undefined> {
+    // Find a direct conversation between two users
+    const user1Convs = await db
+      .select({ conversationId: teamChatParticipants.conversationId })
+      .from(teamChatParticipants)
+      .where(eq(teamChatParticipants.adminUserId, userId1));
+
+    for (const { conversationId } of user1Convs) {
+      const [conv] = await db
+        .select()
+        .from(teamChatConversations)
+        .where(and(
+          eq(teamChatConversations.id, conversationId),
+          eq(teamChatConversations.type, 'direct')
+        ));
+
+      if (conv) {
+        // Check if userId2 is also a participant
+        const [participant] = await db
+          .select()
+          .from(teamChatParticipants)
+          .where(and(
+            eq(teamChatParticipants.conversationId, conversationId),
+            eq(teamChatParticipants.adminUserId, userId2)
+          ));
+
+        if (participant) {
+          return conv;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  async createTeamChatConversation(conversation: InsertTeamChatConversation): Promise<TeamChatConversation> {
+    const [created] = await db
+      .insert(teamChatConversations)
+      .values(conversation)
+      .returning();
+    return created;
+  }
+
+  async updateTeamChatConversation(id: string, data: Partial<InsertTeamChatConversation>): Promise<TeamChatConversation> {
+    const [updated] = await db
+      .update(teamChatConversations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(teamChatConversations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTeamChatConversation(id: string): Promise<boolean> {
+    await db.delete(teamChatConversations).where(eq(teamChatConversations.id, id));
+    return true;
+  }
+
+  // Team chat participant operations
+  async addTeamChatParticipant(participant: InsertTeamChatParticipant): Promise<TeamChatParticipant> {
+    const [created] = await db
+      .insert(teamChatParticipants)
+      .values(participant)
+      .returning();
+    return created;
+  }
+
+  async removeTeamChatParticipant(conversationId: string, userId: string): Promise<boolean> {
+    await db.delete(teamChatParticipants).where(
+      and(
+        eq(teamChatParticipants.conversationId, conversationId),
+        eq(teamChatParticipants.adminUserId, userId)
+      )
+    );
+    return true;
+  }
+
+  async getTeamChatParticipants(conversationId: string): Promise<(TeamChatParticipant & { adminUser: AdminUser })[]> {
+    const participants = await db
+      .select()
+      .from(teamChatParticipants)
+      .where(eq(teamChatParticipants.conversationId, conversationId));
+
+    const result: (TeamChatParticipant & { adminUser: AdminUser })[] = [];
+    for (const p of participants) {
+      const adminUser = await this.getAdminUser(p.adminUserId);
+      if (adminUser) {
+        result.push({ ...p, adminUser });
+      }
+    }
+
+    return result;
+  }
+
+  async updateTeamChatParticipant(id: string, data: Partial<InsertTeamChatParticipant>): Promise<TeamChatParticipant> {
+    const [updated] = await db
+      .update(teamChatParticipants)
+      .set(data)
+      .where(eq(teamChatParticipants.id, id))
+      .returning();
+    return updated;
+  }
+
+  async isTeamChatParticipant(conversationId: string, userId: string): Promise<boolean> {
+    const [participant] = await db
+      .select()
+      .from(teamChatParticipants)
+      .where(and(
+        eq(teamChatParticipants.conversationId, conversationId),
+        eq(teamChatParticipants.adminUserId, userId)
+      ));
+    return !!participant;
+  }
+
+  // Team chat message operations
+  async getTeamChatMessages(conversationId: string, limit: number = 50, before?: string): Promise<TeamChatMessageWithSender[]> {
+    let conditions: any[] = [eq(teamChatMessages.conversationId, conversationId)];
+    
+    if (before) {
+      conditions.push(sql`${teamChatMessages.createdAt} < (SELECT created_at FROM team_chat_messages WHERE id = ${before})`);
+    }
+
+    const messages = await db
+      .select()
+      .from(teamChatMessages)
+      .where(and(...conditions))
+      .orderBy(desc(teamChatMessages.createdAt))
+      .limit(limit);
+
+    // Reverse to get oldest first for display
+    messages.reverse();
+
+    // Fetch sender details
+    const result: TeamChatMessageWithSender[] = [];
+    for (const msg of messages) {
+      let sender = null;
+      if (msg.senderId) {
+        sender = await this.getAdminUser(msg.senderId);
+      }
+      result.push({ ...msg, sender: sender || null });
+    }
+
+    return result;
+  }
+
+  async createTeamChatMessage(message: InsertTeamChatMessage): Promise<TeamChatMessage> {
+    const [created] = await db
+      .insert(teamChatMessages)
+      .values(message)
+      .returning();
+
+    // Update conversation last message time
+    await db
+      .update(teamChatConversations)
+      .set({ lastMessageAt: new Date(), updatedAt: new Date() })
+      .where(eq(teamChatConversations.id, message.conversationId));
+
+    return created;
+  }
+
+  async updateTeamChatMessage(id: string, message: string): Promise<TeamChatMessage> {
+    const [updated] = await db
+      .update(teamChatMessages)
+      .set({ message, isEdited: true, editedAt: new Date() })
+      .where(eq(teamChatMessages.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTeamChatMessage(id: string): Promise<boolean> {
+    await db.delete(teamChatMessages).where(eq(teamChatMessages.id, id));
+    return true;
+  }
+
+  async markTeamChatMessagesRead(conversationId: string, userId: string, lastMessageId: string): Promise<void> {
+    await db
+      .update(teamChatParticipants)
+      .set({ lastReadMessageId: lastMessageId })
+      .where(and(
+        eq(teamChatParticipants.conversationId, conversationId),
+        eq(teamChatParticipants.adminUserId, userId)
+      ));
+  }
+
+  async getTeamChatUnreadCount(userId: string): Promise<number> {
+    const userParticipations = await db
+      .select()
+      .from(teamChatParticipants)
+      .where(eq(teamChatParticipants.adminUserId, userId));
+
+    let totalUnread = 0;
+
+    for (const participation of userParticipations) {
+      if (participation.lastReadMessageId) {
+        const result = await db
+          .select({ count: count() })
+          .from(teamChatMessages)
+          .where(
+            and(
+              eq(teamChatMessages.conversationId, participation.conversationId),
+              sql`${teamChatMessages.createdAt} > (SELECT created_at FROM team_chat_messages WHERE id = ${participation.lastReadMessageId})`
+            )
+          );
+        totalUnread += result[0]?.count || 0;
+      } else {
+        // If no last read message, count all messages
+        const result = await db
+          .select({ count: count() })
+          .from(teamChatMessages)
+          .where(eq(teamChatMessages.conversationId, participation.conversationId));
+        totalUnread += result[0]?.count || 0;
+      }
+    }
+
+    return totalUnread;
   }
 }
 
