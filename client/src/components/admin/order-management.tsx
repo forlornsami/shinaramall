@@ -65,6 +65,9 @@ export default function OrderManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders', selectedOrder?.id] });
+      // Also invalidate payment transactions to sync status changes
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-analytics'] });
       toast({
         title: "Success",
         description: "Order updated successfully",
@@ -127,7 +130,8 @@ export default function OrderManagement() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date | null | undefined) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -216,10 +220,27 @@ export default function OrderManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
-                          {getPaymentStatusLabel(order.paymentStatus)}
-                        </Badge>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
+                            {getPaymentStatusLabel(order.paymentStatus)}
+                          </Badge>
+                          <Select
+                            value={order.paymentStatus}
+                            onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, paymentStatus: value })}
+                          >
+                            <SelectTrigger className="w-28 h-8" data-testid={`select-payment-status-${order.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending" data-testid="option-payment-pending">Pending</SelectItem>
+                              <SelectItem value="processing" data-testid="option-payment-processing">Processing</SelectItem>
+                              <SelectItem value="completed" data-testid="option-payment-completed">Completed</SelectItem>
+                              <SelectItem value="failed" data-testid="option-payment-failed">Failed</SelectItem>
+                              <SelectItem value="refunded" data-testid="option-payment-refunded">Refunded</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="text-xs text-muted-foreground" data-testid={`text-payment-method-${order.id}`}>
                           {order.paymentMethod?.toUpperCase()}
                         </div>

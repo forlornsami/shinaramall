@@ -1222,8 +1222,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const transactions = await storage.getPaymentTransactions({ orderId: order.id });
           if (transactions.length > 0) {
-            const transactionStatus = paymentStatus === 'completed' ? 'completed' : 
-                                       paymentStatus === 'failed' ? 'failed' : 'pending';
+            // Map order payment status to transaction status (they should mirror each other)
+            const statusMapping: Record<string, string> = {
+              'pending': 'pending',
+              'processing': 'processing',
+              'completed': 'completed',
+              'failed': 'failed',
+              'refunded': 'refunded',
+            };
+            const transactionStatus = statusMapping[paymentStatus] || paymentStatus;
             await storage.updatePaymentTransaction(transactions[0].id, { status: transactionStatus });
           }
         } catch (transactionError) {

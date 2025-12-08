@@ -1382,6 +1382,7 @@ export class DatabaseStorage implements IStorage {
     const verificationStatus = approved ? 'approved' : 'rejected';
     const paymentStatus = approved ? 'completed' : 'failed';
     const orderStatus = approved ? 'processing' : 'pending';
+    const transactionStatus = approved ? 'completed' : 'failed';
     
     const [updated] = await db
       .update(orders)
@@ -1396,6 +1397,14 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(orders.id, orderId))
       .returning();
+    
+    // Also update the corresponding payment transaction status
+    const orderTransactions = await this.getPaymentTransactions({ orderId });
+    for (const transaction of orderTransactions) {
+      await this.updatePaymentTransaction(transaction.id, {
+        status: transactionStatus,
+      });
+    }
     
     // Create notification for customer
     const order = await this.getOrder(orderId);
