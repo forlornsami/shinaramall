@@ -5,12 +5,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote } from "lucide-react";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Bitcoin, Copy, Clock, ExternalLink, Loader2 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CartItem, Product } from "@shared/schema";
+import { SiBinance } from "react-icons/si";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ interface CartItemWithProduct extends CartItem {
   product: Product;
 }
 
-type PaymentMethod = "easypaisa" | "jazzcash" | "hbl" | "cod";
+type PaymentMethod = "easypaisa" | "jazzcash" | "hbl" | "cod" | "tron_usdt" | "binance_pay";
 
 const paymentMethods = [
   {
@@ -32,6 +33,7 @@ const paymentMethods = [
     color: "from-green-500 to-emerald-600",
     bgColor: "bg-green-50 dark:bg-green-900/20",
     borderColor: "border-green-500",
+    isCrypto: false,
   },
   {
     id: "jazzcash" as PaymentMethod,
@@ -41,6 +43,7 @@ const paymentMethods = [
     color: "from-red-500 to-rose-600",
     bgColor: "bg-red-50 dark:bg-red-900/20",
     borderColor: "border-red-500",
+    isCrypto: false,
   },
   {
     id: "hbl" as PaymentMethod,
@@ -50,6 +53,7 @@ const paymentMethods = [
     color: "from-blue-600 to-indigo-700",
     bgColor: "bg-blue-50 dark:bg-blue-900/20",
     borderColor: "border-blue-600",
+    isCrypto: false,
   },
   {
     id: "cod" as PaymentMethod,
@@ -59,8 +63,44 @@ const paymentMethods = [
     color: "from-amber-500 to-orange-600",
     bgColor: "bg-amber-50 dark:bg-amber-900/20",
     borderColor: "border-amber-500",
+    isCrypto: false,
+  },
+  {
+    id: "tron_usdt" as PaymentMethod,
+    name: "Tron USDT (TRC-20)",
+    description: "Pay with USDT on Tron network",
+    icon: Bitcoin,
+    color: "from-red-600 to-red-700",
+    bgColor: "bg-red-50 dark:bg-red-900/20",
+    borderColor: "border-red-600",
+    isCrypto: true,
+  },
+  {
+    id: "binance_pay" as PaymentMethod,
+    name: "Binance Pay",
+    description: "Pay with crypto via Binance",
+    icon: SiBinance,
+    color: "from-yellow-500 to-yellow-600",
+    bgColor: "bg-yellow-50 dark:bg-yellow-900/20",
+    borderColor: "border-yellow-500",
+    isCrypto: true,
   },
 ];
+
+interface CryptoPaymentInfo {
+  id: string;
+  orderId: string;
+  gatewayName: string;
+  walletAddress?: string;
+  cryptoAmount: string;
+  cryptoCurrency: string;
+  network: string;
+  paymentUrl?: string;
+  qrCode?: string;
+  externalOrderId: string;
+  status: string;
+  expiresAt: string;
+}
 
 export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { cartItems, clearCart } = useCart() as {
@@ -70,6 +110,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("easypaisa");
+  const [cryptoPaymentInfo, setCryptoPaymentInfo] = useState<CryptoPaymentInfo | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [shippingInfo, setShippingInfo] = useState({
     firstName: "",
     lastName: "",
@@ -86,6 +128,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const shippingCost = subtotal > 5000 ? 0 : 300;
   const total = subtotal + shippingCost;
 
+  const selectedPaymentConfig = paymentMethods.find(m => m.id === paymentMethod);
+  const isCryptoPayment = selectedPaymentConfig?.isCrypto || false;
+
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       const orderData = {
@@ -100,39 +145,63 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       return await response.json();
     },
     onSuccess: async (order) => {
-      const paymentEndpoint = `/api/payment/${paymentMethod}`;
-      const paymentData = {
-        orderId: order.id,
-        amount: total,
-        ...(paymentMethod === 'hbl' ? 
-          { accountNumber: shippingInfo.phone } : 
-          { phoneNumber: shippingInfo.phone }
-        ),
-      };
+      setOrderId(order.id);
       
-      try {
-        const paymentResponse = await apiRequest('POST', paymentEndpoint, paymentData);
-        const paymentResult = await paymentResponse.json();
-        
-        if (paymentResult.success) {
-          toast({
-            title: "Order Placed Successfully!",
-            description: `Your order #${order.orderNumber} has been placed.`,
+      if (isCryptoPayment) {
+        try {
+          const cryptoResponse = await apiRequest('POST', '/api/crypto-payments/create', {
+            orderId: order.id,
+            gatewayName: paymentMethod,
+            cryptoCurrency: 'USDT',
           });
+          const cryptoPayment = await cryptoResponse.json();
+          setCryptoPaymentInfo(cryptoPayment);
+          setStep(3);
           queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
           queryClient.invalidateQueries({ queryKey: ['/api/products'] });
           clearCart();
-          onClose();
-          setStep(1);
-        } else {
-          throw new Error(paymentResult.message || 'Payment failed');
+        } catch (error) {
+          toast({
+            title: "Payment Setup Failed",
+            description: "Failed to create crypto payment. Please try again.",
+            variant: "destructive",
+          });
         }
-      } catch (error) {
-        toast({
-          title: "Payment Failed",
-          description: "Your order was created but payment failed. Please contact support.",
-          variant: "destructive",
-        });
+      } else {
+        const paymentEndpoint = `/api/payment/${paymentMethod}`;
+        const paymentData = {
+          orderId: order.id,
+          amount: total,
+          ...(paymentMethod === 'hbl' ? 
+            { accountNumber: shippingInfo.phone } : 
+            { phoneNumber: shippingInfo.phone }
+          ),
+        };
+        
+        try {
+          const paymentResponse = await apiRequest('POST', paymentEndpoint, paymentData);
+          const paymentResult = await paymentResponse.json();
+          
+          if (paymentResult.success) {
+            toast({
+              title: "Order Placed Successfully!",
+              description: `Your order #${order.orderNumber} has been placed.`,
+            });
+            queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+            clearCart();
+            onClose();
+            setStep(1);
+          } else {
+            throw new Error(paymentResult.message || 'Payment failed');
+          }
+        } catch (error) {
+          toast({
+            title: "Payment Failed",
+            description: "Your order was created but payment failed. Please contact support.",
+            variant: "destructive",
+          });
+        }
       }
     },
     onError: () => {
@@ -143,6 +212,14 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       });
     },
   });
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: "Address copied to clipboard",
+    });
+  };
 
   const handlePlaceOrder = () => {
     if (!shippingInfo.firstName || !shippingInfo.lastName || !shippingInfo.address || 
@@ -199,7 +276,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 <h2 className="text-lg font-semibold text-foreground" data-testid="text-checkout-title">
                   Secure Checkout
                 </h2>
-                <p className="text-sm text-muted-foreground">Step {step} of 2</p>
+                <p className="text-sm text-muted-foreground">
+                  {step === 3 ? 'Complete Payment' : `Step ${step} of 2`}
+                </p>
               </div>
             </div>
             <Button 
@@ -218,6 +297,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           <div className="flex items-center gap-2 mt-4">
             <div className={`flex-1 h-2 rounded-full transition-colors ${step >= 1 ? 'bg-primary' : 'bg-muted'}`} />
             <div className={`flex-1 h-2 rounded-full transition-colors ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+            {step === 3 && (
+              <div className="flex-1 h-2 rounded-full transition-colors bg-primary" />
+            )}
           </div>
         </div>
         
@@ -395,58 +477,187 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </div>
               </div>
             )}
+
+            {step === 3 && cryptoPaymentInfo && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Bitcoin className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    Complete Your Payment
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Send exactly the amount below to complete your order
+                  </p>
+                </div>
+
+                <Card className="border-2 border-primary/20 bg-primary/5">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
+                      <p className="text-3xl font-bold text-primary" data-testid="text-crypto-amount">
+                        {cryptoPaymentInfo.cryptoAmount} {cryptoPaymentInfo.cryptoCurrency}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        ≈ Rs. {total.toLocaleString()}
+                      </p>
+                    </div>
+
+                    {cryptoPaymentInfo.walletAddress && (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Send to this address ({cryptoPaymentInfo.network?.toUpperCase()})</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={cryptoPaymentInfo.walletAddress}
+                            readOnly
+                            className="font-mono text-sm"
+                            data-testid="input-wallet-address"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => copyToClipboard(cryptoPaymentInfo.walletAddress || '')}
+                            data-testid="button-copy-address"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {cryptoPaymentInfo.paymentUrl && cryptoPaymentInfo.gatewayName === 'binance_pay' && (
+                      <div className="text-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => window.open(cryptoPaymentInfo.paymentUrl, '_blank')}
+                          data-testid="button-open-binance"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open Binance Pay
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                      <Clock className="w-4 h-4" />
+                      <span>Payment expires in 1 hour</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="bg-muted/50 rounded-xl p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">Payment Instructions:</h4>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    {cryptoPaymentInfo.gatewayName === 'tron_usdt' ? (
+                      <>
+                        <li>Open your USDT wallet (TRC-20 supported)</li>
+                        <li>Copy the wallet address above</li>
+                        <li>Send exactly {cryptoPaymentInfo.cryptoAmount} USDT</li>
+                        <li>Wait for blockchain confirmation (1-3 minutes)</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>Click "Open Binance Pay" to proceed</li>
+                        <li>Scan QR code or pay from your Binance app</li>
+                        <li>Complete the payment in Binance</li>
+                        <li>Your order will be confirmed automatically</li>
+                      </>
+                    )}
+                  </ol>
+                </div>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  <p>Order ID: <span className="font-mono">{orderId?.slice(0, 8)}</span></p>
+                  <p className="mt-1">Payment will be verified automatically</p>
+                </div>
+              </div>
+            )}
           </CardContent>
           
           {/* Footer */}
           <div className="sticky bottom-0 bg-card border-t border-border p-6">
-            <div className="flex items-center gap-4">
-              {step > 1 && (
+            {step === 3 ? (
+              <div className="flex flex-col gap-3">
                 <Button 
                   type="button"
-                  variant="outline" 
-                  onClick={() => setStep(step - 1)}
-                  className="rounded-xl"
-                  data-testid="button-back"
+                  onClick={() => {
+                    onClose();
+                    setStep(1);
+                    setCryptoPaymentInfo(null);
+                    setOrderId(null);
+                  }}
+                  className="w-full btn-modern rounded-xl py-6"
+                  data-testid="button-done"
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
+                  <CheckCircle2 className="w-5 h-5 mr-2" />
+                  Done - I've Sent the Payment
                 </Button>
-              )}
-              
-              {step < 2 ? (
-                <Button 
-                  type="button"
-                  onClick={handleNextStep}
-                  className="flex-1 btn-modern rounded-xl py-6"
-                  data-testid="button-continue"
-                >
-                  Continue to Payment
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              ) : (
-                <Button 
-                  type="button"
-                  onClick={handlePlaceOrder}
-                  disabled={createOrderMutation.isPending}
-                  className="flex-1 btn-modern rounded-xl py-6"
-                  data-testid="button-place-order"
-                >
-                  {createOrderMutation.isPending ? (
-                    <>Processing...</>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-5 h-5 mr-2" />
-                      Pay Rs. {total.toLocaleString()} with {selectedPaymentMethod?.name}
-                    </>
+                <p className="text-xs text-center text-muted-foreground">
+                  You can check your order status in "My Orders"
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-4">
+                  {step > 1 && (
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      onClick={() => setStep(step - 1)}
+                      className="rounded-xl"
+                      data-testid="button-back"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back
+                    </Button>
                   )}
-                </Button>
-              )}
-            </div>
-            
-            <div className="flex items-center justify-center gap-2 mt-4 text-xs text-muted-foreground">
-              <Lock className="w-3 h-3" />
-              Secured by 256-bit SSL encryption
-            </div>
+                  
+                  {step < 2 ? (
+                    <Button 
+                      type="button"
+                      onClick={handleNextStep}
+                      className="flex-1 btn-modern rounded-xl py-6"
+                      data-testid="button-continue"
+                    >
+                      Continue to Payment
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      type="button"
+                      onClick={handlePlaceOrder}
+                      disabled={createOrderMutation.isPending}
+                      className="flex-1 btn-modern rounded-xl py-6"
+                      data-testid="button-place-order"
+                    >
+                      {createOrderMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-5 h-5 mr-2" />
+                          {isCryptoPayment 
+                            ? `Proceed with ${selectedPaymentMethod?.name}` 
+                            : `Pay Rs. ${total.toLocaleString()} with ${selectedPaymentMethod?.name}`
+                          }
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="flex items-center justify-center gap-2 mt-4 text-xs text-muted-foreground">
+                  <Lock className="w-3 h-3" />
+                  Secured by 256-bit SSL encryption
+                </div>
+              </>
+            )}
           </div>
         </div>
       </Card>
