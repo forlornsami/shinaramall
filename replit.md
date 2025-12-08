@@ -50,18 +50,29 @@ Preferred communication style: Simple, everyday language.
 - **Supported Gateways**: Tron USDT (TRC-20), Binance Pay
 - **Database Table**: `crypto_payments` tracks blockchain transactions with orderId, gatewayName, walletAddress, cryptoAmount, cryptoCurrency, network, txHash, confirmations, status, expiresAt
 - **Payment Status**: awaiting_payment, confirming, completed, failed, expired
-- **Customer Flow**:
-  - Select Tron USDT or Binance Pay at checkout
-  - Order created and crypto payment record generated
-  - Customer shown wallet address (Tron) or redirected to Binance Pay
-  - Payment confirmed automatically via webhooks
+
+### Tron USDT (Manual Wallet Transfer)
+- **Customer Flow**: Customer copies wallet address and manually sends USDT via their Tron wallet
+- **Configuration**: Admin sets TRC-20 wallet address in Payment Management
+- **Confirmation**: Webhook receives blockchain confirmation or admin manually confirms
+
+### Binance Pay (Direct API Integration)
+- **Customer Flow**: Customer is redirected to Binance's secure checkout page to complete payment
+- **Configuration**: Requires environment secrets (NOT database config for security)
+- **Required Environment Secrets**:
+  - `BINANCE_PAY_API_KEY` - Your Binance Pay API Key from merchant portal
+  - `BINANCE_PAY_SECRET_KEY` - Your Binance Pay Secret Key
+- **API Integration**: server/binancePay.ts handles order creation with HMAC SHA512 signature
+- **Confirmation**: Binance sends webhook with signature verification to `/api/webhooks/binance`
+- **Get Credentials**: Register at https://merchant.binance.com → Developers → API Keys
+
+### Common Features
 - **Webhook Endpoints**:
   - POST /api/webhooks/tron - Receives Tron blockchain payment confirmations
-  - POST /api/webhooks/binance - Receives Binance Pay payment notifications
+  - POST /api/webhooks/binance - Receives Binance Pay payment notifications (with signature verification)
 - **Admin Features**:
   - Configure Tron wallet address in Payment Management
-  - Configure Binance Pay API credentials
-  - Manual payment confirmation option
+  - Manual payment confirmation option for both gateways
   - View all crypto payments via GET /api/admin/crypto-payments
 - **API Endpoints**:
   - POST /api/crypto-payments/create - Create crypto payment for order

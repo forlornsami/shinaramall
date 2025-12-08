@@ -861,29 +861,29 @@ export default function PaymentManagement() {
                 )}
 
                 {editingGateway.name === 'binance_pay' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-apiKey">Binance API Key</Label>
-                      <Input
-                        id="edit-apiKey"
-                        value={formData.apiKey}
-                        onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                        placeholder="Your Binance Pay API Key"
-                        data-testid="input-edit-gateway-api-key"
-                      />
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <h5 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Binance Pay API Integration</h5>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                        Binance Pay uses direct API integration. When customers select Binance Pay, they'll be redirected to Binance's secure checkout page to complete payment.
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <p className="font-medium text-blue-800 dark:text-blue-200">Required Environment Secrets:</p>
+                        <ul className="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1">
+                          <li><code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">BINANCE_PAY_API_KEY</code> - Your Binance Pay API Key</li>
+                          <li><code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">BINANCE_PAY_SECRET_KEY</code> - Your Binance Pay Secret Key</li>
+                        </ul>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                          Get your API credentials from <a href="https://merchant.binance.com" target="_blank" rel="noopener noreferrer" className="underline">Binance Merchant Portal</a>
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-apiSecret">Binance API Secret</Label>
-                      <Input
-                        id="edit-apiSecret"
-                        type="password"
-                        value={formData.apiSecret}
-                        onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
-                        placeholder="Your Binance Pay API Secret"
-                        data-testid="input-edit-gateway-api-secret"
-                      />
+                    <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        <strong>Note:</strong> Contact the site administrator to configure the Binance Pay API secrets in the environment settings.
+                      </p>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 <div className="space-y-2">
@@ -920,9 +920,6 @@ export default function PaymentManagement() {
                     if (editingGateway.name === 'tron_usdt') {
                       updateData.apiKey = formData.walletAddress;
                       updateData.configuration = { walletAddress: formData.walletAddress };
-                    } else if (editingGateway.name === 'binance_pay') {
-                      updateData.apiKey = formData.apiKey;
-                      updateData.apiSecret = formData.apiSecret;
                     }
                     updateData.webhookUrl = `${window.location.origin}/api/webhooks/${editingGateway.name === 'tron_usdt' ? 'tron' : 'binance'}`;
                   }

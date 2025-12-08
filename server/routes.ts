@@ -1948,6 +1948,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Binance Pay webhook received:', { bizType, bizStatus });
 
+      // Verify webhook signature if secret key is configured
+      const binancePayService = createBinancePayService();
+      if (binancePayService) {
+        const timestamp = req.headers['binancepay-timestamp'] as string;
+        const nonce = req.headers['binancepay-nonce'] as string;
+        const signature = req.headers['binancepay-signature'] as string;
+        
+        if (timestamp && nonce && signature) {
+          const isValid = binancePayService.verifyWebhookSignature(
+            timestamp, 
+            nonce, 
+            JSON.stringify(req.body), 
+            signature
+          );
+          
+          if (!isValid) {
+            console.warn('Invalid Binance Pay webhook signature');
+            return res.status(401).json({ returnCode: 'FAIL', returnMessage: 'Invalid signature' });
+          }
+        }
+      }
+
       // Binance Pay sends bizStatus: PAY_SUCCESS, PAY_CLOSED, etc.
       if (bizType !== 'PAY') {
         return res.json({ returnCode: 'SUCCESS', returnMessage: 'OK' });
