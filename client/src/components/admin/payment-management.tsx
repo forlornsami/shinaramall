@@ -67,6 +67,7 @@ export default function PaymentManagement() {
     apiKey: '',
     apiSecret: '',
     webhookUrl: '',
+    walletAddress: '',
   });
 
   const resetForm = () => {
@@ -80,7 +81,12 @@ export default function PaymentManagement() {
       apiKey: '',
       apiSecret: '',
       webhookUrl: '',
+      walletAddress: '',
     });
+  };
+
+  const isCryptoGateway = (name: string) => {
+    return name === 'tron_usdt' || name === 'binance_pay';
   };
 
   const { data: gateways, isLoading: gatewaysLoading } = useQuery({
@@ -280,6 +286,7 @@ export default function PaymentManagement() {
 
   const handleEdit = (gateway: PaymentGateway) => {
     setEditingGateway(gateway);
+    const config = gateway.configuration as any || {};
     setFormData({
       name: gateway.name,
       displayName: gateway.displayName,
@@ -287,6 +294,7 @@ export default function PaymentManagement() {
       description: gateway.description || '',
       isEnabled: gateway.isEnabled ?? true,
       testMode: gateway.testMode ?? true,
+      walletAddress: config.walletAddress || gateway.apiKey || '',
       apiKey: gateway.apiKey || '',
       apiSecret: gateway.apiSecret || '',
       webhookUrl: gateway.webhookUrl || '',
@@ -829,21 +837,99 @@ export default function PaymentManagement() {
                 data-testid="switch-edit-gateway-test-mode"
               />
             </div>
+
+            {editingGateway && isCryptoGateway(editingGateway.name) && (
+              <>
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium mb-3">Crypto Configuration</h4>
+                </div>
+                
+                {editingGateway.name === 'tron_usdt' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-walletAddress">USDT (TRC-20) Wallet Address</Label>
+                    <Input
+                      id="edit-walletAddress"
+                      value={formData.walletAddress}
+                      onChange={(e) => setFormData({ ...formData, walletAddress: e.target.value })}
+                      placeholder="Your Tron wallet address (T...)"
+                      data-testid="input-edit-gateway-wallet-address"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Customers will send USDT payments to this address
+                    </p>
+                  </div>
+                )}
+
+                {editingGateway.name === 'binance_pay' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-apiKey">Binance API Key</Label>
+                      <Input
+                        id="edit-apiKey"
+                        value={formData.apiKey}
+                        onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                        placeholder="Your Binance Pay API Key"
+                        data-testid="input-edit-gateway-api-key"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-apiSecret">Binance API Secret</Label>
+                      <Input
+                        id="edit-apiSecret"
+                        type="password"
+                        value={formData.apiSecret}
+                        onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
+                        placeholder="Your Binance Pay API Secret"
+                        data-testid="input-edit-gateway-api-secret"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-webhookUrl">Webhook URL</Label>
+                  <Input
+                    id="edit-webhookUrl"
+                    value={formData.webhookUrl}
+                    readOnly
+                    className="bg-muted"
+                    placeholder={`${window.location.origin}/api/webhooks/${editingGateway.name === 'tron_usdt' ? 'tron' : 'binance'}`}
+                    data-testid="input-edit-gateway-webhook-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Configure this URL in your payment provider's dashboard to receive payment notifications
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
             <Button 
               onClick={() => {
                 if (editingGateway) {
+                  const updateData: any = {
+                    displayName: formData.displayName,
+                    icon: formData.icon,
+                    description: formData.description,
+                    isEnabled: formData.isEnabled,
+                    testMode: formData.testMode,
+                  };
+
+                  if (isCryptoGateway(editingGateway.name)) {
+                    if (editingGateway.name === 'tron_usdt') {
+                      updateData.apiKey = formData.walletAddress;
+                      updateData.configuration = { walletAddress: formData.walletAddress };
+                    } else if (editingGateway.name === 'binance_pay') {
+                      updateData.apiKey = formData.apiKey;
+                      updateData.apiSecret = formData.apiSecret;
+                    }
+                    updateData.webhookUrl = `${window.location.origin}/api/webhooks/${editingGateway.name === 'tron_usdt' ? 'tron' : 'binance'}`;
+                  }
+
                   updateGatewayMutation.mutate({
                     id: editingGateway.id,
-                    data: {
-                      displayName: formData.displayName,
-                      icon: formData.icon,
-                      description: formData.description,
-                      isEnabled: formData.isEnabled,
-                      testMode: formData.testMode,
-                    }
+                    data: updateData
                   });
                 }
               }}

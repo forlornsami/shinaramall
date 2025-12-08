@@ -40,10 +40,33 @@ Preferred communication style: Simple, everyday language.
 
 ## Payment Integration
 - **Pakistani Payment Methods**: EasyPaisa, JazzCash, HBL bank, and Cash on Delivery (COD) support
+- **Cryptocurrency Payments**: Tron USDT (TRC-20) and Binance Pay support with automatic webhook-based confirmation
 - **Payment Gateway Management**: Full CRUD operations for payment gateways with icons and descriptions
 - **Order Processing**: Structured checkout flow with shipping address collection
 - **Payment Status Tracking**: Order status management (pending, processing, shipped, delivered)
 - **COD Support**: Cash on Delivery option marks orders as confirmed with pending payment collection
+
+## Cryptocurrency Payment System
+- **Supported Gateways**: Tron USDT (TRC-20), Binance Pay
+- **Database Table**: `crypto_payments` tracks blockchain transactions with orderId, gatewayName, walletAddress, cryptoAmount, cryptoCurrency, network, txHash, confirmations, status, expiresAt
+- **Payment Status**: awaiting_payment, confirming, completed, failed, expired
+- **Customer Flow**:
+  - Select Tron USDT or Binance Pay at checkout
+  - Order created and crypto payment record generated
+  - Customer shown wallet address (Tron) or redirected to Binance Pay
+  - Payment confirmed automatically via webhooks
+- **Webhook Endpoints**:
+  - POST /api/webhooks/tron - Receives Tron blockchain payment confirmations
+  - POST /api/webhooks/binance - Receives Binance Pay payment notifications
+- **Admin Features**:
+  - Configure Tron wallet address in Payment Management
+  - Configure Binance Pay API credentials
+  - Manual payment confirmation option
+  - View all crypto payments via GET /api/admin/crypto-payments
+- **API Endpoints**:
+  - POST /api/crypto-payments/create - Create crypto payment for order
+  - GET /api/crypto-payments/:orderId/status - Check payment status
+  - POST /api/admin/crypto-payments/:id/confirm - Manual confirmation
 
 ## Key Features
 - **Unified Storefront**: Single consistent UI for both logged-in and guest users with left sidebar navigation
