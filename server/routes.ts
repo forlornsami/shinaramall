@@ -848,6 +848,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clear cart
       await storage.clearCart(userId);
 
+      // Create payment transaction for this order
+      try {
+        const gateways = await storage.getPaymentGateways();
+        const gateway = gateways.find(g => g.name === orderData.paymentMethod);
+        if (gateway) {
+          const transactionStatus = orderData.paymentMethod === 'cod' ? 'pending' : 'pending';
+          await storage.createPaymentTransaction({
+            orderId: order.id,
+            gatewayId: gateway.id,
+            amount: order.total,
+            currency: 'PKR',
+            status: transactionStatus,
+          });
+        }
+      } catch (transactionError) {
+        console.error("Error creating payment transaction:", transactionError);
+      }
+
       // Return order with items
       const orderWithItems = await storage.getOrderWithItems(order.id);
       
@@ -971,12 +989,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Update payment transaction when payment status changes
+      if (paymentStatus && originalOrder && originalOrder.paymentStatus !== paymentStatus) {
+        try {
+          const transactions = await storage.getPaymentTransactions({ orderId: order.id });
+          if (transactions.length > 0) {
+            const transactionStatus = paymentStatus === 'completed' ? 'completed' : 
+                                       paymentStatus === 'failed' ? 'failed' : 'pending';
+            await storage.updatePaymentTransaction(transactions[0].id, { status: transactionStatus });
+          }
+        } catch (transactionError) {
+          console.error("Error updating payment transaction:", transactionError);
+        }
+      }
+      
       // Create customer notification for payment status update
       if (originalOrder && order.userId && paymentStatus && originalOrder.paymentStatus !== paymentStatus) {
         try {
           const paymentMessages: Record<string, string> = {
             'pending': 'Payment is pending for your order.',
-            'paid': 'Payment received! Thank you for your purchase.',
+            'completed': 'Payment received! Thank you for your purchase.',
             'failed': 'Payment failed. Please try again or contact support.',
             'refunded': 'Your order payment has been refunded.',
           };
