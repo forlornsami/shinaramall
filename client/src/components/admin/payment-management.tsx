@@ -867,20 +867,34 @@ export default function PaymentManagement() {
                       <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
                         Binance Pay uses direct API integration. When customers select Binance Pay, they'll be redirected to Binance's secure checkout page to complete payment.
                       </p>
-                      <div className="space-y-2 text-sm">
-                        <p className="font-medium text-blue-800 dark:text-blue-200">Required Environment Secrets:</p>
-                        <ul className="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1">
-                          <li><code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">BINANCE_PAY_API_KEY</code> - Your Binance Pay API Key</li>
-                          <li><code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">BINANCE_PAY_SECRET_KEY</code> - Your Binance Pay Secret Key</li>
-                        </ul>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                          Get your API credentials from <a href="https://merchant.binance.com" target="_blank" rel="noopener noreferrer" className="underline">Binance Merchant Portal</a>
-                        </p>
-                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        Get your API credentials from <a href="https://merchant.binance.com" target="_blank" rel="noopener noreferrer" className="underline">Binance Merchant Portal</a> → Developers → API Keys
+                      </p>
                     </div>
-                    <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                      <p className="text-sm text-amber-700 dark:text-amber-300">
-                        <strong>Note:</strong> Contact the site administrator to configure the Binance Pay API secrets in the environment settings.
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-binanceApiKey">Binance Pay API Key</Label>
+                      <Input
+                        id="edit-binanceApiKey"
+                        value={formData.apiKey}
+                        onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                        placeholder="Your Binance Pay API Key"
+                        data-testid="input-edit-gateway-binance-api-key"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-binanceApiSecret">Binance Pay Secret Key</Label>
+                      <Input
+                        id="edit-binanceApiSecret"
+                        type="password"
+                        value={formData.apiSecret}
+                        onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
+                        placeholder="Your Binance Pay Secret Key"
+                        data-testid="input-edit-gateway-binance-api-secret"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Keep this secret secure. Never share it publicly.
                       </p>
                     </div>
                   </div>
@@ -920,6 +934,10 @@ export default function PaymentManagement() {
                     if (editingGateway.name === 'tron_usdt') {
                       updateData.apiKey = formData.walletAddress;
                       updateData.configuration = { walletAddress: formData.walletAddress };
+                    } else if (editingGateway.name === 'binance_pay') {
+                      updateData.apiKey = formData.apiKey;
+                      updateData.apiSecret = formData.apiSecret;
+                      updateData.configuration = { network: 'binance', supportedCurrencies: ['USDT', 'BUSD', 'BNB'] };
                     }
                     updateData.webhookUrl = `${window.location.origin}/api/webhooks/${editingGateway.name === 'tron_usdt' ? 'tron' : 'binance'}`;
                   }

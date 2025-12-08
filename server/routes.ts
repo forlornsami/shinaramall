@@ -1774,7 +1774,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentData.network = 'binance';
         paymentData.cryptoCurrency = cryptoCurrency || 'USDT';
         
-        const binancePayService = createBinancePayService();
+        // Use credentials from gateway configuration (database), falling back to env vars
+        const binancePayService = createBinancePayService(gateway.apiKey, gateway.apiSecret);
         
         if (binancePayService) {
           try {
@@ -1948,8 +1949,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Binance Pay webhook received:', { bizType, bizStatus });
 
+      // Get gateway credentials from database for signature verification
+      const gateway = await storage.getPaymentGatewayByName('binance_pay');
+      
       // Verify webhook signature if secret key is configured
-      const binancePayService = createBinancePayService();
+      const binancePayService = createBinancePayService(gateway?.apiKey, gateway?.apiSecret);
       if (binancePayService) {
         const timestamp = req.headers['binancepay-timestamp'] as string;
         const nonce = req.headers['binancepay-nonce'] as string;

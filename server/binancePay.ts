@@ -135,9 +135,10 @@ export class BinancePayService {
   }
 }
 
-export function createBinancePayService(): BinancePayService | null {
-  const apiKey = process.env.BINANCE_PAY_API_KEY;
-  const secretKey = process.env.BINANCE_PAY_SECRET_KEY;
+export function createBinancePayService(gatewayApiKey?: string | null, gatewayApiSecret?: string | null): BinancePayService | null {
+  // First try gateway credentials from database, then fall back to environment variables
+  const apiKey = gatewayApiKey || process.env.BINANCE_PAY_API_KEY;
+  const secretKey = gatewayApiSecret || process.env.BINANCE_PAY_SECRET_KEY;
 
   if (!apiKey || !secretKey) {
     console.warn('Binance Pay API credentials not configured');

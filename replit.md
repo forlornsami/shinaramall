@@ -58,10 +58,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Binance Pay (Direct API Integration)
 - **Customer Flow**: Customer is redirected to Binance's secure checkout page to complete payment
-- **Configuration**: Requires environment secrets (NOT database config for security)
-- **Required Environment Secrets**:
-  - `BINANCE_PAY_API_KEY` - Your Binance Pay API Key from merchant portal
-  - `BINANCE_PAY_SECRET_KEY` - Your Binance Pay Secret Key
+- **Configuration**: Admin enters API Key and Secret Key in Payment Management panel (stored in database)
+- **Fallback**: System also checks environment variables BINANCE_PAY_API_KEY and BINANCE_PAY_SECRET_KEY
+- **Admin Panel Fields**: API Key and Secret Key input fields under Binance Pay gateway configuration
 - **API Integration**: server/binancePay.ts handles order creation with HMAC SHA512 signature
 - **Confirmation**: Binance sends webhook with signature verification to `/api/webhooks/binance`
 - **Get Credentials**: Register at https://merchant.binance.com → Developers → API Keys
