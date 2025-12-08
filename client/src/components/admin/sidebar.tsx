@@ -46,7 +46,7 @@ interface Permissions {
 interface AdminSidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
-  adminUser?: { username: string; email: string; role: string; permissions?: Permissions | null } | null;
+  adminUser?: { username: string; email: string; role: string; profilePicture?: string | null; permissions?: Permissions | null } | null;
   onLogout?: () => void;
 }
 
@@ -344,11 +344,20 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
       {adminUser && (
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <span className="text-white font-semibold text-sm">
-                {adminUser.username.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {adminUser.profilePicture ? (
+              <img
+                src={adminUser.profilePicture}
+                alt={adminUser.username}
+                className="w-10 h-10 rounded-xl object-cover"
+                data-testid="img-sidebar-admin-profile"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">
+                  {adminUser.username.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">{adminUser.username}</p>
               <p className="text-xs text-muted-foreground truncate">{adminUser.email}</p>

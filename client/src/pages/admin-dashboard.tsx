@@ -73,6 +73,7 @@ export default function AdminDashboard() {
     email: string; 
     role: string; 
     roleId?: string;
+    profilePicture?: string | null;
     permissions?: Record<string, boolean | Record<string, boolean>> | null;
   } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -88,6 +89,25 @@ export default function AdminDashboard() {
     
     setAdminUser(JSON.parse(user));
   }, [setLocation]);
+
+  const { data: adminProfile } = useQuery<{ profilePicture?: string | null }>({
+    queryKey: ['/api/admin/profile'],
+    queryFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      if (!token) throw new Error('No token');
+      const response = await fetch('/api/admin/profile', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+    enabled: !!adminUser,
+  });
+
+  const adminUserWithProfile = adminUser ? {
+    ...adminUser,
+    profilePicture: adminProfile?.profilePicture || adminUser.profilePicture,
+  } : null;
 
   const { data: stats } = useQuery({
     queryKey: ['/api/admin/stats'],
@@ -368,7 +388,7 @@ export default function AdminDashboard() {
       <AdminSidebar 
         activeSection={activeSection} 
         onSectionChange={(section) => setActiveSection(section as AdminSection)}
-        adminUser={adminUser}
+        adminUser={adminUserWithProfile}
         onLogout={handleLogout}
       />
       <main className="lg:ml-72 min-h-screen">

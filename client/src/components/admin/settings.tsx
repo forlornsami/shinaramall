@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -31,12 +32,24 @@ import {
   EyeOff,
   Upload,
   ImagePlus,
-  X
+  X,
+  User,
+  Camera,
+  Trash2
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
+interface AdminProfile {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  profilePicture?: string | null;
+}
+
 export default function SettingsSection() {
   const { toast } = useToast();
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
   
   const [storeSettings, setStoreSettings] = useState({
     storeName: "",
@@ -65,6 +78,7 @@ export default function SettingsSection() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [showDeletePictureDialog, setShowDeletePictureDialog] = useState(false);
 
   const { data: settings, isLoading: settingsLoading } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
@@ -89,6 +103,113 @@ export default function SettingsSection() {
       });
     }
   }, [settings]);
+
+  const { data: adminProfile, isLoading: profileLoading } = useQuery<AdminProfile>({
+    queryKey: ['/api/admin/profile'],
+    queryFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      if (!token) throw new Error('No token');
+      const response = await fetch('/api/admin/profile', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+  });
+
+  const uploadProfilePictureMutation = useMutation({
+    mutationFn: async (imageData: string) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/profile/picture', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ imageData }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload picture');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+      toast({
+        title: "Picture Updated",
+        description: "Your profile picture has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload picture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProfilePictureMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/profile/picture', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to delete picture');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+      setShowDeletePictureDialog(false);
+      toast({
+        title: "Picture Removed",
+        description: "Your profile picture has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove picture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid File",
+        description: "Please select an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please select an image under 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      uploadProfilePictureMutation.mutate(base64);
+    };
+    reader.readAsDataURL(file);
+
+    if (profilePictureInputRef.current) {
+      profilePictureInputRef.current.value = '';
+    }
+  };
 
   const saveSettingsMutation = useMutation({
     mutationFn: async (data: Partial<StoreSettings>) => {
@@ -241,6 +362,10 @@ export default function SettingsSection() {
           <TabsTrigger value="security" data-testid="tab-security">
             <Shield className="w-4 h-4 mr-2" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="profile" data-testid="tab-profile">
+            <User className="w-4 h-4 mr-2" />
+            Profile
           </TabsTrigger>
         </TabsList>
 
@@ -535,7 +660,157 @@ export default function SettingsSection() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="profile" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="w-5 h-5" />
+                Profile Picture
+              </CardTitle>
+              <CardDescription>
+                Update your profile picture. This will be displayed in the sidebar and throughout the admin panel.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="relative group">
+                  {adminProfile?.profilePicture ? (
+                    <img
+                      src={adminProfile.profilePicture}
+                      alt={adminProfile.username || "Profile"}
+                      className="w-28 h-28 rounded-2xl object-cover border-4 border-background shadow-lg"
+                      data-testid="img-admin-profile-picture"
+                    />
+                  ) : (
+                    <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center border-4 border-background shadow-lg">
+                      <span className="text-white font-bold text-4xl">
+                        {(adminProfile?.username?.charAt(0) || 'A').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {uploadProfilePictureMutation.isPending && (
+                    <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-4 text-center sm:text-left">
+                  <div>
+                    <h3 className="text-lg font-semibold">{adminProfile?.username || 'Admin'}</h3>
+                    <p className="text-sm text-muted-foreground">{adminProfile?.email}</p>
+                    <Badge variant="secondary" className="mt-2 capitalize">{adminProfile?.role || 'Admin'}</Badge>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                    <input
+                      ref={profilePictureInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleProfilePictureChange}
+                      data-testid="input-admin-profile-picture"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => profilePictureInputRef.current?.click()}
+                      disabled={uploadProfilePictureMutation.isPending}
+                      data-testid="button-upload-admin-picture"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {adminProfile?.profilePicture ? 'Change Picture' : 'Upload Picture'}
+                    </Button>
+                    {adminProfile?.profilePicture && (
+                      <Button
+                        variant="outline"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setShowDeletePictureDialog(true)}
+                        disabled={deleteProfilePictureMutation.isPending}
+                        data-testid="button-delete-admin-picture"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Recommended: Square image, at least 200x200 pixels. Max size: 2MB
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Account Information
+              </CardTitle>
+              <CardDescription>
+                Your account details. Contact a super admin to modify these settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Username</Label>
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{adminProfile?.username || '-'}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{adminProfile?.email || '-'}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                    <Shield className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm capitalize">{adminProfile?.role || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Delete Profile Picture Dialog */}
+      <AlertDialog open={showDeletePictureDialog} onOpenChange={setShowDeletePictureDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Profile Picture?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove your profile picture? You can upload a new one anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-admin-picture">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteProfilePictureMutation.mutate()}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteProfilePictureMutation.isPending}
+              data-testid="button-confirm-delete-admin-picture"
+            >
+              {deleteProfilePictureMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Change Password Dialog */}
       <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
