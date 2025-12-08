@@ -30,6 +30,16 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
 
   const { data: messages = [], refetch: refetchMessages } = useQuery<ChatMessage[]>({
     queryKey: ['/api/chat/conversation', conversation?.id, 'messages'],
+    queryFn: async () => {
+      if (!conversation?.id) return [];
+      const token = getToken();
+      const res = await fetch(`/api/chat/conversation/${conversation.id}/messages`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
     enabled: isOpen && !!conversation?.id,
   });
 

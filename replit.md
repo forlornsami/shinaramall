@@ -113,6 +113,35 @@ Preferred communication style: Simple, everyday language.
   - Admin: GET /api/admin/chat/conversations, POST /api/admin/chat/conversations/:id/assign, PATCH /api/admin/chat/conversations/:id/status, POST /api/admin/chat/conversations/:id/messages
 - **Notification Integration**: Creates chat_message notifications for offline agents/customers
 
+## Team Chat System (Internal Employee Communication)
+- **Purpose**: Internal messaging system for admin team members to communicate with each other
+- **Database Tables**:
+  - `team_chat_conversations`: Stores conversations with type (direct, group), name, createdById
+  - `team_chat_participants`: Tracks conversation membership with adminUserId, isAdmin flag, lastReadMessageId
+  - `team_chat_messages`: Stores messages with senderId, message content, replyToMessageId support
+- **WebSocket Server**: Real-time messaging on `/ws/team-chat` endpoint for instant message delivery
+- **Features**:
+  - Direct Messages (1-on-1 private conversations between team members)
+  - Group Chats (multi-member conversations with admin management)
+  - Reply to specific messages
+  - Online presence indicators
+  - Unread message counts
+- **Admin Features**:
+  - Team Chat section in admin sidebar (requires 'chat' permission)
+  - Create new direct messages or group conversations
+  - Add/remove members from group chats
+  - Real-time message delivery with WebSocket
+- **API Endpoints**:
+  - GET /api/admin/team-chat/conversations - List all conversations for current admin
+  - POST /api/admin/team-chat/conversations - Create new conversation (direct or group)
+  - GET /api/admin/team-chat/conversations/:id - Get conversation details
+  - GET /api/admin/team-chat/conversations/:id/messages - Get messages in conversation
+  - POST /api/admin/team-chat/conversations/:id/messages - Send message to conversation
+  - POST /api/admin/team-chat/conversations/:id/participants - Add participants to group
+  - DELETE /api/admin/team-chat/conversations/:id/participants/:userId - Remove participant
+  - POST /api/admin/team-chat/conversations/:id/read - Mark messages as read
+  - GET /api/admin/team-chat/unread-count - Get total unread count
+
 ## Notification System
 - **Database Table**: `notifications` table stores all notifications with recipientType (admin/customer), type, title, message, and metadata
 - **Notification Types**: order_placed, order_status_update, low_stock, chat_message, customer_registration, payment_received, payment_failed, general
