@@ -55,7 +55,7 @@ export default function OrdersView() {
           </p>
           <Button
             className="btn-modern rounded-xl"
-            onClick={() => window.location.href = '/api/login'}
+            onClick={() => window.location.href = '/auth'}
             data-testid="button-signin-orders"
           >
             Sign In

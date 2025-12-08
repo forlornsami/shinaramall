@@ -106,7 +106,7 @@ export default function ProfilePage() {
               <User className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">Sign In Required</h2>
               <p className="text-muted-foreground mb-4">Please sign in to view your profile.</p>
-              <Button onClick={() => window.location.href = '/api/login'} data-testid="button-sign-in">
+              <Button onClick={() => window.location.href = '/auth'} data-testid="button-sign-in">
                 Sign In
               </Button>
             </CardContent>

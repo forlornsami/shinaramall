@@ -40,9 +40,8 @@ export default function CartView() {
   };
 
   const handleLogin = () => {
-    const currentPath = window.location.pathname;
     localStorage.setItem('checkoutRedirect', 'true');
-    window.location.href = '/api/login';
+    window.location.href = '/auth';
   };
 
   if (isLoading) {
@@ -253,7 +252,7 @@ export default function CartView() {
               data-testid="button-login-modal"
             >
               <LogIn className="w-4 h-4 mr-2" />
-              Sign In with Replit
+              Sign In to Continue
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               Your cart items will be saved and merged with your account

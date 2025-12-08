@@ -1,6 +1,6 @@
 # Overview
 
-This is a Pakistani e-commerce platform called Eshaal Store that allows customers to browse and purchase products using local payment methods like EasyPaisa, JazzCash, and HBL. The application features separate authentication systems for customers (via Replit Auth) and administrators (via JWT), with a comprehensive product catalog management system and order processing capabilities.
+This is a Pakistani e-commerce platform called Eshaal Store that allows customers to browse and purchase products using local payment methods like EasyPaisa, JazzCash, and HBL. The application features a fully internal email/password authentication system for both customers and administrators (no external auth dependencies), with a comprehensive product catalog management system and order processing capabilities.
 
 # User Preferences
 
@@ -24,17 +24,19 @@ Preferred communication style: Simple, everyday language.
 - **File Structure**: Monorepo with shared schema between client and server
 
 ## Authentication & Authorization
-- **Customer Authentication**: Replit OpenID Connect (OIDC) integration with session-based auth
+- **Customer Authentication**: Internal email/password auth with JWT tokens stored in localStorage
 - **Admin Authentication**: JWT-based authentication with bcrypt password hashing
-- **Dual Auth Systems**: Separate authentication flows for customers and administrators
-- **Session Storage**: PostgreSQL-backed session store for Replit Auth
+- **Unified Auth Pattern**: Both customers and admins use JWT tokens (separate systems)
+- **Password Security**: bcrypt (10 rounds) for password hashing
+- **Auth Endpoints**: 
+  - Customer: POST /api/auth/register, POST /api/auth/login, GET /api/auth/user
+  - Admin: POST /api/admin/login
 
 ## Database Design
-- **Users Table**: Customer data from Replit Auth (id, email, names, profile image)
-- **Admin Users Table**: Separate admin accounts with username/password
+- **Users Table**: Customer data with email, passwordHash, firstName, lastName, mobile, shippingAddress
+- **Admin Users Table**: Separate admin accounts with username/password and role-based permissions
 - **Product Catalog**: Products, categories with full e-commerce fields (pricing, inventory, images)
 - **Order Management**: Orders, order items, and cart items with shipping details
-- **Session Storage**: Dedicated sessions table for authentication persistence
 
 ## Payment Integration
 - **Pakistani Payment Methods**: EasyPaisa, JazzCash, HBL bank, and Cash on Delivery (COD) support
@@ -113,11 +115,8 @@ Preferred communication style: Simple, everyday language.
 - **connect-pg-simple**: PostgreSQL session store for Express sessions
 
 ## Authentication
-- **Replit Auth**: OpenID Connect integration for customer authentication
-- **openid-client**: OIDC client implementation
-- **Passport.js**: Authentication middleware framework
-- **bcrypt**: Password hashing for admin accounts
-- **jsonwebtoken**: JWT token generation and verification
+- **bcrypt**: Password hashing for customer and admin accounts
+- **jsonwebtoken**: JWT token generation and verification for both customers and admins
 
 ## UI & Styling
 - **Radix UI**: Headless UI component primitives

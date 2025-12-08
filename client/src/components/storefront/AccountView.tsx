@@ -95,7 +95,7 @@ export default function AccountView() {
           </p>
           <Button
             className="btn-modern rounded-xl"
-            onClick={() => window.location.href = '/api/login'}
+            onClick={() => window.location.href = '/auth'}
             data-testid="button-signin-account"
           >
             Sign In
