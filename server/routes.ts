@@ -914,6 +914,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single order details for admin
+  app.get('/api/admin/orders/:id', adminAuth, async (req, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      const orderItems = await storage.getOrderItems(req.params.id);
+      res.json({ ...order, items: orderItems });
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      res.status(500).json({ message: "Failed to fetch order details" });
+    }
+  });
+
   app.patch('/api/admin/orders/:id', adminAuth, async (req, res) => {
     try {
       const { status, paymentStatus } = req.body;

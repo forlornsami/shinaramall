@@ -31,10 +31,10 @@ export default function OrderManagement() {
 
   // Fetch order details
   const { data: orderDetails } = useQuery({
-    queryKey: ['/api/orders', selectedOrder?.id],
+    queryKey: ['/api/admin/orders', selectedOrder?.id],
     queryFn: async () => {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`/api/orders/${selectedOrder?.id}`, {
+      const response = await fetch(`/api/admin/orders/${selectedOrder?.id}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Failed to fetch order details');
@@ -64,7 +64,7 @@ export default function OrderManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders', selectedOrder?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders', selectedOrder?.id] });
       toast({
         title: "Success",
         description: "Order updated successfully",
