@@ -304,13 +304,13 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                     <Plus className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>New Direct Message</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">Select a team member to start a conversation</p>
-                    <ScrollArea className="h-[300px]">
+                    <ScrollArea className="h-[200px] sm:h-[300px]">
                       <div className="space-y-2">
                         {adminUsers.map(user => (
                           <Button
@@ -346,7 +346,7 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                     <Users className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create Group Chat</DialogTitle>
                   </DialogHeader>
@@ -368,15 +368,16 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                         value={newGroupDescription}
                         onChange={(e) => setNewGroupDescription(e.target.value)}
                         placeholder="What's this group for?"
+                        className="min-h-[60px] resize-none"
                         data-testid="input-group-description"
                       />
                     </div>
                     <div>
                       <Label>Add Members</Label>
-                      <ScrollArea className="h-[200px] border rounded-md p-2 mt-2">
+                      <ScrollArea className="h-[150px] sm:h-[200px] border rounded-md p-2 mt-2">
                         <div className="space-y-2">
                           {adminUsers.map(user => (
-                            <div key={user.id} className="flex items-center gap-3">
+                            <div key={user.id} className="flex items-center gap-2 sm:gap-3">
                               <Checkbox
                                 id={`member-${user.id}`}
                                 checked={selectedMembers.includes(user.id)}
@@ -389,12 +390,12 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                                 }}
                                 data-testid={`checkbox-member-${user.id}`}
                               />
-                              <label htmlFor={`member-${user.id}`} className="flex items-center gap-2 cursor-pointer">
-                                <Avatar className="h-6 w-6">
+                              <label htmlFor={`member-${user.id}`} className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                                <Avatar className="h-6 w-6 flex-shrink-0">
                                   {user.profilePicture && <AvatarImage src={user.profilePicture} />}
                                   <AvatarFallback className="text-xs">{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
                                 </Avatar>
-                                <span className="text-sm">{user.username}</span>
+                                <span className="text-sm truncate">{user.username}</span>
                               </label>
                             </div>
                           ))}
@@ -403,7 +404,7 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                       <p className="text-xs text-muted-foreground mt-1">{selectedMembers.length} members selected</p>
                     </div>
                   </div>
-                  <DialogFooter>
+                  <DialogFooter className="flex-col sm:flex-row gap-2">
                     <Button
                       onClick={() => createGroupChatMutation.mutate({
                         title: newGroupTitle,
@@ -411,6 +412,7 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                         memberIds: selectedMembers,
                       })}
                       disabled={!newGroupTitle.trim() || selectedMembers.length === 0 || createGroupChatMutation.isPending}
+                      className="w-full sm:w-auto"
                       data-testid="btn-create-group"
                     >
                       {createGroupChatMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Group'}
@@ -538,7 +540,7 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                               Group Settings
                             </DropdownMenuItem>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Group Settings</DialogTitle>
                             </DialogHeader>
@@ -558,17 +560,19 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                                   id="edit-group-description"
                                   defaultValue={currentConversation.description || ''}
                                   onChange={(e) => setNewGroupDescription(e.target.value)}
+                                  className="min-h-[60px] resize-none"
                                   data-testid="input-edit-group-description"
                                 />
                               </div>
                             </div>
-                            <DialogFooter>
+                            <DialogFooter className="flex-col sm:flex-row gap-2">
                               <Button
                                 onClick={() => updateGroupMutation.mutate({ 
                                   title: newGroupTitle || currentConversation.title || '', 
                                   description: newGroupDescription || currentConversation.description || '' 
                                 })}
                                 disabled={updateGroupMutation.isPending}
+                                className="w-full sm:w-auto"
                                 data-testid="btn-save-group-settings"
                               >
                                 Save Changes
@@ -584,26 +588,26 @@ export default function TeamChat({ adminToken, adminId }: TeamChatProps) {
                               Add Member
                             </DropdownMenuItem>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Add Member</DialogTitle>
                             </DialogHeader>
-                            <ScrollArea className="h-[300px]">
+                            <ScrollArea className="h-[200px] sm:h-[300px]">
                               <div className="space-y-2">
                                 {availableUsersToAdd.map(user => (
                                   <Button
                                     key={user.id}
                                     variant="ghost"
-                                    className="w-full justify-start gap-3"
+                                    className="w-full justify-start gap-2 sm:gap-3"
                                     onClick={() => addMemberMutation.mutate(user.id)}
                                     disabled={addMemberMutation.isPending}
                                     data-testid={`btn-add-member-${user.id}`}
                                   >
-                                    <Avatar className="h-8 w-8">
+                                    <Avatar className="h-8 w-8 flex-shrink-0">
                                       {user.profilePicture && <AvatarImage src={user.profilePicture} />}
                                       <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
                                     </Avatar>
-                                    <span>{user.username}</span>
+                                    <span className="truncate">{user.username}</span>
                                   </Button>
                                 ))}
                                 {availableUsersToAdd.length === 0 && (
