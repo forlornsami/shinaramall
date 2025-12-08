@@ -162,16 +162,16 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg z-50 bg-primary hover:bg-primary/90"
         data-testid="button-chat-open"
       >
-        <MessageCircle className="h-6 w-6" />
+        <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
       </Button>
     );
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-background border rounded-lg shadow-xl flex flex-col z-50" data-testid="chat-widget-container">
+    <div className="fixed bottom-0 left-0 right-0 h-[85vh] sm:bottom-6 sm:left-auto sm:right-6 sm:w-96 sm:h-[500px] m-0 sm:m-0 bg-background border rounded-t-lg sm:rounded-lg shadow-xl flex flex-col z-50" data-testid="chat-widget-container">
       <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground rounded-t-lg">
         <div className="flex items-center gap-2">
           <MessageCircle className="h-5 w-5" />
