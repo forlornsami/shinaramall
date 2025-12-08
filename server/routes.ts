@@ -256,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/change-password', adminAuth, async (req: any, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
-      const adminId = req.adminUser.id;
+      const adminId = req.admin.id;
       
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ message: "Current and new password are required" });
@@ -289,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get admin profile
   app.get('/api/admin/profile', adminAuth, async (req: any, res) => {
     try {
-      const adminId = req.adminUser.id;
+      const adminId = req.admin.id;
       const admin = await storage.getAdminUser(adminId);
       
       if (!admin) {
@@ -313,7 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update admin profile
   app.patch('/api/admin/profile', adminAuth, async (req: any, res) => {
     try {
-      const adminId = req.adminUser.id;
+      const adminId = req.admin.id;
       const { username, email } = req.body;
       
       const updates: any = { updatedAt: new Date() };
@@ -343,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin profile picture upload (base64)
   app.post('/api/admin/profile/picture', adminAuth, async (req: any, res) => {
     try {
-      const adminId = req.adminUser.id;
+      const adminId = req.admin.id;
       const { imageData } = req.body;
       
       if (!imageData || typeof imageData !== 'string') {
@@ -376,7 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin profile picture delete
   app.delete('/api/admin/profile/picture', adminAuth, async (req: any, res) => {
     try {
-      const adminId = req.adminUser.id;
+      const adminId = req.admin.id;
       
       await storage.updateAdminUser(adminId, {
         profilePicture: null,

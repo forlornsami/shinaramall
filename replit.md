@@ -55,6 +55,8 @@ Preferred communication style: Simple, everyday language.
 - **Order Processing**: Complete order lifecycle from cart to delivery
 - **Admin Dashboard**: Statistics, order management, product management, and customer oversight
 - **Customer Profile Management**: Users can view and edit their profile (firstName, lastName) with secure backend validation
+- **Profile Picture System**: Both customers and admins can upload, change, and delete profile pictures (base64 storage, max 2MB, JPG/PNG/GIF)
+- **Sidebar Profile Display**: User profile pictures and emails displayed in bottom-left of both admin and storefront sidebars
 - **Admin Settings & Help Center**: Store configuration, notifications, security settings, FAQ, and support features
 - **Customizable Store Branding**: Admins can upload store logo (base64) and change store name, which dynamically updates across all navigation components
 - **Security Features**: Password change with bcrypt verification, active session management in admin security settings
