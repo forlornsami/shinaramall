@@ -129,13 +129,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       setOrderNumber(order.orderNumber);
       
       if (requiresPaymentProof) {
-        // Go to payment proof step
+        // Go to payment proof step - don't clear cart yet, wait for proof submission
         setStep(3);
-        queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-        clearCart();
       } else {
-        // COD - just show success
+        // COD - just show success and clear cart
         toast({
           title: "Order Placed Successfully!",
           description: `Your order #${order.orderNumber} has been placed. Pay on delivery.`,
@@ -173,6 +170,10 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         title: "Payment Proof Submitted!",
         description: "Your payment is being verified. We'll notify you once confirmed.",
       });
+      // Now clear the cart and close the modal
+      queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      clearCart();
       onClose();
       setStep(1);
       setPaymentScreenshot(null);
