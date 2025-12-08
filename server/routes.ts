@@ -1617,6 +1617,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           testMode: false,
           configuration: { supportedOperations: ['cash_payment'] },
         },
+        {
+          name: 'tron_usdt',
+          displayName: 'Tron USDT (TRC-20)',
+          icon: 'usdt',
+          description: 'Pay with USDT on Tron network',
+          isEnabled: true,
+          testMode: true,
+          apiKey: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+          configuration: { walletAddress: 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', network: 'tron' },
+        },
+        {
+          name: 'binance_pay',
+          displayName: 'Binance Pay',
+          icon: 'binance',
+          description: 'Pay with Binance Pay',
+          isEnabled: true,
+          testMode: true,
+          configuration: { network: 'binance', supportedCurrencies: ['USDT', 'BUSD', 'BNB'] },
+        },
       ];
 
       const createdGateways = [];
@@ -1720,9 +1739,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const config = gateway.configuration as any;
 
       // Calculate crypto amount based on exchange rate (simplified - in production use real-time rates)
-      const orderAmount = parseFloat(order.totalAmount);
+      const orderAmount = parseFloat(order.total || "0");
       let exchangeRate = "1"; // Default for USDT
-      let cryptoAmount = orderAmount.toString();
+      let cryptoAmount = orderAmount.toFixed(2);
 
       // Generate unique payment reference
       const externalOrderId = `ESP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

@@ -64,7 +64,7 @@ export default function CartView() {
     );
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && !showCheckoutModal) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
@@ -87,6 +87,35 @@ export default function CartView() {
           </p>
         </div>
       </div>
+    );
+  }
+  
+  if (items.length === 0 && showCheckoutModal) {
+    return (
+      <>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600">
+              <ShoppingCart className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">Shopping Cart</h2>
+              <p className="text-sm text-muted-foreground">Your cart is empty</p>
+            </div>
+          </div>
+
+          <div className="text-center py-16">
+            <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+              <ShoppingBag className="w-12 h-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Your cart is empty</h3>
+            <p className="text-muted-foreground mb-6">
+              Looks like you haven't added anything to your cart yet.
+            </p>
+          </div>
+        </div>
+        <CheckoutModal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} />
+      </>
     );
   }
 

@@ -130,7 +130,9 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "easypaisa",
   "jazzcash",
   "hbl_bank",
-  "cod"
+  "cod",
+  "tron_usdt",
+  "binance_pay"
 ]);
 
 // Orders
