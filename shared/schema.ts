@@ -125,15 +125,32 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "refunded"
 ]);
 
-// Payment method enum
+// Payment method enum (simplified - no crypto)
 export const paymentMethodEnum = pgEnum("payment_method", [
   "easypaisa",
   "jazzcash",
   "hbl_bank",
-  "cod",
-  "tron_usdt",
-  "binance_pay"
+  "cod"
 ]);
+
+// Payment verification status enum
+export const verificationStatusEnum = pgEnum("verification_status", [
+  "pending",
+  "approved",
+  "rejected"
+]);
+
+// Payment accounts table for storing bank/mobile wallet details
+export const paymentAccounts = pgTable("payment_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  method: varchar("method").notNull(), // 'hbl', 'jazzcash', 'easypaisa'
+  bankName: varchar("bank_name"), // null for mobile wallets
+  accountNumber: varchar("account_number").notNull(),
+  accountHolderName: varchar("account_holder_name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 // Orders
 export const orders = pgTable("orders", {
@@ -142,7 +159,7 @@ export const orders = pgTable("orders", {
   userId: varchar("user_id").references(() => users.id).notNull(),
   status: orderStatusEnum("status").notNull().default("pending"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
-  paymentMethod: paymentMethodEnum("payment_method"),
+  paymentMethod: varchar("payment_method"), // Changed to varchar to avoid enum conflicts
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull().default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
@@ -158,6 +175,12 @@ export const orders = pgTable("orders", {
     transactionId?: string;
     gatewayResponse?: any;
   }>(),
+  paymentScreenshotUrl: text("payment_screenshot_url"),
+  transactionId: varchar("transaction_id"),
+  verificationStatus: varchar("verification_status").default("pending"),
+  verificationNote: text("verification_note"),
+  verifiedBy: varchar("verified_by").references(() => adminUsers.id),
+  verifiedAt: timestamp("verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -364,11 +387,29 @@ export type UpdateOrder = Partial<InsertOrder> & {
   status?: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
   paymentStatus?: "pending" | "processing" | "completed" | "failed" | "refunded";
   paymentDetails?: { transactionId?: string; gatewayResponse?: any; method?: string; note?: string };
+  paymentScreenshotUrl?: string;
+  transactionId?: string;
+  verificationStatus?: "pending" | "approved" | "rejected";
+  verificationNote?: string;
+  verifiedBy?: string;
+  verifiedAt?: Date;
 };
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type CartItem = typeof cartItems.$inferSelect;
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
+
+// Payment accounts schemas and types
+export const insertPaymentAccountSchema = createInsertSchema(paymentAccounts).pick({
+  method: true,
+  bankName: true,
+  accountNumber: true,
+  accountHolderName: true,
+  isActive: true,
+});
+
+export type PaymentAccount = typeof paymentAccounts.$inferSelect;
+export type InsertPaymentAccount = z.infer<typeof insertPaymentAccountSchema>;
 
 // Payment gateway configuration table
 export const paymentGateways = pgTable("payment_gateways", {

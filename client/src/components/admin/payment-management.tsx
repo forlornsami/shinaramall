@@ -32,9 +32,13 @@ import {
   Pencil,
   Trash2,
   Globe,
-  Landmark
+  Landmark,
+  Eye,
+  ImageIcon,
+  FileText,
+  AlertCircle
 } from "lucide-react";
-import type { PaymentGateway, PaymentTransaction } from "@shared/schema";
+import type { PaymentGateway, PaymentTransaction, PaymentAccount, Order } from "@shared/schema";
 
 const iconOptions = [
   { value: 'smartphone', label: 'Mobile', icon: Smartphone },
@@ -69,6 +73,34 @@ export default function PaymentManagement() {
     webhookUrl: '',
     walletAddress: '',
   });
+
+  // Payment Accounts state
+  const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
+  const [isEditAccountModalOpen, setIsEditAccountModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<PaymentAccount | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState<PaymentAccount | null>(null);
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
+  const [accountFormData, setAccountFormData] = useState({
+    method: 'easypaisa',
+    bankName: '',
+    accountNumber: '',
+    accountHolderName: '',
+    isActive: true,
+  });
+
+  // Verification state
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [verificationNote, setVerificationNote] = useState("");
+
+  const resetAccountForm = () => {
+    setAccountFormData({
+      method: 'easypaisa',
+      bankName: '',
+      accountNumber: '',
+      accountHolderName: '',
+      isActive: true,
+    });
+  };
 
   const resetForm = () => {
     setFormData({
@@ -125,6 +157,32 @@ export default function PaymentManagement() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Failed to fetch payment transactions');
+      return response.json();
+    },
+  });
+
+  // Payment Accounts query
+  const { data: paymentAccounts, isLoading: accountsLoading } = useQuery<PaymentAccount[]>({
+    queryKey: ['/api/admin/payment-accounts'],
+    queryFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/payment-accounts', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch payment accounts');
+      return response.json();
+    },
+  });
+
+  // Pending verification orders query
+  const { data: pendingVerificationOrders, isLoading: verificationLoading } = useQuery<Order[]>({
+    queryKey: ['/api/admin/orders/pending-verification'],
+    queryFn: async () => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/orders/pending-verification', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch pending verification orders');
       return response.json();
     },
   });
@@ -246,6 +304,135 @@ export default function PaymentManagement() {
       toast({ title: "Error", description: error.message || "Failed to update payment status", variant: "destructive" });
     },
   });
+
+  // Payment Account mutations
+  const createAccountMutation = useMutation({
+    mutationFn: async (data: typeof accountFormData) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/payment-accounts', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to create payment account');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Payment account created successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-accounts'] });
+      setIsAddAccountModalOpen(false);
+      resetAccountForm();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create payment account", variant: "destructive" });
+    },
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof accountFormData> }) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/admin/payment-accounts/${id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update payment account');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Payment account updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-accounts'] });
+      setIsEditAccountModalOpen(false);
+      setEditingAccount(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update payment account", variant: "destructive" });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/admin/payment-accounts/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to delete payment account');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Payment account deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-accounts'] });
+      setIsDeleteAccountDialogOpen(false);
+      setDeletingAccount(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete payment account", variant: "destructive" });
+    },
+  });
+
+  // Payment Verification mutation
+  const verifyPaymentMutation = useMutation({
+    mutationFn: async ({ orderId, approved, note }: { orderId: string; approved: boolean; note?: string }) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/admin/orders/${orderId}/verify-payment`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ approved, note }),
+      });
+      if (!response.ok) throw new Error('Failed to verify payment');
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      toast({ 
+        title: "Success", 
+        description: `Payment ${variables.approved ? 'approved' : 'rejected'} successfully` 
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders/pending-verification'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-analytics'] });
+      setViewingOrder(null);
+      setVerificationNote("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to verify payment", variant: "destructive" });
+    },
+  });
+
+  const handleEditAccount = (account: PaymentAccount) => {
+    setEditingAccount(account);
+    setAccountFormData({
+      method: account.method,
+      bankName: account.bankName || '',
+      accountNumber: account.accountNumber,
+      accountHolderName: account.accountHolderName,
+      isActive: account.isActive ?? true,
+    });
+    setIsEditAccountModalOpen(true);
+  };
+
+  const handleDeleteAccount = (account: PaymentAccount) => {
+    setDeletingAccount(account);
+    setIsDeleteAccountDialogOpen(true);
+  };
+
+  const getMethodLabel = (method: string) => {
+    switch (method) {
+      case 'easypaisa': return 'EasyPaisa';
+      case 'jazzcash': return 'JazzCash';
+      case 'hbl': return 'HBL Bank';
+      default: return method;
+    }
+  };
 
   const getIconComponent = (iconName: string) => {
     const iconOption = iconOptions.find(i => i.value === iconName);
@@ -382,12 +569,234 @@ export default function PaymentManagement() {
         </Card>
       </div>
 
-      <Tabs defaultValue="gateways" className="space-y-4">
+      <Tabs defaultValue="verification" className="space-y-4">
         <TabsList data-testid="tabs-payment-management">
+          <TabsTrigger value="verification" data-testid="tab-verification" className="relative">
+            Verification
+            {pendingVerificationOrders && pendingVerificationOrders.length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+                {pendingVerificationOrders.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="accounts" data-testid="tab-accounts">Payment Accounts</TabsTrigger>
           <TabsTrigger value="gateways" data-testid="tab-gateways">Payment Gateways</TabsTrigger>
           <TabsTrigger value="transactions" data-testid="tab-transactions">Transactions</TabsTrigger>
           <TabsTrigger value="overview" data-testid="tab-overview">Analytics</TabsTrigger>
         </TabsList>
+
+        {/* Payment Verification Tab */}
+        <TabsContent value="verification" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-medium">Payment Verification</h3>
+              <p className="text-sm text-muted-foreground">
+                Review and verify customer payment screenshots
+              </p>
+            </div>
+            <Button 
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/admin/orders/pending-verification'] })}
+              variant="outline"
+              data-testid="button-refresh-verification"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+
+          <Card data-testid="card-pending-verification">
+            <CardContent className="p-6">
+              {verificationLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+                </div>
+              ) : pendingVerificationOrders && pendingVerificationOrders.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingVerificationOrders.map((order: Order) => (
+                      <TableRow key={order.id} data-testid={`verification-row-${order.id}`}>
+                        <TableCell>
+                          <span className="font-medium">#{order.orderNumber}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{order.userId?.slice(0, 8)}...</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">Rs. {parseFloat(order.total || '0').toLocaleString()}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getIconColor(order.paymentMethod || '')}>
+                            {getMethodLabel(order.paymentMethod || '')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm">{order.transactionId || '-'}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setViewingOrder(order)}
+                              data-testid={`button-view-proof-${order.id}`}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => verifyPaymentMutation.mutate({ orderId: order.id, approved: true })}
+                              disabled={verifyPaymentMutation.isPending}
+                              data-testid={`button-approve-${order.id}`}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => verifyPaymentMutation.mutate({ orderId: order.id, approved: false })}
+                              disabled={verifyPaymentMutation.isPending}
+                              data-testid={`button-reject-${order.id}`}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-500" />
+                  <p>No payments pending verification</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Payment Accounts Tab */}
+        <TabsContent value="accounts" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-medium">Payment Accounts</h3>
+              <p className="text-sm text-muted-foreground">
+                Manage bank and mobile wallet account details shown to customers
+              </p>
+            </div>
+            <Button 
+              onClick={() => {
+                resetAccountForm();
+                setIsAddAccountModalOpen(true);
+              }}
+              data-testid="button-add-account"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Account
+            </Button>
+          </div>
+
+          <Card data-testid="card-payment-accounts">
+            <CardContent className="p-6">
+              {accountsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+                </div>
+              ) : paymentAccounts && paymentAccounts.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Bank/Provider</TableHead>
+                      <TableHead>Account Number</TableHead>
+                      <TableHead>Account Holder</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentAccounts.map((account: PaymentAccount) => (
+                      <TableRow key={account.id} data-testid={`account-row-${account.id}`}>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <div className={`p-2 rounded-lg bg-muted ${getIconColor(account.method)}`}>
+                              {account.method === 'easypaisa' && <Smartphone className="w-4 h-4" />}
+                              {account.method === 'jazzcash' && <Wallet className="w-4 h-4" />}
+                              {account.method === 'hbl' && <Building className="w-4 h-4" />}
+                            </div>
+                            <span className="font-medium">{getMethodLabel(account.method)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{account.bankName || '-'}</TableCell>
+                        <TableCell className="font-mono">{account.accountNumber}</TableCell>
+                        <TableCell>{account.accountHolderName}</TableCell>
+                        <TableCell>
+                          <Badge variant={account.isActive ? "default" : "secondary"}>
+                            {account.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateAccountMutation.mutate({ 
+                                id: account.id, 
+                                data: { isActive: !account.isActive } 
+                              })}
+                              data-testid={`button-toggle-account-${account.id}`}
+                            >
+                              {account.isActive ? "Disable" : "Enable"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditAccount(account)}
+                              data-testid={`button-edit-account-${account.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteAccount(account)}
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-delete-account-${account.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Wallet className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No payment accounts configured</p>
+                  <p className="text-sm mt-1">Add your bank/mobile wallet accounts to receive payments</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="gateways" className="space-y-4">
           <div className="flex justify-between items-center">
@@ -981,6 +1390,281 @@ export default function PaymentManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Payment Account Dialog */}
+      <Dialog open={isAddAccountModalOpen} onOpenChange={setIsAddAccountModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Payment Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-method">Payment Method</Label>
+              <Select 
+                value={accountFormData.method} 
+                onValueChange={(value) => setAccountFormData({ ...accountFormData, method: value })}
+              >
+                <SelectTrigger data-testid="select-account-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easypaisa">EasyPaisa</SelectItem>
+                  <SelectItem value="jazzcash">JazzCash</SelectItem>
+                  <SelectItem value="hbl">HBL Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-bankName">Bank/Provider Name (Optional)</Label>
+              <Input
+                id="account-bankName"
+                placeholder="e.g., EasyPaisa, JazzCash, HBL"
+                value={accountFormData.bankName}
+                onChange={(e) => setAccountFormData({ ...accountFormData, bankName: e.target.value })}
+                data-testid="input-account-bank-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-number">Account Number / Mobile Number</Label>
+              <Input
+                id="account-number"
+                placeholder="e.g., 03001234567"
+                value={accountFormData.accountNumber}
+                onChange={(e) => setAccountFormData({ ...accountFormData, accountNumber: e.target.value })}
+                data-testid="input-account-number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-holder">Account Holder Name</Label>
+              <Input
+                id="account-holder"
+                placeholder="Name as shown on account"
+                value={accountFormData.accountHolderName}
+                onChange={(e) => setAccountFormData({ ...accountFormData, accountHolderName: e.target.value })}
+                data-testid="input-account-holder"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="account-active">Active</Label>
+              <Switch
+                id="account-active"
+                checked={accountFormData.isActive}
+                onCheckedChange={(checked) => setAccountFormData({ ...accountFormData, isActive: checked })}
+                data-testid="switch-account-active"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddAccountModalOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => createAccountMutation.mutate(accountFormData)}
+              disabled={createAccountMutation.isPending || !accountFormData.accountNumber || !accountFormData.accountHolderName}
+              data-testid="button-save-account"
+            >
+              {createAccountMutation.isPending ? "Creating..." : "Add Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Account Dialog */}
+      <Dialog open={isEditAccountModalOpen} onOpenChange={setIsEditAccountModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Payment Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-account-method">Payment Method</Label>
+              <Select 
+                value={accountFormData.method} 
+                onValueChange={(value) => setAccountFormData({ ...accountFormData, method: value })}
+              >
+                <SelectTrigger data-testid="select-edit-account-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easypaisa">EasyPaisa</SelectItem>
+                  <SelectItem value="jazzcash">JazzCash</SelectItem>
+                  <SelectItem value="hbl">HBL Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-account-bankName">Bank/Provider Name (Optional)</Label>
+              <Input
+                id="edit-account-bankName"
+                placeholder="e.g., EasyPaisa, JazzCash, HBL"
+                value={accountFormData.bankName}
+                onChange={(e) => setAccountFormData({ ...accountFormData, bankName: e.target.value })}
+                data-testid="input-edit-account-bank-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-account-number">Account Number / Mobile Number</Label>
+              <Input
+                id="edit-account-number"
+                placeholder="e.g., 03001234567"
+                value={accountFormData.accountNumber}
+                onChange={(e) => setAccountFormData({ ...accountFormData, accountNumber: e.target.value })}
+                data-testid="input-edit-account-number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-account-holder">Account Holder Name</Label>
+              <Input
+                id="edit-account-holder"
+                placeholder="Name as shown on account"
+                value={accountFormData.accountHolderName}
+                onChange={(e) => setAccountFormData({ ...accountFormData, accountHolderName: e.target.value })}
+                data-testid="input-edit-account-holder"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-account-active">Active</Label>
+              <Switch
+                id="edit-account-active"
+                checked={accountFormData.isActive}
+                onCheckedChange={(checked) => setAccountFormData({ ...accountFormData, isActive: checked })}
+                data-testid="switch-edit-account-active"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditAccountModalOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                if (editingAccount) {
+                  updateAccountMutation.mutate({ id: editingAccount.id, data: accountFormData });
+                }
+              }}
+              disabled={updateAccountMutation.isPending || !accountFormData.accountNumber || !accountFormData.accountHolderName}
+              data-testid="button-update-account"
+            >
+              {updateAccountMutation.isPending ? "Updating..." : "Update Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Payment Account Dialog */}
+      <AlertDialog open={isDeleteAccountDialogOpen} onOpenChange={setIsDeleteAccountDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payment Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this payment account ({deletingAccount?.accountNumber})? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-account">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingAccount) {
+                  deleteAccountMutation.mutate(deletingAccount.id);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-account"
+            >
+              {deleteAccountMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* View Payment Screenshot Dialog */}
+      <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Payment Verification - Order #{viewingOrder?.orderNumber}</DialogTitle>
+          </DialogHeader>
+          {viewingOrder && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Amount</Label>
+                  <p className="text-lg font-semibold">Rs. {parseFloat(viewingOrder.total || '0').toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Payment Method</Label>
+                  <Badge variant="outline" className={getIconColor(viewingOrder.paymentMethod || '')}>
+                    {getMethodLabel(viewingOrder.paymentMethod || '')}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Transaction ID</Label>
+                  <p className="font-mono">{viewingOrder.transactionId || 'Not provided'}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Verification Status</Label>
+                  <Badge variant={viewingOrder.verificationStatus === 'pending' ? 'secondary' : viewingOrder.verificationStatus === 'approved' ? 'default' : 'destructive'}>
+                    {viewingOrder.verificationStatus || 'pending'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Payment Screenshot</Label>
+                {viewingOrder.paymentScreenshotUrl ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <img 
+                      src={viewingOrder.paymentScreenshotUrl} 
+                      alt="Payment screenshot" 
+                      className="w-full max-h-96 object-contain"
+                      data-testid="img-verification-screenshot"
+                    />
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                    <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No screenshot uploaded</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="verification-note">Note (Optional)</Label>
+                <Textarea
+                  id="verification-note"
+                  placeholder="Add a note about this verification..."
+                  value={verificationNote}
+                  onChange={(e) => setVerificationNote(e.target.value)}
+                  data-testid="input-verification-note"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingOrder(null)}>Close</Button>
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                if (viewingOrder) {
+                  verifyPaymentMutation.mutate({ orderId: viewingOrder.id, approved: false, note: verificationNote });
+                }
+              }}
+              disabled={verifyPaymentMutation.isPending}
+              data-testid="button-reject-payment"
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Reject Payment
+            </Button>
+            <Button 
+              onClick={() => {
+                if (viewingOrder) {
+                  verifyPaymentMutation.mutate({ orderId: viewingOrder.id, approved: true, note: verificationNote });
+                }
+              }}
+              disabled={verifyPaymentMutation.isPending}
+              data-testid="button-approve-payment"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Approve Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

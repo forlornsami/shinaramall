@@ -10,6 +10,7 @@ import {
   paymentGateways,
   paymentTransactions,
   cryptoPayments,
+  paymentAccounts,
   storeSettings,
   notifications,
   chatConversations,
@@ -38,6 +39,8 @@ import {
   type InsertPaymentTransaction,
   type CryptoPayment,
   type InsertCryptoPayment,
+  type PaymentAccount,
+  type InsertPaymentAccount,
   type StoreSettings,
   type InsertStoreSettings,
   type Notification,
@@ -164,13 +167,25 @@ export interface IStorage {
   markMessagesAsRead(conversationId: string, senderType: string): Promise<void>;
   getUnreadMessageCount(conversationId: string, senderType: string): Promise<number>;
   
-  // Crypto payment operations
+  // Crypto payment operations (deprecated - kept for backward compatibility)
   getCryptoPayments(orderId?: string): Promise<CryptoPayment[]>;
   getCryptoPayment(id: string): Promise<CryptoPayment | undefined>;
   getCryptoPaymentByOrderId(orderId: string): Promise<CryptoPayment | undefined>;
   getCryptoPaymentByExternalId(externalOrderId: string): Promise<CryptoPayment | undefined>;
   createCryptoPayment(payment: InsertCryptoPayment): Promise<CryptoPayment>;
   updateCryptoPayment(id: string, data: Partial<CryptoPayment>): Promise<CryptoPayment>;
+  
+  // Payment account operations (for manual payment verification)
+  getPaymentAccounts(activeOnly?: boolean): Promise<PaymentAccount[]>;
+  getPaymentAccount(id: string): Promise<PaymentAccount | undefined>;
+  getPaymentAccountsByMethod(method: string): Promise<PaymentAccount[]>;
+  createPaymentAccount(account: InsertPaymentAccount): Promise<PaymentAccount>;
+  updatePaymentAccount(id: string, data: Partial<InsertPaymentAccount>): Promise<PaymentAccount>;
+  deletePaymentAccount(id: string): Promise<boolean>;
+  
+  // Order verification operations
+  getOrdersPendingVerification(): Promise<Order[]>;
+  verifyOrderPayment(orderId: string, adminId: string, approved: boolean, note?: string): Promise<Order>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1305,6 +1320,98 @@ export class DatabaseStorage implements IStorage {
       .set({ ...data, updatedAt: new Date() })
       .where(eq(cryptoPayments.id, id))
       .returning();
+    return updated;
+  }
+
+  // Payment account operations (for manual payment verification)
+  async getPaymentAccounts(activeOnly: boolean = false): Promise<PaymentAccount[]> {
+    if (activeOnly) {
+      return db.select().from(paymentAccounts).where(eq(paymentAccounts.isActive, true)).orderBy(paymentAccounts.method);
+    }
+    return db.select().from(paymentAccounts).orderBy(paymentAccounts.method);
+  }
+
+  async getPaymentAccount(id: string): Promise<PaymentAccount | undefined> {
+    const [account] = await db.select().from(paymentAccounts).where(eq(paymentAccounts.id, id));
+    return account;
+  }
+
+  async getPaymentAccountsByMethod(method: string): Promise<PaymentAccount[]> {
+    return db.select().from(paymentAccounts).where(
+      and(
+        eq(paymentAccounts.method, method),
+        eq(paymentAccounts.isActive, true)
+      )
+    );
+  }
+
+  async createPaymentAccount(account: InsertPaymentAccount): Promise<PaymentAccount> {
+    const [created] = await db.insert(paymentAccounts).values(account).returning();
+    return created;
+  }
+
+  async updatePaymentAccount(id: string, data: Partial<InsertPaymentAccount>): Promise<PaymentAccount> {
+    const [updated] = await db
+      .update(paymentAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(paymentAccounts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePaymentAccount(id: string): Promise<boolean> {
+    const result = await db.delete(paymentAccounts).where(eq(paymentAccounts.id, id));
+    return true;
+  }
+
+  // Order verification operations
+  async getOrdersPendingVerification(): Promise<Order[]> {
+    return db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.verificationStatus, 'pending'),
+          sql`${orders.paymentMethod} != 'cod'`
+        )
+      )
+      .orderBy(desc(orders.createdAt));
+  }
+
+  async verifyOrderPayment(orderId: string, adminId: string, approved: boolean, note?: string): Promise<Order> {
+    const verificationStatus = approved ? 'approved' : 'rejected';
+    const paymentStatus = approved ? 'completed' : 'failed';
+    const orderStatus = approved ? 'processing' : 'pending';
+    
+    const [updated] = await db
+      .update(orders)
+      .set({
+        verificationStatus,
+        paymentStatus,
+        status: orderStatus,
+        verifiedBy: adminId,
+        verifiedAt: new Date(),
+        verificationNote: note,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+    
+    // Create notification for customer
+    const order = await this.getOrder(orderId);
+    if (order) {
+      await this.createNotification({
+        recipientType: 'customer',
+        recipientId: order.userId,
+        type: approved ? 'payment_received' : 'payment_failed',
+        title: approved ? 'Payment Verified' : 'Payment Rejected',
+        message: approved 
+          ? `Your payment for order #${order.orderNumber} has been verified.`
+          : `Your payment for order #${order.orderNumber} was rejected. ${note || 'Please contact support.'}`,
+        data: { orderId: order.id, orderNumber: order.orderNumber },
+      });
+    }
+    
     return updated;
   }
 }

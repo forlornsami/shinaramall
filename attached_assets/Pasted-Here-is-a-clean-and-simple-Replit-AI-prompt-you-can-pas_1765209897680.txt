@@ -1,0 +1,170 @@
+Here is a clean and simple Replit AI prompt you can paste directly into Replit to remove all crypto APIs, remove automatic payments, and replace them with manual payment verification using screenshots, plus a new table for bank accounts.
+
+This prompt is written exactly the way Replit AI understands best.
+
+
+---
+
+✅ REPLIT PROMPT — REMOVE AUTO PAYMENTS + ADD MANUAL PAYMENT VERIFICATION
+
+🔥 PROMPT FOR REPLIT AI (Copy & Paste):
+
+
+---
+
+I want to remove all automatic payment gateways and APIs from my project.
+Please remove the following completely from both frontend and backend:
+
+Tron / TRC20 payments
+
+Binance Pay
+
+Any cryptocurrency payment APIs
+
+Any auto-verification or webhook system
+
+Any payment status auto-updating logic
+
+
+Now replace the entire payment system with a manual verification flow.
+
+1. New Manual Payment Flow
+
+When a customer checks out:
+
+They select a payment method: COD, HBL, JazzCash, EasyPaisa
+
+Based on their selection, display our account details (from a new database table)
+
+Customer uploads a payment screenshot
+
+Customer enters transaction ID (optional)
+
+Order is created with status: Pending Payment Verification
+
+No automatic approval
+
+
+2. New Admin Payment Verification
+
+Create an Admin Panel section where staff can:
+
+View all orders with pending payments
+
+View uploaded payment screenshot
+
+View transaction ID
+
+Approve or reject the payment
+
+On approval → order status becomes Paid
+
+On rejection → order status becomes Payment Rejected
+
+
+3. New Database Table: payment_accounts
+
+Create a new table for storing available payment account details.
+Fields required:
+
+id (primary key)
+
+method (HBL / JazzCash / EasyPaisa)
+
+bank_name (nullable if not a bank)
+
+account_number
+
+account_holder_name
+
+active (boolean)
+
+created_at
+
+updated_at
+
+
+4. Customer Checkout Should Use This Table
+
+When user chooses HBL → show HBL account info from database
+
+When user chooses JazzCash → show JazzCash number
+
+When user chooses EasyPaisa → show EasyPaisa number
+
+COD requires no bank info
+
+
+5. Update Backend Logic
+
+Remove crypto API calls entirely
+
+Remove webhook listeners
+
+Remove automatic payment status updates
+
+Remove payment amount verification
+
+Replace with file upload endpoint for screenshot
+
+Save screenshot URL in the order record
+
+Add fields to orders table:
+
+payment_screenshot_url
+
+payment_method
+
+transaction_id
+
+verification_status (pending/approved/rejected)
+
+
+
+6. Update Frontend (React)
+
+Remove all crypto UI components
+
+Remove auto-payment logic
+
+Add screenshot upload UI in checkout
+
+Add transaction ID input
+
+Add a “Waiting for Verification” status in user order history
+
+Admin view to display screenshots + approve/reject buttons
+
+
+7. Clean Code
+
+Remove unused files related to crypto payments
+
+Remove old payment helpers
+
+Remove API keys from environment variables
+
+Remove unnecessary routes
+
+Clean up UI that referenced auto-pay APIs
+
+
+Please generate:
+
+Updated backend code (routes, models, controllers)
+
+Updated frontend code (checkout UI, admin payment UI)
+
+SQL migration for payment_accounts table
+
+Updated order schema fields
+
+Full clean-up of old payment code
+
+
+
+---
+
+✅ Want me to also generate the SQL table + updated order schema right now?
+
+Say "yes generate SQL" and I’ll

@@ -40,43 +40,39 @@ Preferred communication style: Simple, everyday language.
 
 ## Payment Integration
 - **Pakistani Payment Methods**: EasyPaisa, JazzCash, HBL bank, and Cash on Delivery (COD) support
-- **Cryptocurrency Payments**: Tron USDT (TRC-20) and Binance Pay support with automatic webhook-based confirmation
-- **Payment Gateway Management**: Full CRUD operations for payment gateways with icons and descriptions
+- **Manual Payment Verification**: Customers upload payment screenshots and transaction IDs for admin approval
+- **Payment Account Management**: Admin can configure bank/mobile wallet account details for each payment method
 - **Order Processing**: Structured checkout flow with shipping address collection
-- **Payment Status Tracking**: Order status management (pending, processing, shipped, delivered)
+- **Payment Status Tracking**: Order verification status management (pending, approved, rejected)
 - **COD Support**: Cash on Delivery option marks orders as confirmed with pending payment collection
 
-## Cryptocurrency Payment System
-- **Supported Gateways**: Tron USDT (TRC-20), Binance Pay
-- **Database Table**: `crypto_payments` tracks blockchain transactions with orderId, gatewayName, walletAddress, cryptoAmount, cryptoCurrency, network, txHash, confirmations, status, expiresAt
-- **Payment Status**: awaiting_payment, confirming, completed, failed, expired
+## Manual Payment Verification System
+- **Customer Flow**:
+  1. Customer selects payment method at checkout
+  2. System displays payment account details (bank name, account number, account holder)
+  3. Customer makes payment using their banking app
+  4. Customer uploads payment screenshot and enters transaction ID
+  5. Order is created with pending verification status
+- **Admin Flow**:
+  1. Admin navigates to Payments > Verification tab in dashboard
+  2. Views pending orders with payment screenshots and transaction IDs
+  3. Clicks to view full-size screenshot in modal
+  4. Approves or rejects payment with optional notes
+  5. Customer receives notification of verification result
 
-### Tron USDT (Manual Wallet Transfer)
-- **Customer Flow**: Customer copies wallet address and manually sends USDT via their Tron wallet
-- **Configuration**: Admin sets TRC-20 wallet address in Payment Management
-- **Confirmation**: Webhook receives blockchain confirmation or admin manually confirms
+### Payment Accounts Table
+- **Database Table**: `payment_accounts` stores account details per payment method
+- **Fields**: method (easypaisa, jazzcash, hbl_bank), bankName, accountNumber, accountHolderName, description, isActive
+- **Admin Management**: Full CRUD operations via Payment Management > Payment Accounts tab
 
-### Binance Pay (Direct API Integration)
-- **Customer Flow**: Customer is redirected to Binance's secure checkout page to complete payment
-- **Configuration**: Admin enters API Key and Secret Key in Payment Management panel (stored in database)
-- **Fallback**: System also checks environment variables BINANCE_PAY_API_KEY and BINANCE_PAY_SECRET_KEY
-- **Admin Panel Fields**: API Key and Secret Key input fields under Binance Pay gateway configuration
-- **API Integration**: server/binancePay.ts handles order creation with HMAC SHA512 signature
-- **Confirmation**: Binance sends webhook with signature verification to `/api/webhooks/binance`
-- **Get Credentials**: Register at https://merchant.binance.com → Developers → API Keys
-
-### Common Features
-- **Webhook Endpoints**:
-  - POST /api/webhooks/tron - Receives Tron blockchain payment confirmations
-  - POST /api/webhooks/binance - Receives Binance Pay payment notifications (with signature verification)
-- **Admin Features**:
-  - Configure Tron wallet address in Payment Management
-  - Manual payment confirmation option for both gateways
-  - View all crypto payments via GET /api/admin/crypto-payments
+### Order Verification Fields
+- **Orders Table Extensions**: transactionId, paymentScreenshot (base64), verificationStatus (pending, approved, rejected), verificationNote, verifiedBy, verifiedAt
 - **API Endpoints**:
-  - POST /api/crypto-payments/create - Create crypto payment for order
-  - GET /api/crypto-payments/:orderId/status - Check payment status
-  - POST /api/admin/crypto-payments/:id/confirm - Manual confirmation
+  - GET /api/payment-accounts?method=xyz - Get active payment accounts for a method
+  - POST /api/admin/payment-accounts - Create new payment account
+  - PUT /api/admin/payment-accounts/:id - Update payment account
+  - DELETE /api/admin/payment-accounts/:id - Delete payment account
+  - POST /api/admin/orders/:id/verify - Approve or reject payment with notes
 
 ## Key Features
 - **Unified Storefront**: Single consistent UI for both logged-in and guest users with left sidebar navigation

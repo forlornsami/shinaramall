@@ -1,17 +1,17 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Bitcoin, Copy, Clock, ExternalLink, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { CartItem, Product } from "@shared/schema";
-import { SiBinance } from "react-icons/si";
+import type { CartItem, Product, PaymentAccount } from "@shared/schema";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ interface CartItemWithProduct extends CartItem {
   product: Product;
 }
 
-type PaymentMethod = "easypaisa" | "jazzcash" | "hbl" | "cod" | "tron_usdt" | "binance_pay";
+type PaymentMethod = "easypaisa" | "jazzcash" | "hbl" | "cod";
 
 const paymentMethods = [
   {
@@ -33,7 +33,7 @@ const paymentMethods = [
     color: "from-green-500 to-emerald-600",
     bgColor: "bg-green-50 dark:bg-green-900/20",
     borderColor: "border-green-500",
-    isCrypto: false,
+    requiresProof: true,
   },
   {
     id: "jazzcash" as PaymentMethod,
@@ -43,7 +43,7 @@ const paymentMethods = [
     color: "from-red-500 to-rose-600",
     bgColor: "bg-red-50 dark:bg-red-900/20",
     borderColor: "border-red-500",
-    isCrypto: false,
+    requiresProof: true,
   },
   {
     id: "hbl" as PaymentMethod,
@@ -53,7 +53,7 @@ const paymentMethods = [
     color: "from-blue-600 to-indigo-700",
     bgColor: "bg-blue-50 dark:bg-blue-900/20",
     borderColor: "border-blue-600",
-    isCrypto: false,
+    requiresProof: true,
   },
   {
     id: "cod" as PaymentMethod,
@@ -63,44 +63,9 @@ const paymentMethods = [
     color: "from-amber-500 to-orange-600",
     bgColor: "bg-amber-50 dark:bg-amber-900/20",
     borderColor: "border-amber-500",
-    isCrypto: false,
-  },
-  {
-    id: "tron_usdt" as PaymentMethod,
-    name: "Tron USDT (TRC-20)",
-    description: "Pay with USDT on Tron network",
-    icon: Bitcoin,
-    color: "from-red-600 to-red-700",
-    bgColor: "bg-red-50 dark:bg-red-900/20",
-    borderColor: "border-red-600",
-    isCrypto: true,
-  },
-  {
-    id: "binance_pay" as PaymentMethod,
-    name: "Binance Pay",
-    description: "Pay with crypto via Binance",
-    icon: SiBinance,
-    color: "from-yellow-500 to-yellow-600",
-    bgColor: "bg-yellow-50 dark:bg-yellow-900/20",
-    borderColor: "border-yellow-500",
-    isCrypto: true,
+    requiresProof: false,
   },
 ];
-
-interface CryptoPaymentInfo {
-  id: string;
-  orderId: string;
-  gatewayName: string;
-  walletAddress?: string;
-  cryptoAmount: string;
-  cryptoCurrency: string;
-  network: string;
-  paymentUrl?: string;
-  qrCode?: string;
-  externalOrderId: string;
-  status: string;
-  expiresAt: string;
-}
 
 export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { cartItems, clearCart } = useCart() as {
@@ -110,8 +75,11 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("easypaisa");
-  const [cryptoPaymentInfo, setCryptoPaymentInfo] = useState<CryptoPaymentInfo | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
+  const [transactionId, setTransactionId] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [shippingInfo, setShippingInfo] = useState({
     firstName: "",
     lastName: "",
@@ -119,6 +87,18 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     city: "",
     postalCode: "",
     phone: "",
+  });
+
+  // Fetch payment accounts for selected method
+  const { data: paymentAccounts } = useQuery<PaymentAccount[]>({
+    queryKey: ['/api/payment-accounts/method', paymentMethod],
+    queryFn: async () => {
+      if (paymentMethod === 'cod') return [];
+      const response = await fetch(`/api/payment-accounts/method/${paymentMethod}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: paymentMethod !== 'cod',
   });
 
   const subtotal = cartItems?.reduce((sum: number, item: CartItemWithProduct) => 
@@ -129,7 +109,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const total = subtotal + shippingCost;
 
   const selectedPaymentConfig = paymentMethods.find(m => m.id === paymentMethod);
-  const isCryptoPayment = selectedPaymentConfig?.isCrypto || false;
+  const requiresPaymentProof = selectedPaymentConfig?.requiresProof || false;
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -146,62 +126,25 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     },
     onSuccess: async (order) => {
       setOrderId(order.id);
+      setOrderNumber(order.orderNumber);
       
-      if (isCryptoPayment) {
-        try {
-          const cryptoResponse = await apiRequest('POST', '/api/crypto-payments/create', {
-            orderId: order.id,
-            gatewayName: paymentMethod,
-            cryptoCurrency: 'USDT',
-          });
-          const cryptoPayment = await cryptoResponse.json();
-          setCryptoPaymentInfo(cryptoPayment);
-          setStep(3);
-          queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-          clearCart();
-        } catch (error) {
-          toast({
-            title: "Payment Setup Failed",
-            description: "Failed to create crypto payment. Please try again.",
-            variant: "destructive",
-          });
-        }
+      if (requiresPaymentProof) {
+        // Go to payment proof step
+        setStep(3);
+        queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+        clearCart();
       } else {
-        const paymentEndpoint = `/api/payment/${paymentMethod}`;
-        const paymentData = {
-          orderId: order.id,
-          amount: total,
-          ...(paymentMethod === 'hbl' ? 
-            { accountNumber: shippingInfo.phone } : 
-            { phoneNumber: shippingInfo.phone }
-          ),
-        };
-        
-        try {
-          const paymentResponse = await apiRequest('POST', paymentEndpoint, paymentData);
-          const paymentResult = await paymentResponse.json();
-          
-          if (paymentResult.success) {
-            toast({
-              title: "Order Placed Successfully!",
-              description: `Your order #${order.orderNumber} has been placed.`,
-            });
-            queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-            clearCart();
-            onClose();
-            setStep(1);
-          } else {
-            throw new Error(paymentResult.message || 'Payment failed');
-          }
-        } catch (error) {
-          toast({
-            title: "Payment Failed",
-            description: "Your order was created but payment failed. Please contact support.",
-            variant: "destructive",
-          });
-        }
+        // COD - just show success
+        toast({
+          title: "Order Placed Successfully!",
+          description: `Your order #${order.orderNumber} has been placed. Pay on delivery.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+        clearCart();
+        onClose();
+        setStep(1);
       }
     },
     onError: () => {
@@ -212,6 +155,72 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       });
     },
   });
+
+  // Upload payment proof mutation
+  const uploadPaymentProofMutation = useMutation({
+    mutationFn: async () => {
+      if (!orderId || !paymentScreenshot) {
+        throw new Error("Order ID and screenshot are required");
+      }
+      const response = await apiRequest('POST', `/api/orders/${orderId}/payment-proof`, {
+        screenshot: paymentScreenshot,
+        transactionId: transactionId || null,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Payment Proof Submitted!",
+        description: "Your payment is being verified. We'll notify you once confirmed.",
+      });
+      onClose();
+      setStep(1);
+      setPaymentScreenshot(null);
+      setTransactionId("");
+      setOrderId(null);
+      setOrderNumber(null);
+    },
+    onError: () => {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload payment proof. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle screenshot upload
+  const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid File",
+        description: "Please upload an image file (JPG, PNG, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload an image smaller than 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPaymentScreenshot(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -478,114 +487,133 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               </div>
             )}
 
-            {step === 3 && cryptoPaymentInfo && (
+            {step === 3 && (
               <div className="space-y-6 animate-fade-in">
                 <div className="text-center">
                   <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <Bitcoin className="w-8 h-8 text-primary" />
+                    <ShieldCheck className="w-8 h-8 text-primary" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">
                     Complete Your Payment
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Send exactly the amount below to complete your order
+                    Order #{orderNumber} created. Send payment and upload proof.
                   </p>
                 </div>
 
-                <Card className="border-2 border-primary/20 bg-primary/5">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
-                      <p className="text-3xl font-bold text-primary" data-testid="text-crypto-amount">
-                        {cryptoPaymentInfo.cryptoAmount} {cryptoPaymentInfo.cryptoCurrency}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        ≈ Rs. {total.toLocaleString()}
-                      </p>
-                    </div>
-
-                    {cryptoPaymentInfo.walletAddress && (
-                      <div className="space-y-2">
-                        <Label className="text-sm text-muted-foreground">Send to this address ({cryptoPaymentInfo.network?.toUpperCase()})</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={cryptoPaymentInfo.walletAddress}
-                            readOnly
-                            className="font-mono text-sm"
-                            data-testid="input-wallet-address"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => copyToClipboard(cryptoPaymentInfo.walletAddress || '')}
-                            data-testid="button-copy-address"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {cryptoPaymentInfo.paymentUrl && cryptoPaymentInfo.gatewayName === 'binance_pay' && (
-                      <div className="space-y-3">
-                        <Button
-                          type="button"
-                          className="w-full btn-modern rounded-xl py-6 text-lg font-semibold"
-                          onClick={() => window.open(cryptoPaymentInfo.paymentUrl, '_blank')}
-                          data-testid="button-open-binance"
-                        >
-                          <ExternalLink className="w-5 h-5 mr-2" />
-                          Pay with Binance Pay
-                        </Button>
-                        <p className="text-xs text-center text-muted-foreground">
-                          You'll be redirected to Binance to complete your payment securely
+                {/* Payment Account Details */}
+                {paymentAccounts && paymentAccounts.length > 0 && (
+                  <Card className="border-2 border-primary/20 bg-primary/5">
+                    <CardContent className="p-6 space-y-4">
+                      <div className="text-center mb-4">
+                        <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
+                        <p className="text-3xl font-bold text-primary" data-testid="text-payment-amount">
+                          Rs. {total.toLocaleString()}
                         </p>
-                        {cryptoPaymentInfo.qrCode && (
-                          <div className="flex flex-col items-center gap-2 pt-2">
-                            <p className="text-sm text-muted-foreground">Or scan with Binance App:</p>
-                            <img 
-                              src={cryptoPaymentInfo.qrCode} 
-                              alt="Binance Pay QR Code" 
-                              className="w-32 h-32 rounded-lg border"
-                              data-testid="img-binance-qr"
-                            />
-                          </div>
-                        )}
                       </div>
-                    )}
 
-                    <div className="flex items-center justify-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                      <Clock className="w-4 h-4" />
-                      <span>Payment expires in 1 hour</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Send payment to:</Label>
+                        {paymentAccounts.map((account) => (
+                          <div key={account.id} className="bg-background rounded-lg p-4 border space-y-2">
+                            {account.bankName && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-muted-foreground">Bank/Provider</span>
+                                <span className="font-medium">{account.bankName}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Account Number</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-medium">{account.accountNumber}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => copyToClipboard(account.accountNumber)}
+                                  data-testid="button-copy-account"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Account Name</span>
+                              <span className="font-medium">{account.accountHolderName}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
+                {/* Payment Instructions */}
                 <div className="bg-muted/50 rounded-xl p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">Payment Instructions:</h4>
+                  <h4 className="font-medium text-foreground">Instructions:</h4>
                   <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                    {cryptoPaymentInfo.gatewayName === 'tron_usdt' ? (
-                      <>
-                        <li>Open your USDT wallet (TRC-20 supported)</li>
-                        <li>Copy the wallet address above</li>
-                        <li>Send exactly {cryptoPaymentInfo.cryptoAmount} USDT</li>
-                        <li>Wait for blockchain confirmation (1-3 minutes)</li>
-                      </>
-                    ) : (
-                      <>
-                        <li>Click "Open Binance Pay" to proceed</li>
-                        <li>Scan QR code or pay from your Binance app</li>
-                        <li>Complete the payment in Binance</li>
-                        <li>Your order will be confirmed automatically</li>
-                      </>
-                    )}
+                    <li>Send Rs. {total.toLocaleString()} to the account above</li>
+                    <li>Take a screenshot of your payment confirmation</li>
+                    <li>Upload the screenshot below</li>
+                    <li>Enter the transaction ID (optional but recommended)</li>
                   </ol>
                 </div>
 
-                <div className="text-center text-sm text-muted-foreground">
-                  <p>Order ID: <span className="font-mono">{orderId?.slice(0, 8)}</span></p>
-                  <p className="mt-1">Payment will be verified automatically</p>
+                {/* Screenshot Upload */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">Upload Payment Screenshot *</Label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleScreenshotUpload}
+                    accept="image/*"
+                    className="hidden"
+                    data-testid="input-screenshot-file"
+                  />
+                  
+                  {paymentScreenshot ? (
+                    <div className="relative">
+                      <img 
+                        src={paymentScreenshot} 
+                        alt="Payment screenshot" 
+                        className="w-full max-h-48 object-contain rounded-lg border"
+                        data-testid="img-payment-screenshot"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => setPaymentScreenshot(null)}
+                        data-testid="button-remove-screenshot"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      data-testid="button-upload-screenshot"
+                    >
+                      <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-sm font-medium text-foreground">Click to upload screenshot</p>
+                      <p className="text-xs text-muted-foreground mt-1">JPG, PNG (max 2MB)</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="transactionId" className="text-sm font-medium">Transaction ID (Optional)</Label>
+                    <Input
+                      id="transactionId"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      placeholder="e.g., TXN123456789"
+                      className="h-12 rounded-xl"
+                      data-testid="input-transaction-id"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -597,20 +625,25 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               <div className="flex flex-col gap-3">
                 <Button 
                   type="button"
-                  onClick={() => {
-                    onClose();
-                    setStep(1);
-                    setCryptoPaymentInfo(null);
-                    setOrderId(null);
-                  }}
+                  onClick={() => uploadPaymentProofMutation.mutate()}
+                  disabled={!paymentScreenshot || uploadPaymentProofMutation.isPending}
                   className="w-full btn-modern rounded-xl py-6"
-                  data-testid="button-done"
+                  data-testid="button-submit-proof"
                 >
-                  <CheckCircle2 className="w-5 h-5 mr-2" />
-                  Done - I've Sent the Payment
+                  {uploadPaymentProofMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      Submit Payment Proof
+                    </>
+                  )}
                 </Button>
                 <p className="text-xs text-center text-muted-foreground">
-                  You can check your order status in "My Orders"
+                  Your payment will be verified within 24 hours
                 </p>
               </div>
             ) : (

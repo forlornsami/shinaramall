@@ -5,7 +5,6 @@ import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateT
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
-import { createBinancePayService } from "./binancePay";
 
 // Admin JWT middleware
 const adminAuth = async (req: any, res: any, next: any) => {
@@ -1708,369 +1707,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
-  // CRYPTO PAYMENT ROUTES
+  // PAYMENT ACCOUNTS ROUTES (for manual payment verification)
   // ============================================
 
-  // Create a crypto payment for an order
-  app.post('/api/crypto-payments/create', isAuthenticated, async (req: any, res) => {
+  // Get all payment accounts (public - for checkout)
+  app.get('/api/payment-accounts', async (req, res) => {
     try {
-      const { orderId, gatewayName, cryptoCurrency } = req.body;
+      const accounts = await storage.getPaymentAccounts(true); // Only active accounts
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching payment accounts:", error);
+      res.status(500).json({ message: "Failed to fetch payment accounts" });
+    }
+  });
+
+  // Get payment accounts by method (public - for checkout)
+  app.get('/api/payment-accounts/method/:method', async (req, res) => {
+    try {
+      const { method } = req.params;
+      const accounts = await storage.getPaymentAccountsByMethod(method);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching payment accounts by method:", error);
+      res.status(500).json({ message: "Failed to fetch payment accounts" });
+    }
+  });
+
+  // Admin: Get all payment accounts
+  app.get('/api/admin/payment-accounts', adminAuth, async (req, res) => {
+    try {
+      const accounts = await storage.getPaymentAccounts(false); // All accounts
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching payment accounts:", error);
+      res.status(500).json({ message: "Failed to fetch payment accounts" });
+    }
+  });
+
+  // Admin: Create payment account
+  app.post('/api/admin/payment-accounts', adminAuth, async (req, res) => {
+    try {
+      const { method, bankName, accountNumber, accountHolderName, isActive } = req.body;
       
-      if (!orderId || !gatewayName) {
-        return res.status(400).json({ message: "Order ID and gateway name are required" });
+      if (!method || !accountNumber || !accountHolderName) {
+        return res.status(400).json({ message: "Method, account number, and account holder name are required" });
       }
 
-      // Get the order
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      // Verify the order belongs to this user
-      if (order.userId !== req.user.id) {
-        return res.status(403).json({ message: "Unauthorized" });
-      }
-
-      // Get the payment gateway
-      const gateway = await storage.getPaymentGatewayByName(gatewayName);
-      if (!gateway || !gateway.isEnabled) {
-        return res.status(400).json({ message: "Payment gateway not available" });
-      }
-
-      const config = gateway.configuration as any;
-
-      // Calculate crypto amount based on exchange rate (simplified - in production use real-time rates)
-      const orderAmount = parseFloat(order.total || "0");
-      let exchangeRate = "1"; // Default for USDT
-      let cryptoAmount = orderAmount.toFixed(2);
-
-      // Generate unique payment reference
-      const externalOrderId = `ESP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Set expiry time (1 hour from now)
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
-      let paymentData: any = {
-        orderId,
-        gatewayName,
-        cryptoAmount,
-        cryptoCurrency: cryptoCurrency || 'USDT',
-        exchangeRate,
-        externalOrderId,
-        status: 'awaiting_payment',
-        expiresAt,
-      };
-
-      if (gatewayName === 'tron_usdt') {
-        // For Tron USDT, we need a wallet address from the gateway configuration
-        const walletAddress = config?.walletAddress || gateway.apiKey; // Use API key as fallback for wallet address
-        paymentData.walletAddress = walletAddress;
-        paymentData.network = 'tron';
-        paymentData.cryptoCurrency = 'USDT';
-        
-        // In production, generate QR code for wallet address payment
-        paymentData.paymentUrl = `tron:${walletAddress}?amount=${cryptoAmount}&token=USDT`;
-      } else if (gatewayName === 'binance_pay') {
-        paymentData.network = 'binance';
-        paymentData.cryptoCurrency = cryptoCurrency || 'USDT';
-        
-        // Use credentials from gateway configuration (database), falling back to env vars
-        const binancePayService = createBinancePayService(gateway.apiKey, gateway.apiSecret);
-        
-        if (binancePayService) {
-          try {
-            const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-              : process.env.BASE_URL || 'http://localhost:5000';
-            
-            const binanceOrder = await binancePayService.createOrder({
-              merchantTradeNo: externalOrderId,
-              orderAmount: orderAmount,
-              currency: paymentData.cryptoCurrency,
-              description: `Eshaal Store Order #${orderId.slice(0, 8)}`,
-              goodsDetails: [{
-                goodsType: '01',
-                goodsCategory: 'D000',
-                referenceGoodsId: orderId,
-                goodsName: 'Eshaal Store Purchase',
-                goodsDetail: `Order total: ${orderAmount} USDT`
-              }],
-              returnUrl: `${baseUrl}/?view=orders`,
-              cancelUrl: `${baseUrl}/?view=cart`,
-              webhookUrl: `${baseUrl}/api/webhooks/binance`
-            });
-            
-            if (binanceOrder.data) {
-              paymentData.paymentUrl = binanceOrder.data.checkoutUrl;
-              paymentData.qrCode = binanceOrder.data.qrcodeLink || binanceOrder.data.qrContent;
-              paymentData.binancePrepayId = binanceOrder.data.prepayId;
-            }
-          } catch (apiError) {
-            console.error('Binance Pay API error:', apiError);
-            return res.status(500).json({ 
-              message: "Failed to create Binance Pay order. Please check API credentials or try another payment method."
-            });
-          }
-        } else {
-          return res.status(500).json({ 
-            message: "Binance Pay is not configured. Please contact the store administrator."
-          });
-        }
-      }
-
-      // Create the crypto payment record
-      const cryptoPayment = await storage.createCryptoPayment(paymentData);
-
-      // Update the order's payment method
-      await storage.updateOrder(orderId, {
-        paymentDetails: {
-          method: gatewayName,
-          cryptoPaymentId: cryptoPayment.id,
-        }
+      const account = await storage.createPaymentAccount({
+        method,
+        bankName: bankName || null,
+        accountNumber,
+        accountHolderName,
+        isActive: isActive !== false,
       });
 
-      res.status(201).json({
-        id: cryptoPayment.id,
-        orderId: cryptoPayment.orderId,
-        gatewayName: cryptoPayment.gatewayName,
-        walletAddress: cryptoPayment.walletAddress,
-        cryptoAmount: cryptoPayment.cryptoAmount,
-        cryptoCurrency: cryptoPayment.cryptoCurrency,
-        network: cryptoPayment.network,
-        paymentUrl: cryptoPayment.paymentUrl,
-        qrCode: cryptoPayment.qrCode,
-        externalOrderId: cryptoPayment.externalOrderId,
-        status: cryptoPayment.status,
-        expiresAt: cryptoPayment.expiresAt,
-      });
+      res.status(201).json(account);
     } catch (error) {
-      console.error("Error creating crypto payment:", error);
-      res.status(500).json({ message: "Failed to create crypto payment" });
+      console.error("Error creating payment account:", error);
+      res.status(500).json({ message: "Failed to create payment account" });
     }
   });
 
-  // Get crypto payment status
-  app.get('/api/crypto-payments/:orderId/status', isAuthenticated, async (req: any, res) => {
-    try {
-      const { orderId } = req.params;
-      
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      // Verify the order belongs to this user
-      if (order.userId !== req.user.id) {
-        return res.status(403).json({ message: "Unauthorized" });
-      }
-
-      const cryptoPayment = await storage.getCryptoPaymentByOrderId(orderId);
-      if (!cryptoPayment) {
-        return res.status(404).json({ message: "No crypto payment found for this order" });
-      }
-
-      res.json({
-        id: cryptoPayment.id,
-        status: cryptoPayment.status,
-        txHash: cryptoPayment.txHash,
-        confirmations: cryptoPayment.confirmations,
-        requiredConfirmations: cryptoPayment.requiredConfirmations,
-        paidAt: cryptoPayment.paidAt,
-        expiresAt: cryptoPayment.expiresAt,
-      });
-    } catch (error) {
-      console.error("Error fetching crypto payment status:", error);
-      res.status(500).json({ message: "Failed to fetch payment status" });
-    }
-  });
-
-  // Webhook for Tron USDT payment confirmation (called by payment provider or blockchain monitor)
-  app.post('/api/webhooks/tron', async (req, res) => {
-    try {
-      const { externalOrderId, txHash, amount, status, confirmations } = req.body;
-      
-      console.log('Tron webhook received:', { externalOrderId, txHash, status });
-
-      if (!externalOrderId) {
-        return res.status(400).json({ message: "External order ID required" });
-      }
-
-      const cryptoPayment = await storage.getCryptoPaymentByExternalId(externalOrderId);
-      if (!cryptoPayment) {
-        return res.status(404).json({ message: "Payment not found" });
-      }
-
-      // Update the crypto payment with blockchain data
-      const updateData: any = {
-        webhookData: req.body,
-      };
-
-      if (txHash) updateData.txHash = txHash;
-      if (confirmations !== undefined) updateData.confirmations = confirmations;
-
-      // Check if payment is confirmed
-      if (status === 'confirmed' || (confirmations && confirmations >= (cryptoPayment.requiredConfirmations || 1))) {
-        updateData.status = 'completed';
-        updateData.paidAt = new Date();
-
-        // Update the order status
-        await storage.updateOrder(cryptoPayment.orderId, {
-          paymentStatus: 'completed',
-          status: 'processing',
-        });
-
-        // Notify admin of completed payment
-        await storage.createNotification({
-          recipientType: 'admin',
-          type: 'payment_received',
-          title: 'Crypto Payment Received',
-          message: `Payment of ${cryptoPayment.cryptoAmount} ${cryptoPayment.cryptoCurrency} received for order #${cryptoPayment.orderId.slice(0, 8)}`,
-          metadata: { orderId: cryptoPayment.orderId, txHash, gateway: 'tron_usdt' },
-        });
-      } else if (status === 'pending' || status === 'confirming') {
-        updateData.status = 'confirming';
-      } else if (status === 'failed') {
-        updateData.status = 'failed';
-      }
-
-      await storage.updateCryptoPayment(cryptoPayment.id, updateData);
-
-      res.json({ success: true, message: 'Webhook processed' });
-    } catch (error) {
-      console.error("Error processing Tron webhook:", error);
-      res.status(500).json({ message: "Webhook processing failed" });
-    }
-  });
-
-  // Webhook for Binance Pay payment confirmation
-  app.post('/api/webhooks/binance', async (req, res) => {
-    try {
-      const { bizType, bizStatus, data } = req.body;
-      
-      console.log('Binance Pay webhook received:', { bizType, bizStatus });
-
-      // Get gateway credentials from database for signature verification
-      const gateway = await storage.getPaymentGatewayByName('binance_pay');
-      
-      // Verify webhook signature if secret key is configured
-      const binancePayService = createBinancePayService(gateway?.apiKey, gateway?.apiSecret);
-      if (binancePayService) {
-        const timestamp = req.headers['binancepay-timestamp'] as string;
-        const nonce = req.headers['binancepay-nonce'] as string;
-        const signature = req.headers['binancepay-signature'] as string;
-        
-        if (timestamp && nonce && signature) {
-          const isValid = binancePayService.verifyWebhookSignature(
-            timestamp, 
-            nonce, 
-            JSON.stringify(req.body), 
-            signature
-          );
-          
-          if (!isValid) {
-            console.warn('Invalid Binance Pay webhook signature');
-            return res.status(401).json({ returnCode: 'FAIL', returnMessage: 'Invalid signature' });
-          }
-        }
-      }
-
-      // Binance Pay sends bizStatus: PAY_SUCCESS, PAY_CLOSED, etc.
-      if (bizType !== 'PAY') {
-        return res.json({ returnCode: 'SUCCESS', returnMessage: 'OK' });
-      }
-
-      const externalOrderId = data?.merchantTradeNo;
-      if (!externalOrderId) {
-        return res.status(400).json({ message: "Merchant trade number required" });
-      }
-
-      const cryptoPayment = await storage.getCryptoPaymentByExternalId(externalOrderId);
-      if (!cryptoPayment) {
-        console.log('Payment not found for:', externalOrderId);
-        return res.json({ returnCode: 'SUCCESS', returnMessage: 'OK' });
-      }
-
-      // Update the crypto payment
-      const updateData: any = {
-        webhookData: req.body,
-      };
-
-      if (bizStatus === 'PAY_SUCCESS') {
-        updateData.status = 'completed';
-        updateData.paidAt = new Date();
-        if (data?.transactionId) updateData.txHash = data.transactionId;
-
-        // Update the order status
-        await storage.updateOrder(cryptoPayment.orderId, {
-          paymentStatus: 'completed',
-          status: 'processing',
-        });
-
-        // Notify admin of completed payment
-        await storage.createNotification({
-          recipientType: 'admin',
-          type: 'payment_received',
-          title: 'Binance Pay Payment Received',
-          message: `Payment of ${data?.totalFee || cryptoPayment.cryptoAmount} ${data?.currency || cryptoPayment.cryptoCurrency} received for order #${cryptoPayment.orderId.slice(0, 8)}`,
-          metadata: { orderId: cryptoPayment.orderId, gateway: 'binance_pay' },
-        });
-      } else if (bizStatus === 'PAY_CLOSED' || bizStatus === 'EXPIRED') {
-        updateData.status = 'expired';
-      } else if (bizStatus === 'PAY_ERROR') {
-        updateData.status = 'failed';
-      }
-
-      await storage.updateCryptoPayment(cryptoPayment.id, updateData);
-
-      // Binance expects this response format
-      res.json({ returnCode: 'SUCCESS', returnMessage: 'OK' });
-    } catch (error) {
-      console.error("Error processing Binance webhook:", error);
-      res.json({ returnCode: 'FAIL', returnMessage: 'Processing error' });
-    }
-  });
-
-  // Admin endpoint to manually confirm a crypto payment (for testing or manual verification)
-  app.post('/api/admin/crypto-payments/:id/confirm', adminAuth, async (req: any, res) => {
+  // Admin: Update payment account
+  app.patch('/api/admin/payment-accounts/:id', adminAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const { txHash } = req.body;
-
-      const cryptoPayment = await storage.getCryptoPayment(id);
-      if (!cryptoPayment) {
-        return res.status(404).json({ message: "Crypto payment not found" });
+      const updates = req.body;
+      
+      const account = await storage.getPaymentAccount(id);
+      if (!account) {
+        return res.status(404).json({ message: "Payment account not found" });
       }
 
-      // Mark as completed
-      const updated = await storage.updateCryptoPayment(id, {
-        status: 'completed',
-        paidAt: new Date(),
-        txHash: txHash || 'manual-confirmation',
-        confirmations: cryptoPayment.requiredConfirmations || 1,
-      });
-
-      // Update the order
-      await storage.updateOrder(cryptoPayment.orderId, {
-        paymentStatus: 'completed',
-        status: 'processing',
-      });
-
-      res.json({ message: 'Payment confirmed', payment: updated });
+      const updated = await storage.updatePaymentAccount(id, updates);
+      res.json(updated);
     } catch (error) {
-      console.error("Error confirming crypto payment:", error);
-      res.status(500).json({ message: "Failed to confirm payment" });
+      console.error("Error updating payment account:", error);
+      res.status(500).json({ message: "Failed to update payment account" });
     }
   });
 
-  // Admin endpoint to get all crypto payments
-  app.get('/api/admin/crypto-payments', adminAuth, async (req: any, res) => {
+  // Admin: Delete payment account
+  app.delete('/api/admin/payment-accounts/:id', adminAuth, async (req, res) => {
     try {
-      const payments = await storage.getCryptoPayments();
-      res.json(payments);
+      const { id } = req.params;
+      
+      const account = await storage.getPaymentAccount(id);
+      if (!account) {
+        return res.status(404).json({ message: "Payment account not found" });
+      }
+
+      await storage.deletePaymentAccount(id);
+      res.json({ message: "Payment account deleted successfully" });
     } catch (error) {
-      console.error("Error fetching crypto payments:", error);
-      res.status(500).json({ message: "Failed to fetch crypto payments" });
+      console.error("Error deleting payment account:", error);
+      res.status(500).json({ message: "Failed to delete payment account" });
     }
+  });
+
+  // ============================================
+  // PAYMENT VERIFICATION ROUTES
+  // ============================================
+
+  // Upload payment screenshot for an order
+  app.post('/api/orders/:orderId/payment-proof', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orderId } = req.params;
+      const { screenshot, transactionId } = req.body;
+      
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Verify the order belongs to this user
+      if (order.userId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Validate screenshot (base64 data URL)
+      if (!screenshot || !screenshot.startsWith('data:image/')) {
+        return res.status(400).json({ message: "Valid payment screenshot is required" });
+      }
+
+      // Check size (max 2MB)
+      const base64Data = screenshot.split(',')[1];
+      if (base64Data && Buffer.from(base64Data, 'base64').length > 2 * 1024 * 1024) {
+        return res.status(400).json({ message: "Screenshot file size must be less than 2MB" });
+      }
+
+      // Update order with payment proof
+      const updated = await storage.updateOrder(orderId, {
+        paymentScreenshotUrl: screenshot,
+        transactionId: transactionId || null,
+        verificationStatus: 'pending',
+      });
+
+      res.json({ 
+        message: "Payment proof uploaded successfully. Awaiting verification.",
+        order: updated 
+      });
+    } catch (error) {
+      console.error("Error uploading payment proof:", error);
+      res.status(500).json({ message: "Failed to upload payment proof" });
+    }
+  });
+
+  // Admin: Get orders pending payment verification
+  app.get('/api/admin/orders/pending-verification', adminAuth, async (req, res) => {
+    try {
+      const orders = await storage.getOrdersPendingVerification();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching pending verification orders:", error);
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  // Admin: Verify payment (approve or reject)
+  app.post('/api/admin/orders/:orderId/verify-payment', adminAuth, async (req: any, res) => {
+    try {
+      const { orderId } = req.params;
+      const { approved, note } = req.body;
+      
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const updated = await storage.verifyOrderPayment(orderId, req.user.id, approved, note);
+
+      // Create admin notification about the verification
+      await storage.createNotification({
+        recipientType: 'admin',
+        type: approved ? 'payment_received' : 'payment_failed',
+        title: approved ? 'Payment Approved' : 'Payment Rejected',
+        message: `Payment for order #${order.orderNumber} has been ${approved ? 'approved' : 'rejected'}.`,
+        data: { orderId: order.id, orderNumber: order.orderNumber },
+      });
+
+      res.json({ 
+        message: `Payment ${approved ? 'approved' : 'rejected'} successfully`,
+        order: updated 
+      });
+    } catch (error) {
+      console.error("Error verifying payment:", error);
+      res.status(500).json({ message: "Failed to verify payment" });
+    }
+  });
+
+  // ============================================
+  // CRYPTO PAYMENT ROUTES (DEPRECATED - No longer supported)
+  // ============================================
+  
+  // Crypto payments have been deprecated in favor of manual payment verification
+  app.post('/api/crypto-payments/create', isAuthenticated, (req, res) => {
+    res.status(410).json({ message: "Crypto payments are no longer supported. Please use manual payment verification." });
+  });
+
+  app.get('/api/crypto-payments/:orderId/status', isAuthenticated, (req, res) => {
+    res.status(410).json({ message: "Crypto payments are no longer supported." });
+  });
+
+  app.post('/api/webhooks/tron', (req, res) => {
+    res.status(410).json({ message: "Tron USDT payments are no longer supported." });
+  });
+
+  app.post('/api/webhooks/binance', (req, res) => {
+    res.status(410).json({ returnCode: 'SUCCESS', returnMessage: 'Binance Pay is no longer supported.' });
+  });
+
+  app.post('/api/admin/crypto-payments/:id/confirm', adminAuth, (req, res) => {
+    res.status(410).json({ message: "Crypto payments are no longer supported." });
+  });
+
+  app.get('/api/admin/crypto-payments', adminAuth, (req, res) => {
+    res.json([]); // Return empty array for backward compatibility
   });
 
   // Store Settings API (public GET for landing page, admin PUT for updates)
