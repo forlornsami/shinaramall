@@ -94,7 +94,7 @@ const helpNavItems = [
 ];
 
 export default function StorefrontSidebar({ activeSection, onSectionChange }: StorefrontSidebarProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { itemCount } = useCart();
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
@@ -113,11 +113,12 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
   });
 
   const handleLogin = () => {
-    window.location.href = '/api/login';
+    window.location.href = '/auth';
   };
 
   const handleLogout = () => {
-    window.location.href = '/api/logout';
+    logout();
+    window.location.href = '/';
   };
 
   const renderNavItem = (item: typeof mainNavItems[0] & { badge?: number; requiresAuth?: boolean; hasSubmenu?: boolean }) => {

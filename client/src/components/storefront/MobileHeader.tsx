@@ -47,7 +47,7 @@ const helpNavItems = [
 ];
 
 export default function MobileHeader({ activeSection, onSectionChange }: MobileHeaderProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { itemCount } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
@@ -68,7 +68,7 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
 
   const handleNavClick = (section: StorefrontSection, requiresAuth?: boolean, hasSubmenu?: boolean) => {
     if (requiresAuth && !isAuthenticated) {
-      window.location.href = '/api/login';
+      window.location.href = '/auth';
       return;
     }
     if (hasSubmenu) {
@@ -226,7 +226,8 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
                     <Button
                       variant="outline"
                       className="w-full justify-start rounded-xl h-11 text-destructive hover:text-destructive"
-                      onClick={() => window.location.href = '/api/logout'}
+                      onClick={() => { logout(); window.location.href = '/'; }}
+                      data-testid="button-logout"
                     >
                       <LogOut className="h-4 w-4 mr-3" />
                       Sign Out
@@ -235,7 +236,8 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
                 ) : (
                   <Button
                     className="w-full btn-modern rounded-xl h-11"
-                    onClick={() => window.location.href = '/api/login'}
+                    onClick={() => window.location.href = '/auth'}
+                    data-testid="button-login"
                   >
                     <LogIn className="h-4 w-4 mr-2" />
                     Sign In

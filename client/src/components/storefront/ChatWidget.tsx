@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { MessageCircle, X, Send, Loader2, Minimize2 } from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getToken } from '@/lib/queryClient';
 import { format } from 'date-fns';
 import type { ChatMessage, ChatConversationWithDetails } from '@shared/schema';
 
@@ -60,10 +60,11 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      const token = getToken();
       ws.send(JSON.stringify({
         type: 'auth',
         userType: 'customer',
-        userId: userId,
+        token: token,
       }));
     };
 
