@@ -216,6 +216,31 @@ export default function PaymentManagement() {
     },
   });
 
+  const updateTransactionStatusMutation = useMutation({
+    mutationFn: async ({ transactionId, status }: { transactionId: string; status: string }) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/admin/payment-transactions/${transactionId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error('Failed to update transaction status');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Payment status updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update payment status", variant: "destructive" });
+    },
+  });
+
   const getIconComponent = (iconName: string) => {
     const iconOption = iconOptions.find(i => i.value === iconName);
     if (iconOption) {
@@ -548,6 +573,7 @@ export default function PaymentManagement() {
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead>Update Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -579,6 +605,26 @@ export default function PaymentManagement() {
                           </TableCell>
                           <TableCell>
                             {new Date(transaction.createdAt!).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={transaction.status}
+                              onValueChange={(value) => updateTransactionStatusMutation.mutate({ 
+                                transactionId: transaction.id, 
+                                status: value 
+                              })}
+                              disabled={updateTransactionStatusMutation.isPending}
+                            >
+                              <SelectTrigger className="w-32 h-8" data-testid={`select-transaction-status-${transaction.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="completed">Paid</SelectItem>
+                                <SelectItem value="failed">Failed</SelectItem>
+                                <SelectItem value="refunded">Refunded</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                         </TableRow>
                       );

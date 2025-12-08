@@ -1277,6 +1277,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/admin/payment-transactions/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      const updatedTransaction = await storage.updatePaymentTransaction(id, { status });
+      
+      if (!updatedTransaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // Also update the associated order's payment status
+      if (updatedTransaction.orderId) {
+        const paymentStatus = status === 'completed' ? 'completed' : 
+                              status === 'failed' ? 'failed' : 
+                              status === 'refunded' ? 'refunded' : 'pending';
+        await storage.updateOrder(updatedTransaction.orderId, { paymentStatus });
+        
+        // Create customer notification for payment status update
+        const order = await storage.getOrder(updatedTransaction.orderId);
+        if (order?.userId) {
+          const paymentMessages: Record<string, string> = {
+            'pending': 'Payment is pending for your order.',
+            'completed': 'Payment received! Thank you for your purchase.',
+            'failed': 'Payment failed. Please try again or contact support.',
+            'refunded': 'Your order payment has been refunded.',
+          };
+          
+          const paymentType = status === 'completed' ? 'payment_received' : 
+                              status === 'failed' ? 'payment_failed' : 'general';
+          
+          await storage.createNotification({
+            recipientType: 'customer',
+            recipientId: order.userId,
+            type: paymentType,
+            title: `Payment Update for Order #${order.id.slice(-8).toUpperCase()}`,
+            message: paymentMessages[status] || `Payment status changed to ${status}.`,
+            data: { orderId: order.id, paymentStatus: status },
+          });
+        }
+      }
+      
+      res.json(updatedTransaction);
+    } catch (error) {
+      console.error("Error updating payment transaction:", error);
+      res.status(500).json({ message: "Failed to update payment transaction" });
+    }
+  });
+
   app.get('/api/admin/payment-analytics', adminAuth, async (req, res) => {
     try {
       const transactions = await storage.getPaymentTransactions();
