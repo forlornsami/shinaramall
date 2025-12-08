@@ -401,6 +401,51 @@ export const paymentTransactions = pgTable("payment_transactions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Crypto payment details table for tracking blockchain transactions
+export const cryptoPayments = pgTable("crypto_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  transactionId: varchar("transaction_id").references(() => paymentTransactions.id),
+  gatewayName: varchar("gateway_name").notNull(), // 'tron_usdt', 'binance_pay'
+  walletAddress: varchar("wallet_address"), // Receiving wallet address
+  cryptoAmount: varchar("crypto_amount"), // Amount in crypto
+  cryptoCurrency: varchar("crypto_currency").notNull(), // 'USDT', 'TRX', 'BTC', 'BNB', 'ETH'
+  network: varchar("network"), // 'tron', 'bsc', 'ethereum'
+  exchangeRate: varchar("exchange_rate"), // Rate at time of payment
+  txHash: varchar("tx_hash"), // Blockchain transaction hash
+  confirmations: integer("confirmations").default(0),
+  requiredConfirmations: integer("required_confirmations").default(1),
+  externalOrderId: varchar("external_order_id"), // ID from payment provider (Binance prepayId, etc.)
+  paymentUrl: varchar("payment_url"), // URL for customer to complete payment
+  qrCode: varchar("qr_code"), // QR code URL for payment
+  status: varchar("status").notNull().default("pending"), // 'pending', 'awaiting_payment', 'confirming', 'completed', 'expired', 'failed'
+  expiresAt: timestamp("expires_at"),
+  paidAt: timestamp("paid_at"),
+  webhookData: jsonb("webhook_data"), // Raw webhook payload from provider
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCryptoPaymentSchema = createInsertSchema(cryptoPayments).pick({
+  orderId: true,
+  transactionId: true,
+  gatewayName: true,
+  walletAddress: true,
+  cryptoAmount: true,
+  cryptoCurrency: true,
+  network: true,
+  exchangeRate: true,
+  txHash: true,
+  externalOrderId: true,
+  paymentUrl: true,
+  qrCode: true,
+  status: true,
+  expiresAt: true,
+});
+
+export type CryptoPayment = typeof cryptoPayments.$inferSelect;
+export type InsertCryptoPayment = z.infer<typeof insertCryptoPaymentSchema>;
+
 // Insert schemas for payment management
 export const insertPaymentGatewaySchema = createInsertSchema(paymentGateways).pick({
   name: true,

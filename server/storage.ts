@@ -9,6 +9,7 @@ import {
   cartItems,
   paymentGateways,
   paymentTransactions,
+  cryptoPayments,
   storeSettings,
   notifications,
   chatConversations,
@@ -35,6 +36,8 @@ import {
   type InsertPaymentGateway,
   type PaymentTransaction,
   type InsertPaymentTransaction,
+  type CryptoPayment,
+  type InsertCryptoPayment,
   type StoreSettings,
   type InsertStoreSettings,
   type Notification,
@@ -160,6 +163,14 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   markMessagesAsRead(conversationId: string, senderType: string): Promise<void>;
   getUnreadMessageCount(conversationId: string, senderType: string): Promise<number>;
+  
+  // Crypto payment operations
+  getCryptoPayments(orderId?: string): Promise<CryptoPayment[]>;
+  getCryptoPayment(id: string): Promise<CryptoPayment | undefined>;
+  getCryptoPaymentByOrderId(orderId: string): Promise<CryptoPayment | undefined>;
+  getCryptoPaymentByExternalId(externalOrderId: string): Promise<CryptoPayment | undefined>;
+  createCryptoPayment(payment: InsertCryptoPayment): Promise<CryptoPayment>;
+  updateCryptoPayment(id: string, data: Partial<CryptoPayment>): Promise<CryptoPayment>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1258,6 +1269,43 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result[0]?.count || 0;
+  }
+
+  // Crypto payment operations
+  async getCryptoPayments(orderId?: string): Promise<CryptoPayment[]> {
+    if (orderId) {
+      return db.select().from(cryptoPayments).where(eq(cryptoPayments.orderId, orderId)).orderBy(desc(cryptoPayments.createdAt));
+    }
+    return db.select().from(cryptoPayments).orderBy(desc(cryptoPayments.createdAt));
+  }
+
+  async getCryptoPayment(id: string): Promise<CryptoPayment | undefined> {
+    const [payment] = await db.select().from(cryptoPayments).where(eq(cryptoPayments.id, id));
+    return payment;
+  }
+
+  async getCryptoPaymentByOrderId(orderId: string): Promise<CryptoPayment | undefined> {
+    const [payment] = await db.select().from(cryptoPayments).where(eq(cryptoPayments.orderId, orderId));
+    return payment;
+  }
+
+  async getCryptoPaymentByExternalId(externalOrderId: string): Promise<CryptoPayment | undefined> {
+    const [payment] = await db.select().from(cryptoPayments).where(eq(cryptoPayments.externalOrderId, externalOrderId));
+    return payment;
+  }
+
+  async createCryptoPayment(payment: InsertCryptoPayment): Promise<CryptoPayment> {
+    const [created] = await db.insert(cryptoPayments).values(payment).returning();
+    return created;
+  }
+
+  async updateCryptoPayment(id: string, data: Partial<CryptoPayment>): Promise<CryptoPayment> {
+    const [updated] = await db
+      .update(cryptoPayments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(cryptoPayments.id, id))
+      .returning();
+    return updated;
   }
 }
 
