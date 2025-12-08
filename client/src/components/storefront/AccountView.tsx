@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -18,13 +18,26 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   User,
   Mail,
   Save,
-  LogIn,
   Shield,
   Bell,
   CreditCard,
+  Camera,
+  Trash2,
+  Loader2,
+  Upload,
 } from "lucide-react";
 
 const profileSchema = z.object({
@@ -38,6 +51,8 @@ export default function AccountView() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -67,6 +82,85 @@ export default function AccountView() {
       });
     },
   });
+
+  const uploadPictureMutation = useMutation({
+    mutationFn: async (imageData: string) => {
+      return apiRequest('POST', '/api/profile/picture', { imageData });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      toast({
+        title: "Picture Updated",
+        description: "Your profile picture has been updated",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload picture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePictureMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', '/api/profile/picture');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      setShowDeleteDialog(false);
+      toast({
+        title: "Picture Removed",
+        description: "Your profile picture has been removed",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove picture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid File",
+        description: "Please select an image file (JPG, PNG, GIF, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please select an image under 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      uploadPictureMutation.mutate(base64);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const onSubmit = (data: ProfileFormValues) => {
     updateProfileMutation.mutate(data);
@@ -232,27 +326,81 @@ export default function AccountView() {
 
         <div className="space-y-6">
           <Card className="border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                {user?.profileImageUrl ? (
-                  <img
-                    src={user.profileImageUrl}
-                    alt={user.firstName || "Profile"}
-                    className="w-16 h-16 rounded-2xl object-cover"
-                  />
-                ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <span className="text-white font-bold text-2xl">
-                      {(user?.firstName?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Camera className="w-4 h-4 text-primary" />
+                Profile Picture
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-2">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative group">
+                  {user?.profileImageUrl ? (
+                    <img
+                      src={user.profileImageUrl}
+                      alt={user.firstName || "Profile"}
+                      className="w-24 h-24 rounded-2xl object-cover border-4 border-background shadow-lg"
+                      data-testid="img-profile-picture"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center border-4 border-background shadow-lg">
+                      <span className="text-white font-bold text-3xl">
+                        {(user?.firstName?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {uploadPictureMutation.isPending && (
+                    <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="text-center">
                   <h3 className="font-semibold text-foreground">
                     {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Customer'}
                   </h3>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
                 </div>
+                
+                <div className="flex gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    data-testid="input-profile-picture"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadPictureMutation.isPending}
+                    data-testid="button-upload-picture"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {user?.profileImageUrl ? 'Change' : 'Upload'}
+                  </Button>
+                  {user?.profileImageUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl text-destructive hover:text-destructive"
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={deletePictureMutation.isPending}
+                      data-testid="button-delete-picture"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Max size: 2MB. Supported: JPG, PNG, GIF
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -290,6 +438,35 @@ export default function AccountView() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Profile Picture?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove your profile picture? You can upload a new one anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletePictureMutation.mutate()}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deletePictureMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deletePictureMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
