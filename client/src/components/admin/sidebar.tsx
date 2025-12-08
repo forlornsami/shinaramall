@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Shield,
   UserCog,
-  MessageCircle
+  MessageCircle,
+  MessagesSquare
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
@@ -74,6 +75,7 @@ const sectionToPermissionKey: Record<string, string> = {
   settings: 'settings',
   help: 'help',
   chat: 'chat',
+  'team-chat': 'chat',
 };
 
 const sidebarItems = [
@@ -124,6 +126,12 @@ const sidebarItems = [
     label: "Chat Support",
     icon: MessageCircle,
     color: "from-violet-500 to-violet-600",
+  },
+  {
+    id: "team-chat",
+    label: "Team Chat",
+    icon: MessagesSquare,
+    color: "from-sky-500 to-sky-600",
   },
 ];
 

@@ -12,6 +12,7 @@ import RoleManagement from "@/components/admin/role-management";
 import SettingsSection from "@/components/admin/settings";
 import HelpCenterSection from "@/components/admin/help-center";
 import ChatSupport from "@/components/admin/chat-support";
+import TeamChat from "@/components/admin/team-chat";
 import { AdminNotificationBell } from "@/components/admin/notification-bell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "users" | "roles" | "settings" | "help" | "chat";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "users" | "roles" | "settings" | "help" | "chat" | "team-chat";
 
 const sidebarItems = [
   { id: "overview", label: "Dashboard", icon: BarChart3, color: "from-blue-500 to-blue-600" },
@@ -378,6 +379,11 @@ export default function AdminDashboard() {
         const storedUser = localStorage.getItem('adminUser');
         const adminId = storedUser ? JSON.parse(storedUser).id || '' : '';
         return <ChatSupport adminToken={adminToken} adminId={adminId} />;
+      case "team-chat":
+        const teamChatToken = localStorage.getItem('adminToken') || '';
+        const teamChatStoredUser = localStorage.getItem('adminUser');
+        const teamChatAdminId = teamChatStoredUser ? JSON.parse(teamChatStoredUser).id || '' : '';
+        return <TeamChat adminToken={teamChatToken} adminId={teamChatAdminId} />;
       default:
         return null;
     }
