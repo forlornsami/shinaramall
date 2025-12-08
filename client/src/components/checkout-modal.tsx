@@ -688,10 +688,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                       ) : (
                         <>
                           <ShieldCheck className="w-5 h-5 mr-2" />
-                          {isCryptoPayment 
-                            ? `Proceed with ${selectedPaymentMethod?.name}` 
-                            : `Pay Rs. ${total.toLocaleString()} with ${selectedPaymentMethod?.name}`
-                          }
+                          {`Pay Rs. ${total.toLocaleString()} with ${selectedPaymentMethod?.name}`}
                         </>
                       )}
                     </Button>
