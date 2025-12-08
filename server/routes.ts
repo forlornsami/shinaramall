@@ -296,6 +296,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Admin user not found" });
       }
       
+      // Fetch permissions from the role if roleId exists
+      let permissions = null;
+      if (admin.roleId) {
+        const role = await storage.getRole(admin.roleId);
+        if (role) {
+          permissions = role.permissions;
+        }
+      }
+      
       res.json({
         id: admin.id,
         username: admin.username,
@@ -303,6 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: admin.role,
         roleId: admin.roleId,
         profilePicture: admin.profilePicture,
+        permissions: permissions,
       });
     } catch (error) {
       console.error("Error fetching admin profile:", error);
