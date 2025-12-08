@@ -528,17 +528,30 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     )}
 
                     {cryptoPaymentInfo.paymentUrl && cryptoPaymentInfo.gatewayName === 'binance_pay' && (
-                      <div className="text-center">
+                      <div className="space-y-3">
                         <Button
                           type="button"
-                          variant="outline"
-                          className="w-full"
+                          className="w-full btn-modern rounded-xl py-6 text-lg font-semibold"
                           onClick={() => window.open(cryptoPaymentInfo.paymentUrl, '_blank')}
                           data-testid="button-open-binance"
                         >
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Open Binance Pay
+                          <ExternalLink className="w-5 h-5 mr-2" />
+                          Pay with Binance Pay
                         </Button>
+                        <p className="text-xs text-center text-muted-foreground">
+                          You'll be redirected to Binance to complete your payment securely
+                        </p>
+                        {cryptoPaymentInfo.qrCode && (
+                          <div className="flex flex-col items-center gap-2 pt-2">
+                            <p className="text-sm text-muted-foreground">Or scan with Binance App:</p>
+                            <img 
+                              src={cryptoPaymentInfo.qrCode} 
+                              alt="Binance Pay QR Code" 
+                              className="w-32 h-32 rounded-lg border"
+                              data-testid="img-binance-qr"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 
