@@ -60,6 +60,12 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
     queryKey: ['/api/store-settings'],
   });
 
+  const { data: pendingOrdersCount } = useQuery<{ count: number }>({
+    queryKey: ['/api/orders/pending-count'],
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
+
   const handleNavClick = (section: StorefrontSection, requiresAuth?: boolean, hasSubmenu?: boolean) => {
     if (requiresAuth && !isAuthenticated) {
       window.location.href = '/api/login';
@@ -79,7 +85,8 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
     const isActive = activeSection === item.id || 
       (item.id === "categories" && activeSection.startsWith("category-"));
     const isDisabled = item.requiresAuth && !isAuthenticated;
-    const showBadge = item.id === "cart" && itemCount > 0;
+    const showCartBadge = item.id === "cart" && itemCount > 0;
+    const showOrdersBadge = item.id === "orders" && pendingOrdersCount && pendingOrdersCount.count > 0;
     
     return (
       <div key={item.id}>
@@ -102,8 +109,11 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
             <Icon className="h-5 w-5 text-white" />
           </div>
           <span className="flex-1 text-left">{item.label}</span>
-          {showBadge && (
+          {showCartBadge && (
             <Badge className="bg-destructive text-white border-0">{itemCount}</Badge>
+          )}
+          {showOrdersBadge && (
+            <Badge className="bg-orange-500 text-white border-0">{pendingOrdersCount.count}</Badge>
           )}
           {item.hasSubmenu && (categoriesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
         </Button>

@@ -695,6 +695,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get customer's pending orders count for sidebar badge
+  app.get('/api/orders/pending-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await storage.getCustomerPendingOrdersCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching pending orders count:", error);
+      res.status(500).json({ message: "Failed to fetch pending orders count" });
+    }
+  });
+
   app.get('/api/orders/:id', isAuthenticated, async (req: any, res) => {
     try {
       const order = await storage.getOrderWithItems(req.params.id);

@@ -103,6 +103,7 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: UpdateOrder): Promise<Order>;
   getPendingOrdersCount(): Promise<number>;
+  getCustomerPendingOrdersCount(userId: string): Promise<number>;
   
   // Order item operations
   createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
@@ -735,6 +736,14 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(orders)
       .where(eq(orders.status, 'pending'));
+    return result[0]?.count || 0;
+  }
+
+  async getCustomerPendingOrdersCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(orders)
+      .where(and(eq(orders.userId, userId), eq(orders.status, 'pending')));
     return result[0]?.count || 0;
   }
 

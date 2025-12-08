@@ -106,6 +106,12 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
     queryKey: ['/api/store-settings'],
   });
 
+  const { data: pendingOrdersCount } = useQuery<{ count: number }>({
+    queryKey: ['/api/orders/pending-count'],
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
+
   const handleLogin = () => {
     window.location.href = '/api/login';
   };
@@ -119,7 +125,8 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
     const isActive = activeSection === item.id || 
       (item.id === "categories" && activeSection.startsWith("category-"));
     const isDisabled = item.requiresAuth && !isAuthenticated;
-    const showBadge = item.id === "cart" && itemCount > 0;
+    const showCartBadge = item.id === "cart" && itemCount > 0;
+    const showOrdersBadge = item.id === "orders" && pendingOrdersCount && pendingOrdersCount.count > 0;
     
     return (
       <div key={item.id}>
@@ -156,9 +163,14 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
             <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-white")} />
           </div>
           <span className="flex-1 text-left">{item.label}</span>
-          {showBadge && (
+          {showCartBadge && (
             <Badge className="bg-destructive text-white border-0 h-5 min-w-5 flex items-center justify-center text-xs">
               {itemCount}
+            </Badge>
+          )}
+          {showOrdersBadge && (
+            <Badge className="bg-orange-500 text-white border-0 h-5 min-w-5 flex items-center justify-center text-xs">
+              {pendingOrdersCount.count}
             </Badge>
           )}
           {item.hasSubmenu && (
