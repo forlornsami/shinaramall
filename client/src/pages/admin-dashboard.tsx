@@ -40,7 +40,9 @@ import {
   HelpCircle,
   ChevronRight,
   Shield,
-  UserCog
+  UserCog,
+  MessageCircle,
+  MessagesSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +56,8 @@ const sidebarItems = [
   { id: "customers", label: "Customers", icon: Users, color: "from-green-500 to-green-600" },
   { id: "inventory", label: "Inventory", icon: Warehouse, color: "from-cyan-500 to-cyan-600" },
   { id: "payments", label: "Payments", icon: CreditCard, color: "from-emerald-500 to-emerald-600" },
+  { id: "chat", label: "Chat Support", icon: MessageCircle, color: "from-violet-500 to-violet-600" },
+  { id: "team-chat", label: "Team Chat", icon: MessagesSquare, color: "from-sky-500 to-sky-600" },
 ];
 
 const accessControlItems = [
