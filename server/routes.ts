@@ -2293,6 +2293,330 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== TEAM CHAT ROUTES (Employee Internal Chat) ====================
+
+  // Get all team chat conversations for current admin user
+  app.get('/api/admin/team-chat/conversations', adminAuth, async (req: any, res) => {
+    try {
+      const conversations = await storage.getTeamChatConversations(req.admin.id);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching team chat conversations:", error);
+      res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  // Get all admin users for starting new chats
+  app.get('/api/admin/team-chat/users', adminAuth, async (req: any, res) => {
+    try {
+      const users = await storage.getAdminUsers();
+      // Exclude current user from the list
+      const filteredUsers = users.filter(u => u.id !== req.admin.id);
+      res.json(filteredUsers);
+    } catch (error) {
+      console.error("Error fetching admin users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Get a specific team chat conversation
+  app.get('/api/admin/team-chat/conversations/:id', adminAuth, async (req: any, res) => {
+    try {
+      // Check if user is a participant
+      const isParticipant = await storage.isTeamChatParticipant(req.params.id, req.admin.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+
+      const conversation = await storage.getTeamChatConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error fetching conversation:", error);
+      res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // Create a new direct message conversation
+  app.post('/api/admin/team-chat/conversations/direct', adminAuth, async (req: any, res) => {
+    try {
+      const { targetUserId } = req.body;
+      
+      if (!targetUserId) {
+        return res.status(400).json({ message: "Target user ID is required" });
+      }
+
+      // Check if a direct conversation already exists
+      const existingConv = await storage.findDirectConversation(req.admin.id, targetUserId);
+      if (existingConv) {
+        const fullConv = await storage.getTeamChatConversation(existingConv.id);
+        return res.json(fullConv);
+      }
+
+      // Create new conversation
+      const conversation = await storage.createTeamChatConversation({
+        type: 'direct',
+        createdById: req.admin.id,
+      });
+
+      // Add both participants
+      await storage.addTeamChatParticipant({
+        conversationId: conversation.id,
+        adminUserId: req.admin.id,
+        isAdmin: true,
+      });
+      await storage.addTeamChatParticipant({
+        conversationId: conversation.id,
+        adminUserId: targetUserId,
+        isAdmin: false,
+      });
+
+      const fullConv = await storage.getTeamChatConversation(conversation.id);
+      res.json(fullConv);
+    } catch (error) {
+      console.error("Error creating direct conversation:", error);
+      res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  // Create a new group chat conversation
+  app.post('/api/admin/team-chat/conversations/group', adminAuth, async (req: any, res) => {
+    try {
+      const { title, description, memberIds } = req.body;
+      
+      if (!title) {
+        return res.status(400).json({ message: "Group title is required" });
+      }
+
+      if (!memberIds || memberIds.length < 1) {
+        return res.status(400).json({ message: "At least one other member is required" });
+      }
+
+      // Create new group conversation
+      const conversation = await storage.createTeamChatConversation({
+        type: 'group',
+        title,
+        description,
+        createdById: req.admin.id,
+      });
+
+      // Add creator as admin participant
+      await storage.addTeamChatParticipant({
+        conversationId: conversation.id,
+        adminUserId: req.admin.id,
+        isAdmin: true,
+      });
+
+      // Add other members
+      for (const memberId of memberIds) {
+        await storage.addTeamChatParticipant({
+          conversationId: conversation.id,
+          adminUserId: memberId,
+          isAdmin: false,
+        });
+      }
+
+      const fullConv = await storage.getTeamChatConversation(conversation.id);
+      res.json(fullConv);
+    } catch (error) {
+      console.error("Error creating group conversation:", error);
+      res.status(500).json({ message: "Failed to create group" });
+    }
+  });
+
+  // Update group conversation (title, description)
+  app.patch('/api/admin/team-chat/conversations/:id', adminAuth, async (req: any, res) => {
+    try {
+      const { title, description } = req.body;
+      
+      // Check if user is a participant
+      const isParticipant = await storage.isTeamChatParticipant(req.params.id, req.admin.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const conversation = await storage.updateTeamChatConversation(req.params.id, { title, description });
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error updating conversation:", error);
+      res.status(500).json({ message: "Failed to update conversation" });
+    }
+  });
+
+  // Delete/leave a conversation
+  app.delete('/api/admin/team-chat/conversations/:id', adminAuth, async (req: any, res) => {
+    try {
+      const conversation = await storage.getTeamChatConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // For direct chats, just remove participant (effectively leaving)
+      // For groups, remove participant unless they're the last admin
+      await storage.removeTeamChatParticipant(req.params.id, req.admin.id);
+      
+      // Check if conversation is empty
+      const remainingParticipants = await storage.getTeamChatParticipants(req.params.id);
+      if (remainingParticipants.length === 0) {
+        await storage.deleteTeamChatConversation(req.params.id);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error leaving conversation:", error);
+      res.status(500).json({ message: "Failed to leave conversation" });
+    }
+  });
+
+  // Add member to group
+  app.post('/api/admin/team-chat/conversations/:id/members', adminAuth, async (req: any, res) => {
+    try {
+      const { userId } = req.body;
+      
+      const conversation = await storage.getTeamChatConversation(req.params.id);
+      if (!conversation || conversation.type !== 'group') {
+        return res.status(400).json({ message: "Can only add members to group chats" });
+      }
+
+      // Check if current user is a participant
+      const isParticipant = await storage.isTeamChatParticipant(req.params.id, req.admin.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Check if user is already a member
+      const alreadyMember = await storage.isTeamChatParticipant(req.params.id, userId);
+      if (alreadyMember) {
+        return res.status(400).json({ message: "User is already a member" });
+      }
+
+      await storage.addTeamChatParticipant({
+        conversationId: req.params.id,
+        adminUserId: userId,
+        isAdmin: false,
+      });
+
+      const updatedConv = await storage.getTeamChatConversation(req.params.id);
+      res.json(updatedConv);
+    } catch (error) {
+      console.error("Error adding member:", error);
+      res.status(500).json({ message: "Failed to add member" });
+    }
+  });
+
+  // Remove member from group
+  app.delete('/api/admin/team-chat/conversations/:id/members/:userId', adminAuth, async (req: any, res) => {
+    try {
+      const conversation = await storage.getTeamChatConversation(req.params.id);
+      if (!conversation || conversation.type !== 'group') {
+        return res.status(400).json({ message: "Can only remove members from group chats" });
+      }
+
+      // Check if current user is a participant and admin
+      const participants = await storage.getTeamChatParticipants(req.params.id);
+      const currentUserParticipant = participants.find(p => p.adminUserId === req.admin.id);
+      
+      if (!currentUserParticipant) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Only group admins or the user themselves can remove members
+      if (!currentUserParticipant.isAdmin && req.params.userId !== req.admin.id) {
+        return res.status(403).json({ message: "Only group admins can remove other members" });
+      }
+
+      await storage.removeTeamChatParticipant(req.params.id, req.params.userId);
+      
+      const updatedConv = await storage.getTeamChatConversation(req.params.id);
+      res.json(updatedConv);
+    } catch (error) {
+      console.error("Error removing member:", error);
+      res.status(500).json({ message: "Failed to remove member" });
+    }
+  });
+
+  // Get messages for a conversation
+  app.get('/api/admin/team-chat/conversations/:id/messages', adminAuth, async (req: any, res) => {
+    try {
+      // Check if user is a participant
+      const isParticipant = await storage.isTeamChatParticipant(req.params.id, req.admin.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const before = req.query.before as string;
+      
+      const messages = await storage.getTeamChatMessages(req.params.id, limit, before);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  // Send a message
+  app.post('/api/admin/team-chat/conversations/:id/messages', adminAuth, async (req: any, res) => {
+    try {
+      const { message, replyToMessageId } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      // Check if user is a participant
+      const isParticipant = await storage.isTeamChatParticipant(req.params.id, req.admin.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const newMessage = await storage.createTeamChatMessage({
+        conversationId: req.params.id,
+        senderId: req.admin.id,
+        message: message.trim(),
+        replyToMessageId,
+      });
+
+      // Get sender info
+      const sender = await storage.getAdminUser(req.admin.id);
+      
+      res.json({ ...newMessage, sender });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Mark messages as read
+  app.post('/api/admin/team-chat/conversations/:id/read', adminAuth, async (req: any, res) => {
+    try {
+      const { lastMessageId } = req.body;
+      
+      if (!lastMessageId) {
+        return res.status(400).json({ message: "Last message ID is required" });
+      }
+
+      await storage.markTeamChatMessagesRead(req.params.id, req.admin.id, lastMessageId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ message: "Failed to mark messages as read" });
+    }
+  });
+
+  // Get total unread count for team chat
+  app.get('/api/admin/team-chat/unread-count', adminAuth, async (req: any, res) => {
+    try {
+      const count = await storage.getTeamChatUnreadCount(req.admin.id);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error getting unread count:", error);
+      res.status(500).json({ message: "Failed to get unread count" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Setup WebSocket for chat
