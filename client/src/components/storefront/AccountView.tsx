@@ -285,9 +285,6 @@ export default function AccountView() {
                       <Mail className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm" data-testid="text-email">{user?.email}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Email is managed by your Replit account
-                    </p>
                   </div>
 
                   <div className="flex gap-3 pt-2">

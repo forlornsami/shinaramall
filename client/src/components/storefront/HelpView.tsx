@@ -88,7 +88,7 @@ const faqs = [
     questions: [
       {
         q: "How do I create an account?",
-        a: "Click the 'Sign In' button and authenticate with your Replit account. Your account will be created automatically."
+        a: "Click the 'Sign In' button and register with your email address. Your account will be created automatically."
       },
       {
         q: "Is my personal information secure?",
