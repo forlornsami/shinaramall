@@ -832,8 +832,13 @@ export default function SettingsSection() {
               </div>
               {!isEditingProfile ? (
                 <Button 
+                  type="button"
                   variant="outline" 
-                  onClick={() => setIsEditingProfile(true)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsEditingProfile(true);
+                  }}
                   className="w-full sm:w-auto"
                   data-testid="button-edit-admin-profile"
                 >

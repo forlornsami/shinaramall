@@ -321,7 +321,11 @@ export default function AccountView() {
                         type="button"
                         variant="outline"
                         className="rounded-xl"
-                        onClick={() => setIsEditing(true)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsEditing(true);
+                        }}
                         data-testid="button-edit-profile"
                       >
                         Edit Profile
