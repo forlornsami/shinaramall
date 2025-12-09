@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -61,6 +61,16 @@ export default function AccountView() {
       lastName: user?.lastName || "",
     },
   });
+
+  // Sync form values when user data changes, but only when not editing
+  useEffect(() => {
+    if (user && !isEditing) {
+      form.reset({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+      });
+    }
+  }, [user, isEditing, form]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {

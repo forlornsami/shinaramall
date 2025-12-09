@@ -123,13 +123,13 @@ export default function SettingsSection() {
   });
 
   useEffect(() => {
-    if (adminProfile) {
+    if (adminProfile && !isEditingProfile) {
       setProfileForm({
         username: adminProfile.username || "",
         email: adminProfile.email || "",
       });
     }
-  }, [adminProfile]);
+  }, [adminProfile, isEditingProfile]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { username: string; email: string }) => {
