@@ -79,6 +79,11 @@ export default function SettingsSection() {
     confirmPassword: "",
   });
   const [showDeletePictureDialog, setShowDeletePictureDialog] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    username: "",
+    email: "",
+  });
 
   const { data: settings, isLoading: settingsLoading } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
@@ -116,6 +121,77 @@ export default function SettingsSection() {
       return response.json();
     },
   });
+
+  useEffect(() => {
+    if (adminProfile) {
+      setProfileForm({
+        username: adminProfile.username || "",
+        email: adminProfile.email || "",
+      });
+    }
+  }, [adminProfile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { username: string; email: string }) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update profile');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+      setIsEditingProfile(false);
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveProfile = () => {
+    if (!profileForm.username.trim()) {
+      toast({
+        title: "Error",
+        description: "Username is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!profileForm.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Email is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateProfileMutation.mutate(profileForm);
+  };
+
+  const handleCancelEditProfile = () => {
+    setProfileForm({
+      username: adminProfile?.username || "",
+      email: adminProfile?.email || "",
+    });
+    setIsEditingProfile(false);
+  };
 
   const uploadProfilePictureMutation = useMutation({
     mutationFn: async (imageData: string) => {
@@ -744,30 +820,89 @@ export default function SettingsSection() {
           </Card>
           
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Account Information
-              </CardTitle>
-              <CardDescription>
-                Your account details. Contact a super admin to modify these settings.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Account Information
+                </CardTitle>
+                <CardDescription>
+                  Update your account details
+                </CardDescription>
+              </div>
+              {!isEditingProfile ? (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditingProfile(true)}
+                  data-testid="button-edit-admin-profile"
+                >
+                  Edit Profile
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleCancelEditProfile}
+                    data-testid="button-cancel-edit-admin-profile"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSaveProfile}
+                    disabled={updateProfileMutation.isPending}
+                    data-testid="button-save-admin-profile"
+                  >
+                    {updateProfileMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Username</Label>
-                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{adminProfile?.username || '-'}</span>
-                  </div>
+                  <Label htmlFor="admin-username">Username</Label>
+                  {isEditingProfile ? (
+                    <Input
+                      id="admin-username"
+                      value={profileForm.username}
+                      onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
+                      placeholder="Enter username"
+                      data-testid="input-admin-username"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">{adminProfile?.username || '-'}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{adminProfile?.email || '-'}</span>
-                  </div>
+                  <Label htmlFor="admin-email">Email</Label>
+                  {isEditingProfile ? (
+                    <Input
+                      id="admin-email"
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                      placeholder="Enter email"
+                      data-testid="input-admin-email"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">{adminProfile?.email || '-'}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Role</Label>
@@ -775,6 +910,9 @@ export default function SettingsSection() {
                     <Shield className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm capitalize">{adminProfile?.role || '-'}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Role can only be changed by a super admin
+                  </p>
                 </div>
               </div>
             </CardContent>
