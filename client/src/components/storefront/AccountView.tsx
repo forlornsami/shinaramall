@@ -62,15 +62,17 @@ export default function AccountView() {
     },
   });
 
-  // Sync form values when user data changes, but only when not editing
+  // Only sync form values on initial mount when user data loads
+  const initialSyncDone = useRef(false);
   useEffect(() => {
-    if (user && !isEditing) {
+    if (user && !initialSyncDone.current) {
       form.reset({
         firstName: user.firstName || "",
         lastName: user.lastName || "",
       });
+      initialSyncDone.current = true;
     }
-  }, [user, isEditing, form]);
+  }, [user, form]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {

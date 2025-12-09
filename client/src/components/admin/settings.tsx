@@ -122,14 +122,19 @@ export default function SettingsSection() {
     },
   });
 
+  // Track if initial profile sync has been done
+  const profileSyncDone = useRef(false);
+  
   useEffect(() => {
-    if (adminProfile && !isEditingProfile) {
+    // Only sync on initial load, not after every save
+    if (adminProfile && !profileSyncDone.current) {
       setProfileForm({
         username: adminProfile.username || "",
         email: adminProfile.email || "",
       });
+      profileSyncDone.current = true;
     }
-  }, [adminProfile, isEditingProfile]);
+  }, [adminProfile]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { username: string; email: string }) => {
