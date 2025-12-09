@@ -820,7 +820,7 @@ export default function SettingsSection() {
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <User className="w-5 h-5" />
@@ -834,15 +834,17 @@ export default function SettingsSection() {
                 <Button 
                   variant="outline" 
                   onClick={() => setIsEditingProfile(true)}
+                  className="w-full sm:w-auto"
                   data-testid="button-edit-admin-profile"
                 >
                   Edit Profile
                 </Button>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     onClick={handleCancelEditProfile}
+                    className="flex-1 sm:flex-none"
                     data-testid="button-cancel-edit-admin-profile"
                   >
                     Cancel
@@ -850,6 +852,7 @@ export default function SettingsSection() {
                   <Button 
                     onClick={handleSaveProfile}
                     disabled={updateProfileMutation.isPending}
+                    className="flex-1 sm:flex-none"
                     data-testid="button-save-admin-profile"
                   >
                     {updateProfileMutation.isPending ? (
