@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Search, Power, PowerOff } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Power, PowerOff, Upload, X, Star, GripVertical, ImageIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Product, Category } from "@shared/schema";
+
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 export default function ProductManagement() {
   const { toast } = useToast();
@@ -23,6 +25,9 @@ export default function ProductManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const [productForm, setProductForm] = useState({
     name: "",
@@ -34,7 +39,7 @@ export default function ProductManagement() {
     sku: "",
     stock: "",
     categoryId: "",
-    imageUrl: "",
+    imageUrls: [] as string[],
     isActive: true,
     isFeatured: false,
   });
@@ -92,7 +97,7 @@ export default function ProductManagement() {
       setIsAddModalOpen(false);
       resetForm();
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
         description: "Failed to create product",
@@ -128,7 +133,7 @@ export default function ProductManagement() {
       setIsAddModalOpen(false);
       resetForm();
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
         description: "Failed to update product",
@@ -164,7 +169,7 @@ export default function ProductManagement() {
         });
       }
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
         description: "Failed to delete product",
@@ -197,7 +202,7 @@ export default function ProductManagement() {
         description: variables.isActive ? "Product activated successfully" : "Product deactivated successfully",
       });
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
         description: "Failed to update product status",
@@ -217,10 +222,115 @@ export default function ProductManagement() {
       sku: "",
       stock: "",
       categoryId: "",
-      imageUrl: "",
+      imageUrls: [],
       isActive: true,
       isFeatured: false,
     });
+  };
+
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files) return;
+
+    const newImages: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not a supported image format. Use JPG, PNG, GIF, or WebP.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 2MB limit.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        newImages.push(base64);
+      } catch {
+        toast({
+          title: "Error",
+          description: `Failed to read ${file.name}`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    if (newImages.length > 0) {
+      setProductForm(prev => ({
+        ...prev,
+        imageUrls: [...prev.imageUrls, ...newImages],
+      }));
+    }
+  }, [toast]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFileSelect(e.dataTransfer.files);
+  }, [handleFileSelect]);
+
+  const removeImage = (index: number) => {
+    setProductForm(prev => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index),
+    }));
+  };
+
+  const setPrimaryImage = (index: number) => {
+    if (index === 0) return;
+    setProductForm(prev => {
+      const newUrls = [...prev.imageUrls];
+      const [removed] = newUrls.splice(index, 1);
+      newUrls.unshift(removed);
+      return { ...prev, imageUrls: newUrls };
+    });
+  };
+
+  const handleImageDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleImageDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    setProductForm(prev => {
+      const newUrls = [...prev.imageUrls];
+      const [removed] = newUrls.splice(draggedIndex, 1);
+      newUrls.splice(index, 0, removed);
+      setDraggedIndex(index);
+      return { ...prev, imageUrls: newUrls };
+    });
+  };
+
+  const handleImageDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -231,6 +341,8 @@ export default function ProductManagement() {
       price: parseFloat(productForm.price).toString(),
       compareAtPrice: productForm.compareAtPrice ? parseFloat(productForm.compareAtPrice).toString() : undefined,
       stock: parseInt(productForm.stock),
+      imageUrl: productForm.imageUrls[0] || null,
+      imageUrls: productForm.imageUrls,
     };
 
     if (editingProduct) {
@@ -242,6 +354,14 @@ export default function ProductManagement() {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    const existingImages = product.imageUrls || [];
+    const primaryImage = product.imageUrl;
+    
+    let imageUrls = [...existingImages];
+    if (primaryImage && !imageUrls.includes(primaryImage)) {
+      imageUrls = [primaryImage, ...imageUrls];
+    }
+    
     setProductForm({
       name: product.name,
       slug: product.slug,
@@ -252,7 +372,7 @@ export default function ProductManagement() {
       sku: product.sku || "",
       stock: product.stock.toString(),
       categoryId: product.categoryId || "",
-      imageUrl: product.imageUrl || "",
+      imageUrls,
       isActive: product.isActive,
       isFeatured: product.isFeatured,
     });
@@ -269,6 +389,16 @@ export default function ProductManagement() {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   };
 
+  const getProductThumbnail = (product: Product) => {
+    if (product.imageUrls && product.imageUrls.length > 0) {
+      return product.imageUrls[0];
+    }
+    if (product.imageUrl) {
+      return product.imageUrl;
+    }
+    return "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80";
+  };
+
   const filteredProducts = products?.filter((product: Product) => {
     if (selectedStatus === 'active' && !product.isActive) return false;
     if (selectedStatus === 'inactive' && product.isActive) return false;
@@ -278,7 +408,7 @@ export default function ProductManagement() {
 
   return (
     <div className="space-y-6" data-testid="section-products">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-foreground" data-testid="text-product-management-title">
           Product Management
         </h2>
@@ -289,14 +419,14 @@ export default function ProductManagement() {
               Add New Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle data-testid="text-product-modal-title">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4" data-testid="form-product">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-6" data-testid="form-product">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name" data-testid="label-product-name">Product Name</Label>
                   <Input
@@ -311,6 +441,7 @@ export default function ProductManagement() {
                       });
                     }}
                     placeholder="Product name"
+                    required
                     data-testid="input-product-name"
                   />
                 </div>
@@ -321,6 +452,7 @@ export default function ProductManagement() {
                     value={productForm.slug}
                     onChange={(e) => setProductForm({ ...productForm, slug: e.target.value })}
                     placeholder="product-slug"
+                    required
                     data-testid="input-product-slug"
                   />
                 </div>
@@ -349,16 +481,18 @@ export default function ProductManagement() {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="price" data-testid="label-price">Price (Rs.)</Label>
                   <Input
                     id="price"
                     type="number"
                     step="0.01"
+                    min="0"
                     value={productForm.price}
                     onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
                     placeholder="0.00"
+                    required
                     data-testid="input-price"
                   />
                 </div>
@@ -368,6 +502,7 @@ export default function ProductManagement() {
                     id="compareAtPrice"
                     type="number"
                     step="0.01"
+                    min="0"
                     value={productForm.compareAtPrice}
                     onChange={(e) => setProductForm({ ...productForm, compareAtPrice: e.target.value })}
                     placeholder="0.00"
@@ -379,15 +514,17 @@ export default function ProductManagement() {
                   <Input
                     id="stock"
                     type="number"
+                    min="0"
                     value={productForm.stock}
                     onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
                     placeholder="0"
+                    required
                     data-testid="input-stock"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sku" data-testid="label-sku">SKU</Label>
                   <Input
@@ -418,39 +555,142 @@ export default function ProductManagement() {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="imageUrl" data-testid="label-image-url">Image URL</Label>
-                <Input
-                  id="imageUrl"
-                  value={productForm.imageUrl}
-                  onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                  data-testid="input-image-url"
-                />
+              {/* Image Upload Section */}
+              <div className="space-y-4">
+                <Label data-testid="label-images">Product Images</Label>
+                
+                {/* Drop Zone */}
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                    isDragging 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-muted-foreground/25 hover:border-primary/50'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid="dropzone-images"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    multiple
+                    onChange={(e) => handleFileSelect(e.target.files)}
+                    className="hidden"
+                    data-testid="input-file-images"
+                  />
+                  <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-sm font-medium mb-1">
+                    Drag & drop images here or click to browse
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG, GIF, WebP up to 2MB each
+                  </p>
+                </div>
+
+                {/* Image Gallery */}
+                {productForm.imageUrls.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Drag to reorder. First image is the primary thumbnail.
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {productForm.imageUrls.map((url, index) => (
+                        <div
+                          key={index}
+                          draggable
+                          onDragStart={() => handleImageDragStart(index)}
+                          onDragOver={(e) => handleImageDragOver(e, index)}
+                          onDragEnd={handleImageDragEnd}
+                          className={`relative group aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-move ${
+                            index === 0 ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                          } ${draggedIndex === index ? 'opacity-50' : ''}`}
+                          data-testid={`image-preview-${index}`}
+                        >
+                          <img
+                            src={url}
+                            alt={`Product ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          
+                          {/* Primary Badge */}
+                          {index === 0 && (
+                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Star className="w-3 h-3" />
+                              Primary
+                            </div>
+                          )}
+
+                          {/* Drag Handle */}
+                          <div className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                            <GripVertical className="w-4 h-4" />
+                          </div>
+
+                          {/* Actions Overlay */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            {index !== 0 && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPrimaryImage(index);
+                                }}
+                                className="h-8"
+                                data-testid={`button-set-primary-${index}`}
+                              >
+                                <Star className="w-3 h-3 mr-1" />
+                                Set Primary
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeImage(index);
+                              }}
+                              className="h-8"
+                              data-testid={`button-remove-image-${index}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={productForm.isActive}
                     onChange={(e) => setProductForm({ ...productForm, isActive: e.target.checked })}
+                    className="w-4 h-4"
                     data-testid="checkbox-active"
                   />
                   <span className="text-sm font-medium">Active</span>
                 </label>
-                <label className="flex items-center space-x-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={productForm.isFeatured}
                     onChange={(e) => setProductForm({ ...productForm, isFeatured: e.target.checked })}
+                    className="w-4 h-4"
                     data-testid="checkbox-featured"
                   />
                   <span className="text-sm font-medium">Featured</span>
                 </label>
               </div>
 
-              <div className="flex justify-end space-x-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -482,8 +722,8 @@ export default function ProductManagement() {
       {/* Filters */}
       <Card data-testid="card-product-filters">
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-48">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -496,7 +736,7 @@ export default function ProductManagement() {
               </div>
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-48" data-testid="select-filter-category">
+              <SelectTrigger className="w-full sm:w-48" data-testid="select-filter-category">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -509,7 +749,7 @@ export default function ProductManagement() {
               </SelectContent>
             </Select>
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-48" data-testid="select-filter-status">
+              <SelectTrigger className="w-full sm:w-48" data-testid="select-filter-status">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -542,118 +782,133 @@ export default function ProductManagement() {
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="p-6 text-center" data-testid="text-no-products">
+              <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
               <p className="text-muted-foreground">No products found</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead data-testid="header-product">Product</TableHead>
-                  <TableHead data-testid="header-category">Category</TableHead>
-                  <TableHead data-testid="header-price">Price</TableHead>
-                  <TableHead data-testid="header-stock">Stock</TableHead>
-                  <TableHead data-testid="header-status">Status</TableHead>
-                  <TableHead data-testid="header-actions">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product: Product) => (
-                  <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80"}
-                          alt={product.name}
-                          className="w-12 h-12 object-cover rounded"
-                          data-testid={`img-product-${product.id}`}
-                        />
-                        <div>
-                          <div className="font-medium text-foreground" data-testid={`text-product-name-${product.id}`}>
-                            {product.name}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead data-testid="header-product">Product</TableHead>
+                    <TableHead className="hidden md:table-cell" data-testid="header-category">Category</TableHead>
+                    <TableHead data-testid="header-price">Price</TableHead>
+                    <TableHead className="hidden sm:table-cell" data-testid="header-stock">Stock</TableHead>
+                    <TableHead data-testid="header-status">Status</TableHead>
+                    <TableHead data-testid="header-actions">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product: Product) => (
+                    <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className="relative w-12 h-12 flex-shrink-0">
+                            <img
+                              src={getProductThumbnail(product)}
+                              alt={product.name}
+                              className="w-full h-full object-cover rounded"
+                              data-testid={`img-product-${product.id}`}
+                            />
+                            {product.imageUrls && product.imageUrls.length > 1 && (
+                              <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                                +{product.imageUrls.length - 1}
+                              </div>
+                            )}
                           </div>
-                          <div className="text-sm text-muted-foreground" data-testid={`text-product-sku-${product.id}`}>
-                            SKU: {product.sku || 'N/A'}
+                          <div className="min-w-0">
+                            <div className="font-medium text-foreground truncate max-w-[150px] sm:max-w-none" data-testid={`text-product-name-${product.id}`}>
+                              {product.name}
+                            </div>
+                            <div className="text-sm text-muted-foreground" data-testid={`text-product-sku-${product.id}`}>
+                              SKU: {product.sku || 'N/A'}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell data-testid={`text-product-category-${product.id}`}>
-                      {categories?.find((c: Category) => c.id === product.categoryId)?.name || 'N/A'}
-                    </TableCell>
-                    <TableCell data-testid={`text-product-price-${product.id}`}>
-                      Rs. {parseFloat(product.price).toLocaleString()}
-                    </TableCell>
-                    <TableCell data-testid={`text-product-stock-${product.id}`}>
-                      {product.stock}
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={product.isActive ? "default" : "secondary"}
-                        data-testid={`badge-product-status-${product.id}`}
-                      >
-                        {product.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <TooltipProvider>
-                        <div className="flex items-center space-x-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(product)}
-                                data-testid={`button-edit-${product.id}`}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Edit product</TooltipContent>
-                          </Tooltip>
-                          
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleStatusMutation.mutate({ 
-                                  id: product.id, 
-                                  isActive: !product.isActive 
-                                })}
-                                className={product.isActive ? "text-orange-500 hover:text-orange-600" : "text-green-500 hover:text-green-600"}
-                                data-testid={`button-toggle-status-${product.id}`}
-                              >
-                                {product.isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {product.isActive ? "Deactivate product" : "Activate product"}
-                            </TooltipContent>
-                          </Tooltip>
-                          
-                          {!product.isActive && (
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell" data-testid={`text-product-category-${product.id}`}>
+                        {categories?.find((c: Category) => c.id === product.categoryId)?.name || 'Uncategorized'}
+                      </TableCell>
+                      <TableCell data-testid={`text-product-price-${product.id}`}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Rs. {parseFloat(product.price).toLocaleString()}</span>
+                          {product.compareAtPrice && (
+                            <span className="text-xs text-muted-foreground line-through">
+                              Rs. {parseFloat(product.compareAtPrice).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell" data-testid={`text-product-stock-${product.id}`}>
+                        <Badge variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}>
+                          {product.stock > 0 ? product.stock : 'Out of Stock'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell data-testid={`text-product-status-${product.id}`}>
+                        <Badge variant={product.isActive ? "default" : "secondary"}>
+                          {product.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(product.id)}
-                                  className="text-destructive hover:text-destructive"
-                                  data-testid={`button-delete-${product.id}`}
+                                  size="icon"
+                                  onClick={() => handleEdit(product)}
+                                  data-testid={`button-edit-product-${product.id}`}
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Delete permanently</TooltipContent>
+                              <TooltipContent>Edit product</TooltipContent>
                             </Tooltip>
-                          )}
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleStatusMutation.mutate({ id: product.id, isActive: !product.isActive })}
+                                  data-testid={`button-toggle-status-${product.id}`}
+                                >
+                                  {product.isActive ? (
+                                    <PowerOff className="h-4 w-4 text-yellow-600" />
+                                  ) : (
+                                    <Power className="h-4 w-4 text-green-600" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {product.isActive ? 'Deactivate' : 'Activate'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(product.id)}
+                                  data-testid={`button-delete-product-${product.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete product</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
-                      </TooltipProvider>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
