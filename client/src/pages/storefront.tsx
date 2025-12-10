@@ -116,7 +116,11 @@ export default function Storefront() {
   return (
     <CartProvider>
       {seoData && (
-        <SEO title={seoData.title} description={seoData.description} />
+        <SEO 
+          title={seoData.title} 
+          description={seoData.description}
+          url={typeof window !== 'undefined' ? window.location.href : undefined}
+        />
       )}
       <div className="min-h-screen bg-background">
         <StorefrontSidebar

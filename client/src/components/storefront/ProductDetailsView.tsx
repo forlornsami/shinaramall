@@ -158,6 +158,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
         description={product.description || `Buy ${product.name} at Eshaal Store. Quality products with secure Pakistani payment options.`}
         type="product"
         image={images[0]}
+        url={typeof window !== 'undefined' ? window.location.href : undefined}
         product={{
           name: product.name,
           price: product.price,
@@ -192,7 +193,8 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
           >
             <img
               src={images[selectedImageIndex]}
-              alt={product.name}
+              alt={`${product.name} - Product image`}
+              loading="eager"
               className="w-full h-full object-cover transition-transform duration-500"
             />
             
@@ -273,7 +275,8 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
                 >
                   <img
                     src={image}
-                    alt={`${product.name} ${index + 1}`}
+                    alt={`${product.name} - Image ${index + 1} of ${images.length}`}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                 </button>
@@ -467,7 +470,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
             
             <img
               src={images[selectedImageIndex]}
-              alt={product.name}
+              alt={`${product.name} - Enlarged view`}
               className="max-w-full max-h-full object-contain"
             />
 
@@ -507,7 +510,8 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
                   >
                     <img
                       src={image}
-                      alt={`${product.name} ${index + 1}`}
+                      alt={`${product.name} - Thumbnail ${index + 1}`}
+                      loading="lazy"
                       className="w-full h-full object-cover"
                     />
                   </button>

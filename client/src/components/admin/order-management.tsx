@@ -674,7 +674,8 @@ export default function OrderManagement() {
                             <div className="flex items-center space-x-3">
                               <img
                                 src={getProductThumbnail(item.product, storeSettings?.defaultProductImage)}
-                                alt={item.product.name}
+                                alt={`${item.product.name} - Order item`}
+                                loading="lazy"
                                 className="w-12 h-12 object-cover rounded"
                                 data-testid={`img-order-item-${item.id}`}
                               />

@@ -961,7 +961,8 @@ export default function ProductManagement() {
                           <div className="relative w-12 h-12 flex-shrink-0">
                             <img
                               src={getProductThumbnail(product, storeSettings?.defaultProductImage)}
-                              alt={product.name}
+                              alt={`${product.name} - Product thumbnail`}
+                              loading="lazy"
                               className="w-full h-full object-cover rounded"
                               data-testid={`img-product-${product.id}`}
                             />

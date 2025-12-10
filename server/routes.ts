@@ -2627,6 +2627,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // SEO ROUTES - Sitemap and Robots.txt
+  // ============================================
+
+  // robots.txt
+  app.get('/robots.txt', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.type('text/plain');
+    res.send(`User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /api/*
+
+Sitemap: ${baseUrl}/sitemap.xml
+`);
+  });
+
+  // sitemap.xml
+  app.get('/sitemap.xml', async (req, res) => {
+    try {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const products = await storage.getProducts();
+      const categories = await storage.getCategories();
+      
+      const urls: string[] = [];
+      
+      // Static pages
+      urls.push(`
+    <url>
+      <loc>${baseUrl}/</loc>
+      <changefreq>daily</changefreq>
+      <priority>1.0</priority>
+    </url>`);
+      
+      urls.push(`
+    <url>
+      <loc>${baseUrl}/?view=products</loc>
+      <changefreq>daily</changefreq>
+      <priority>0.9</priority>
+    </url>`);
+      
+      urls.push(`
+    <url>
+      <loc>${baseUrl}/?view=categories</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.8</priority>
+    </url>`);
+      
+      urls.push(`
+    <url>
+      <loc>${baseUrl}/?view=featured</loc>
+      <changefreq>daily</changefreq>
+      <priority>0.8</priority>
+    </url>`);
+      
+      // Category pages
+      for (const category of categories) {
+        urls.push(`
+    <url>
+      <loc>${baseUrl}/?view=category-${category.id}</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.7</priority>
+    </url>`);
+      }
+      
+      // Product pages
+      for (const product of products) {
+        urls.push(`
+    <url>
+      <loc>${baseUrl}/?view=product-${product.id}</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.6</priority>
+    </url>`);
+      }
+      
+      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('')}
+</urlset>`;
+      
+      res.type('application/xml');
+      res.send(sitemap);
+    } catch (error) {
+      console.error("Error generating sitemap:", error);
+      res.status(500).send('Error generating sitemap');
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Setup WebSocket for customer support chat
