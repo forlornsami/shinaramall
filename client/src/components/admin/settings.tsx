@@ -58,6 +58,8 @@ export default function SettingsSection() {
     storePhone: "",
     storeAddress: "",
     currency: "PKR",
+    defaultProductImage: "",
+    defaultCategoryImage: "",
   });
 
   const [notifications, setNotifications] = useState({
@@ -98,6 +100,8 @@ export default function SettingsSection() {
         storePhone: settings.storePhone || "",
         storeAddress: settings.storeAddress || "",
         currency: settings.currency || "PKR",
+        defaultProductImage: settings.defaultProductImage || "",
+        defaultCategoryImage: settings.defaultCategoryImage || "",
       });
       setNotifications({
         orderNotifications: settings.orderNotifications ?? true,
@@ -533,6 +537,166 @@ export default function SettingsSection() {
                         className="mt-2"
                         onClick={() => document.getElementById('logo-upload')?.click()}
                         data-testid="button-upload-logo"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose File
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Default Product Image Upload */}
+              <div className="space-y-3">
+                <Label>Default Product Image</Label>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Shown when products don't have their own images
+                </p>
+                <div className="flex items-start gap-4">
+                  <div className="relative">
+                    {storeSettings.defaultProductImage ? (
+                      <div className="relative w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden group">
+                        <img 
+                          src={storeSettings.defaultProductImage} 
+                          alt="Default Product" 
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStoreSettings({ ...storeSettings, defaultProductImage: "" })}
+                          className="absolute top-1 right-1 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid="button-remove-default-product-image"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label 
+                        htmlFor="default-product-upload" 
+                        className="w-24 h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <ImagePlus className="w-8 h-8 text-muted-foreground mb-1" />
+                        <span className="text-xs text-muted-foreground">Upload</span>
+                      </label>
+                    )}
+                    <input
+                      id="default-product-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast({
+                              title: "File too large",
+                              description: "Image must be less than 2MB",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            setStoreSettings({ ...storeSettings, defaultProductImage: result });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      data-testid="input-default-product-upload"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      This image will be displayed for products without images.
+                    </p>
+                    {!storeSettings.defaultProductImage && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => document.getElementById('default-product-upload')?.click()}
+                        data-testid="button-upload-default-product"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose File
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Default Category Image Upload */}
+              <div className="space-y-3">
+                <Label>Default Category Image</Label>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Shown when categories don't have their own images
+                </p>
+                <div className="flex items-start gap-4">
+                  <div className="relative">
+                    {storeSettings.defaultCategoryImage ? (
+                      <div className="relative w-24 h-24 rounded-xl border-2 border-dashed border-border overflow-hidden group">
+                        <img 
+                          src={storeSettings.defaultCategoryImage} 
+                          alt="Default Category" 
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStoreSettings({ ...storeSettings, defaultCategoryImage: "" })}
+                          className="absolute top-1 right-1 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid="button-remove-default-category-image"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label 
+                        htmlFor="default-category-upload" 
+                        className="w-24 h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <ImagePlus className="w-8 h-8 text-muted-foreground mb-1" />
+                        <span className="text-xs text-muted-foreground">Upload</span>
+                      </label>
+                    )}
+                    <input
+                      id="default-category-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast({
+                              title: "File too large",
+                              description: "Image must be less than 2MB",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            setStoreSettings({ ...storeSettings, defaultCategoryImage: result });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      data-testid="input-default-category-upload"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      This image will be displayed for categories without images.
+                    </p>
+                    {!storeSettings.defaultCategoryImage && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => document.getElementById('default-category-upload')?.click()}
+                        data-testid="button-upload-default-category"
                       >
                         <Upload className="w-4 h-4 mr-2" />
                         Choose File

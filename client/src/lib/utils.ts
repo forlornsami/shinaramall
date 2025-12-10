@@ -7,8 +7,14 @@ export function cn(...inputs: ClassValue[]) {
 
 const FALLBACK_PRODUCT_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f3f4f6'/%3E%3Cpath d='M200 120c-22 0-40 18-40 40v80c0 22 18 40 40 40s40-18 40-40v-80c0-22-18-40-40-40z' fill='%239ca3af'/%3E%3Crect x='160' y='260' width='80' height='20' rx='4' fill='%239ca3af'/%3E%3C/svg%3E";
 
+const FALLBACK_CATEGORY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23e5e7eb'/%3E%3Crect x='80' y='80' width='100' height='100' rx='8' fill='%239ca3af'/%3E%3Crect x='220' y='80' width='100' height='100' rx='8' fill='%239ca3af'/%3E%3Crect x='80' y='220' width='100' height='100' rx='8' fill='%239ca3af'/%3E%3Crect x='220' y='220' width='100' height='100' rx='8' fill='%239ca3af'/%3E%3C/svg%3E";
+
 export function getDefaultProductPlaceholder(defaultProductImage?: string | null): string {
   return defaultProductImage || FALLBACK_PRODUCT_PLACEHOLDER;
+}
+
+export function getDefaultCategoryPlaceholder(defaultCategoryImage?: string | null): string {
+  return defaultCategoryImage || FALLBACK_CATEGORY_PLACEHOLDER;
 }
 
 export function getProductThumbnail(
@@ -22,4 +28,14 @@ export function getProductThumbnail(
     return product.imageUrl;
   }
   return getDefaultProductPlaceholder(defaultProductImage);
+}
+
+export function getCategoryThumbnail(
+  category: { imageUrl?: string | null },
+  defaultCategoryImage?: string | null
+): string {
+  if (category.imageUrl) {
+    return category.imageUrl;
+  }
+  return getDefaultCategoryPlaceholder(defaultCategoryImage);
 }

@@ -561,6 +561,7 @@ export const storeSettings = pgTable("store_settings", {
   timezone: varchar("timezone").default("PKT"),
   language: varchar("language").default("en"),
   defaultProductImage: text("default_product_image"),
+  defaultCategoryImage: text("default_category_image"),
   orderNotifications: boolean("order_notifications").default(true),
   stockAlerts: boolean("stock_alerts").default(true),
   customerRegistrations: boolean("customer_registrations").default(true),
