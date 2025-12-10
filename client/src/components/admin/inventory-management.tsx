@@ -11,6 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Search, AlertTriangle, Package, TrendingUp, TrendingDown } from "lucide-react";
+import { getProductThumbnail } from "@/lib/utils";
 import type { Product, Category } from "@shared/schema";
 
 export default function InventoryManagement() {
@@ -253,7 +254,7 @@ export default function InventoryManagement() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <img
-                            src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80"}
+                            src={getProductThumbnail(product)}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded"
                             data-testid={`img-inventory-${product.id}`}
