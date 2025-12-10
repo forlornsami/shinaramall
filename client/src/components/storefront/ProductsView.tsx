@@ -389,11 +389,24 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, size, defaultProductImage }: ProductCardProps) {
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const { toast } = useToast();
   const isSmall = size === "small";
   const hasDiscount = product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(product.price);
   const discountPercent = hasDiscount 
     ? Math.round((1 - parseFloat(product.price) / parseFloat(product.compareAtPrice!)) * 100)
     : 0;
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsWishlisted(!isWishlisted);
+    toast({
+      title: isWishlisted ? "Removed from wishlist" : "Added to wishlist",
+      description: isWishlisted 
+        ? `${product.name} removed from your wishlist`
+        : `${product.name} added to your wishlist`,
+    });
+  };
   
   return (
     <Card 
@@ -431,11 +444,12 @@ function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, siz
         <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <Button
             size="icon"
-            variant="secondary"
+            variant={isWishlisted ? "default" : "secondary"}
             className="w-8 h-8 rounded-full shadow-lg"
+            onClick={handleWishlist}
             data-testid={`button-wishlist-${product.id}`}
           >
-            <Heart className="w-4 h-4" />
+            <Heart className={`w-4 h-4 ${isWishlisted ? "fill-current" : ""}`} />
           </Button>
         </div>
         

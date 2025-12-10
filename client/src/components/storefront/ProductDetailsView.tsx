@@ -39,6 +39,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
   const [quantity, setQuantity] = useState(1);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const { data: product, isLoading } = useQuery<Product>({
     queryKey: ['/api/products', productId],
@@ -104,6 +105,46 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
     if (!product) return;
     const images = getProductImages(product);
     setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  const handleWishlist = () => {
+    setIsWishlisted(!isWishlisted);
+    toast({
+      title: isWishlisted ? "Removed from wishlist" : "Added to wishlist",
+      description: isWishlisted 
+        ? `${product?.name} removed from your wishlist`
+        : `${product?.name} added to your wishlist`,
+    });
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+    
+    const shareData = {
+      title: product.name,
+      text: `Check out ${product.name} at Eshaal Store - Rs. ${parseFloat(product.price).toLocaleString()}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({
+          title: "Link copied!",
+          description: "Product link has been copied to your clipboard",
+        });
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({
+          title: "Link copied!",
+          description: "Product link has been copied to your clipboard",
+        });
+      }
+    }
   };
 
   if (isLoading) {
@@ -386,17 +427,19 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
               </Button>
               <Button
                 size="lg"
-                variant="outline"
+                variant={isWishlisted ? "default" : "outline"}
                 className="gap-2"
+                onClick={handleWishlist}
                 data-testid="button-wishlist"
               >
-                <Heart className="w-5 h-5" />
-                <span className="sm:hidden lg:inline">Wishlist</span>
+                <Heart className={`w-5 h-5 ${isWishlisted ? "fill-current" : ""}`} />
+                <span className="sm:hidden lg:inline">{isWishlisted ? "Wishlisted" : "Wishlist"}</span>
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 className="gap-2"
+                onClick={handleShare}
                 data-testid="button-share"
               >
                 <Share2 className="w-5 h-5" />
