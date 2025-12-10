@@ -3,18 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { getProductThumbnail } from "@/lib/utils";
-import { Plus, Edit, Trash2, Search, Power, PowerOff, Upload, X, Star, GripVertical, ImageIcon } from "lucide-react";
+import { getProductThumbnail, getDefaultProductPlaceholder } from "@/lib/utils";
+import { Plus, Edit, Trash2, Search, Power, PowerOff, Upload, X, Star, GripVertical, ImageIcon, Settings } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Product, Category } from "@shared/schema";
+import type { Product, Category, StoreSettings } from "@shared/schema";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -71,6 +71,105 @@ export default function ProductManagement() {
       return response.json();
     },
   });
+
+  // Fetch store settings for default product image
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
+  // Default image file input ref
+  const defaultImageInputRef = useRef<HTMLInputElement>(null);
+  const [isDefaultImageDragging, setIsDefaultImageDragging] = useState(false);
+
+  // Update default product image mutation
+  const updateDefaultImageMutation = useMutation({
+    mutationFn: async (defaultProductImage: string | null) => {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/store-settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ defaultProductImage }),
+      });
+      if (!response.ok) throw new Error('Failed to update default image');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/store-settings'] });
+      toast({
+        title: "Success",
+        description: "Default product image updated",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update default image",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDefaultImageSelect = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Use JPG, PNG, GIF, or WebP format.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast({
+        title: "File too large",
+        description: "Image must be under 2MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      updateDefaultImageMutation.mutate(base64);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to read image file",
+        variant: "destructive",
+      });
+    }
+  }, [toast, updateDefaultImageMutation]);
+
+  const handleDefaultImageDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDefaultImageDragging(true);
+  }, []);
+
+  const handleDefaultImageDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDefaultImageDragging(false);
+  }, []);
+
+  const handleDefaultImageDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDefaultImageDragging(false);
+    handleDefaultImageSelect(e.dataTransfer.files);
+  }, [handleDefaultImageSelect]);
+
+  const handleRemoveDefaultImage = () => {
+    updateDefaultImageMutation.mutate(null);
+  };
 
   // Create product mutation
   const createProductMutation = useMutation({
@@ -710,6 +809,71 @@ export default function ProductManagement() {
         </Dialog>
       </div>
 
+      {/* Default Product Image Settings */}
+      <Card data-testid="card-default-product-image">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-muted-foreground" />
+            <CardTitle className="text-lg">Default Product Image</CardTitle>
+          </div>
+          <CardDescription>
+            This image will be shown for products that don't have any images uploaded.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            <div className="flex-shrink-0">
+              <img
+                src={getDefaultProductPlaceholder(storeSettings?.defaultProductImage)}
+                alt="Default product"
+                className="w-24 h-24 object-cover rounded-lg border"
+                data-testid="img-default-product"
+              />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                  isDefaultImageDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+                }`}
+                onDragOver={handleDefaultImageDragOver}
+                onDragLeave={handleDefaultImageDragLeave}
+                onDrop={handleDefaultImageDrop}
+                onClick={() => defaultImageInputRef.current?.click()}
+                data-testid="dropzone-default-image"
+              >
+                <input
+                  ref={defaultImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleDefaultImageSelect(e.target.files)}
+                  data-testid="input-default-image-file"
+                />
+                <Upload className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {storeSettings?.defaultProductImage ? 'Change default image' : 'Upload default image'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  JPG, PNG, GIF, WebP (max 2MB)
+                </p>
+              </div>
+              {storeSettings?.defaultProductImage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemoveDefaultImage}
+                  disabled={updateDefaultImageMutation.isPending}
+                  data-testid="button-remove-default-image"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Remove Default Image
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card data-testid="card-product-filters">
         <CardContent className="p-4">
@@ -796,7 +960,7 @@ export default function ProductManagement() {
                         <div className="flex items-center space-x-3">
                           <div className="relative w-12 h-12 flex-shrink-0">
                             <img
-                              src={getProductThumbnail(product)}
+                              src={getProductThumbnail(product, storeSettings?.defaultProductImage)}
                               alt={product.name}
                               className="w-full h-full object-cover rounded"
                               data-testid={`img-product-${product.id}`}

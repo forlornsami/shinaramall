@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Category, Product } from "@shared/schema";
+import type { Category, Product, StoreSettings } from "@shared/schema";
 import type { StorefrontSection } from "./StorefrontSidebar";
 import {
   Search,
@@ -51,6 +51,10 @@ export default function ProductsView({ categoryId, featuredOnly, title, onProduc
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
+  });
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   const { data: allProducts, isLoading: productsLoading } = useQuery<Product[]>({
@@ -366,6 +370,7 @@ export default function ProductsView({ categoryId, featuredOnly, title, onProduc
               onProductClick={() => onProductSelect?.(`product-${product.id}`)}
               isAddingToCart={isAddingToCart}
               size={gridView === "large" ? "large" : "small"}
+              defaultProductImage={storeSettings?.defaultProductImage}
             />
           ))}
         </div>
@@ -380,9 +385,10 @@ interface ProductCardProps {
   onProductClick?: () => void;
   isAddingToCart: boolean;
   size: "large" | "small";
+  defaultProductImage?: string | null;
 }
 
-function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, size }: ProductCardProps) {
+function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, size, defaultProductImage }: ProductCardProps) {
   const isSmall = size === "small";
   const hasDiscount = product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(product.price);
   const discountPercent = hasDiscount 
@@ -397,7 +403,7 @@ function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, siz
     >
       <div className="relative overflow-hidden">
         <img
-          src={getProductThumbnail(product)}
+          src={getProductThumbnail(product, defaultProductImage)}
           alt={product.name}
           className={cn(
             "w-full object-cover transition-transform duration-500 group-hover:scale-110",

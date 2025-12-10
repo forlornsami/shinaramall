@@ -12,7 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getProductThumbnail } from "@/lib/utils";
 import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X } from "lucide-react";
-import type { Order, OrderItem, Product } from "@shared/schema";
+import type { Order, OrderItem, Product, StoreSettings } from "@shared/schema";
 
 type SortField = 'orderNumber' | 'customer' | 'amount' | 'status' | 'paymentStatus' | 'date';
 type SortDirection = 'asc' | 'desc';
@@ -33,6 +33,11 @@ export default function OrderManagement() {
   // Sort states
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Fetch store settings
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
 
   // Fetch orders
   const { data: orders, isLoading } = useQuery({
@@ -668,7 +673,7 @@ export default function OrderManagement() {
                           <TableCell>
                             <div className="flex items-center space-x-3">
                               <img
-                                src={getProductThumbnail(item.product)}
+                                src={getProductThumbnail(item.product, storeSettings?.defaultProductImage)}
                                 alt={item.product.name}
                                 className="w-12 h-12 object-cover rounded"
                                 data-testid={`img-order-item-${item.id}`}
