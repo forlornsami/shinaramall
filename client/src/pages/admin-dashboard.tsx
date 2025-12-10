@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
+import type { StoreSettings } from "@shared/schema";
 import { 
   BarChart3, 
   Package, 
@@ -143,6 +144,10 @@ export default function AdminDashboard() {
     },
     enabled: !!adminUser,
     refetchInterval: 30000,
+  });
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   const handleLogout = () => {
@@ -422,11 +427,19 @@ export default function AdminDashboard() {
                   {/* Logo Section */}
                   <div className="p-6 border-b border-border">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                        <span className="text-white font-bold text-lg">E</span>
-                      </div>
+                      {storeSettings?.storeLogo ? (
+                        <img 
+                          src={storeSettings.storeLogo} 
+                          alt={storeSettings?.storeName || "Store"}
+                          className="w-10 h-10 rounded-xl object-cover shadow-lg"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+                          <span className="text-white font-bold text-lg">{(storeSettings?.storeName || "E").charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
                       <div>
-                        <h2 className="text-xl font-bold gradient-text">Eshaal Store</h2>
+                        <h2 className="text-xl font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</h2>
                         <p className="text-xs text-muted-foreground">Admin Panel</p>
                       </div>
                     </div>

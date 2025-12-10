@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, ShoppingBag, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import type { StoreSettings } from "@shared/schema";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -39,6 +41,10 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -100,7 +106,7 @@ export default function AuthPage() {
       });
       toast({
         title: "Account created!",
-        description: "Welcome to Eshaal Store!",
+        description: `Welcome to ${storeSettings?.storeName || "Eshaal Store"}!`,
       });
       setLocation("/");
     } catch (error: any) {
@@ -127,10 +133,18 @@ export default function AuthPage() {
               Back to Store
             </Button>
           </Link>
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <ShoppingBag className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold gradient-text">Eshaal Store</h1>
+          {storeSettings?.storeLogo ? (
+            <img 
+              src={storeSettings.storeLogo} 
+              alt={storeSettings?.storeName || "Store"}
+              className="w-16 h-16 rounded-2xl object-cover mx-auto mb-4 shadow-lg"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <ShoppingBag className="h-8 w-8 text-white" />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</h1>
           <p className="text-muted-foreground mt-1">Shop Authentic Products</p>
         </div>
 

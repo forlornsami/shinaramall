@@ -5,15 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Shield, Lock, ArrowLeft, Eye, EyeOff, Sparkles } from "lucide-react";
+import type { StoreSettings } from "@shared/schema";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({ username: "", password: "" });
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
 
   const loginMutation = useMutation({
     mutationFn: async (data: { username: string; password: string }) => {
@@ -61,10 +66,18 @@ export default function AdminLogin() {
         
         <div className="relative z-10 flex flex-col justify-center p-12 text-white">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-              <Sparkles className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-2xl font-bold">Eshaal Store</span>
+            {storeSettings?.storeLogo ? (
+              <img 
+                src={storeSettings.storeLogo} 
+                alt={storeSettings?.storeName || "Store"}
+                className="w-14 h-14 rounded-2xl object-cover backdrop-blur-sm"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                <Sparkles className="w-7 h-7 text-white" />
+              </div>
+            )}
+            <span className="text-2xl font-bold">{storeSettings?.storeName || "Eshaal Store"}</span>
           </div>
           
           <h1 className="text-4xl font-bold mb-4">
@@ -98,10 +111,18 @@ export default function AdminLogin() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center gap-2 mb-4">
-              <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold gradient-text">Eshaal Store</span>
+              {storeSettings?.storeLogo ? (
+                <img 
+                  src={storeSettings.storeLogo} 
+                  alt={storeSettings?.storeName || "Store"}
+                  className="w-12 h-12 rounded-xl object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+              )}
+              <span className="text-2xl font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</span>
             </div>
           </div>
           

@@ -56,7 +56,7 @@ const faqItems = [
   },
   {
     question: "What payment methods are supported?",
-    answer: "Eshaal Store supports popular Pakistani payment methods including EasyPaisa, JazzCash, HBL Bank Transfer, and Cash on Delivery (COD). You can enable or disable any payment method from the Payments section.",
+    answer: "This store supports popular Pakistani payment methods including EasyPaisa, JazzCash, HBL Bank Transfer, and Cash on Delivery (COD). You can enable or disable any payment method from the Payments section.",
     category: "Payments",
   },
   {
@@ -95,7 +95,7 @@ export default function HelpCenterSection() {
             <HelpCircle className="w-6 h-6" />
             Help Center
           </h2>
-          <p className="text-muted-foreground">Find answers and get support for Eshaal Store</p>
+          <p className="text-muted-foreground">Find answers and get support for {storeSettings?.storeName || "your store"}</p>
         </div>
       </div>
 
@@ -219,7 +219,7 @@ export default function HelpCenterSection() {
             <CardContent className="space-y-3">
               <div className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                 <Badge variant="secondary">5 min</Badge>
-                <span className="text-sm flex-1">Getting Started with Eshaal Store</span>
+                <span className="text-sm flex-1">Getting Started with {storeSettings?.storeName || "Your Store"}</span>
               </div>
               <div className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                 <Badge variant="secondary">8 min</Badge>

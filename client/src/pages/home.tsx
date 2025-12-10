@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Category, Product } from "@shared/schema";
+import type { Category, Product, StoreSettings } from "@shared/schema";
 import { 
   ShoppingCart as CartIcon, 
   Search, 
@@ -57,6 +57,10 @@ export default function Home() {
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
+  });
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   const { data: featuredProducts, isLoading: featuredLoading } = useQuery<Product[]>({
@@ -517,13 +521,21 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-                <span className="text-white font-bold text-sm">E</span>
-              </div>
-              <span className="font-bold gradient-text">Eshaal Store</span>
+              {storeSettings?.storeLogo ? (
+                <img 
+                  src={storeSettings.storeLogo} 
+                  alt={storeSettings?.storeName || "Store"}
+                  className="w-8 h-8 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">{(storeSettings?.storeName || "E").charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+              <span className="font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</span>
             </div>
             <p className="text-sm text-muted-foreground text-center">
-              © 2024 Eshaal Store. Pakistan's trusted online marketplace.
+              © 2024 {storeSettings?.storeName || "Eshaal Store"}. Pakistan's trusted online marketplace.
             </p>
             <div className="flex gap-2">
               {paymentMethods.map((method) => (

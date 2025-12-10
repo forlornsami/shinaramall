@@ -117,10 +117,18 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg">E</span>
-              </div>
-              <h1 className="text-2xl font-bold gradient-text" data-testid="logo-text">Eshaal Store</h1>
+              {storeSettings?.storeLogo ? (
+                <img 
+                  src={storeSettings.storeLogo} 
+                  alt={storeSettings?.storeName || "Store"}
+                  className="w-10 h-10 rounded-xl object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-lg">{(storeSettings?.storeName || "E").charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+              <h1 className="text-2xl font-bold gradient-text" data-testid="logo-text">{storeSettings?.storeName || "Eshaal Store"}</h1>
             </div>
             <div className="flex items-center gap-4">
               <Button 
@@ -469,7 +477,7 @@ export default function Landing() {
           
           <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 Eshaal Store. All rights reserved.
+              © 2024 {storeSettings?.storeName || "Eshaal Store"}. All rights reserved.
             </p>
             <Button 
               variant="ghost" 
