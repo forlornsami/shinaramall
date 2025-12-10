@@ -574,7 +574,7 @@ export default function OrderManagement() {
 
       {/* Order Details Modal */}
       <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
-        <DialogContent className="max-w-4xl max-h-screen overflow-y-auto">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-4xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle data-testid="text-order-details-title">
               Order Details - {selectedOrder?.orderNumber}

@@ -410,7 +410,7 @@ export default function ProductManagement() {
               Add New Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-3xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle data-testid="text-product-modal-title">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}

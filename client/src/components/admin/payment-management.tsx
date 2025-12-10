@@ -1103,7 +1103,7 @@ export default function PaymentManagement() {
       </Tabs>
 
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md">
           <DialogHeader>
             <DialogTitle>Add Payment Gateway</DialogTitle>
           </DialogHeader>
@@ -1189,7 +1189,7 @@ export default function PaymentManagement() {
       </Dialog>
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Payment Gateway</DialogTitle>
           </DialogHeader>
@@ -1395,7 +1395,7 @@ export default function PaymentManagement() {
 
       {/* Add Payment Account Dialog */}
       <Dialog open={isAddAccountModalOpen} onOpenChange={setIsAddAccountModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md">
           <DialogHeader>
             <DialogTitle>Add Payment Account</DialogTitle>
           </DialogHeader>
@@ -1471,7 +1471,7 @@ export default function PaymentManagement() {
 
       {/* Edit Payment Account Dialog */}
       <Dialog open={isEditAccountModalOpen} onOpenChange={setIsEditAccountModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Payment Account</DialogTitle>
           </DialogHeader>
@@ -1577,7 +1577,7 @@ export default function PaymentManagement() {
 
       {/* View Payment Screenshot Dialog */}
       <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment Verification - Order #{viewingOrder?.orderNumber}</DialogTitle>
           </DialogHeader>

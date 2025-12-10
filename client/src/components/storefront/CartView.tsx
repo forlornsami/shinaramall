@@ -264,7 +264,7 @@ export default function CartView() {
       </div>
 
       <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <LogIn className="w-5 h-5 text-primary" />

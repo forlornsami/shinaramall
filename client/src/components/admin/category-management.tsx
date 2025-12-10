@@ -255,7 +255,7 @@ export default function CategoryManagement() {
               Add Category
             </Button>
           </DialogTrigger>
-          <DialogContent data-testid="modal-add-category">
+          <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md" data-testid="modal-add-category">
             <DialogHeader>
               <DialogTitle>
                 {editingCategory ? 'Edit Category' : 'Add New Category'}

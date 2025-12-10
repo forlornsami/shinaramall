@@ -327,7 +327,7 @@ export default function InventoryManagement() {
 
       {/* Stock Adjustment Modal */}
       <Dialog open={isAdjustModalOpen} onOpenChange={setIsAdjustModalOpen}>
-        <DialogContent data-testid="dialog-adjust-stock">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md" data-testid="dialog-adjust-stock">
           <DialogHeader>
             <DialogTitle>
               {adjustmentType === "increase" ? "Increase" : "Decrease"} Stock - {adjustingProduct?.name}

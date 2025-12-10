@@ -431,7 +431,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
 
       {/* Zoom Modal */}
       <Dialog open={isZoomed} onOpenChange={setIsZoomed}>
-        <DialogContent className="max-w-5xl w-full h-[90vh] p-0 bg-black/95">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-5xl h-[85vh] sm:h-[90vh] p-0 bg-black/95">
           <div className="relative w-full h-full flex items-center justify-center">
             <Button
               variant="ghost"

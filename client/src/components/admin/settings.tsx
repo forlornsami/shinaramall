@@ -965,7 +965,7 @@ export default function SettingsSection() {
 
       {/* Change Password Dialog */}
       <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Key className="w-5 h-5" />
@@ -1067,7 +1067,7 @@ export default function SettingsSection() {
 
       {/* Manage Sessions Dialog */}
       <Dialog open={manageSessionsOpen} onOpenChange={setManageSessionsOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Monitor className="w-5 h-5" />
