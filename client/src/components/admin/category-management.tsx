@@ -23,7 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Tag, Star } from "lucide-react";
+import { Plus, Edit, Trash2, Tag, Star, ImagePlus, X, Upload } from "lucide-react";
+import { getCategoryThumbnail } from "@/lib/utils";
+import type { StoreSettings } from "@shared/schema";
 
 interface Category {
   id: string;
@@ -53,6 +55,11 @@ export default function CategoryManagement() {
       if (!response.ok) throw new Error('Failed to fetch categories');
       return response.json();
     },
+  });
+
+  // Fetch store settings for default category image
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   // Create category mutation
@@ -288,16 +295,80 @@ export default function CategoryManagement() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="imageUrl" data-testid="label-category-image">Image URL</Label>
-                <Input
-                  id="imageUrl"
-                  type="url"
-                  placeholder="https://example.com/image.jpg (optional)"
-                  value={categoryForm.imageUrl}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, imageUrl: e.target.value })}
-                  data-testid="input-category-image"
-                />
+              <div className="space-y-3">
+                <Label data-testid="label-category-image">Category Image</Label>
+                <div className="flex items-start gap-4">
+                  <div className="relative">
+                    {categoryForm.imageUrl ? (
+                      <div className="relative w-20 h-20 rounded-xl border-2 border-dashed border-border overflow-hidden group">
+                        <img 
+                          src={categoryForm.imageUrl} 
+                          alt="Category" 
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCategoryForm({ ...categoryForm, imageUrl: "" })}
+                          className="absolute top-1 right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid="button-remove-category-image"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label 
+                        htmlFor="category-image-upload" 
+                        className="w-20 h-20 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                      >
+                        <ImagePlus className="w-6 h-6 text-muted-foreground mb-1" />
+                        <span className="text-xs text-muted-foreground">Upload</span>
+                      </label>
+                    )}
+                    <input
+                      id="category-image-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast({
+                              title: "File too large",
+                              description: "Image must be less than 2MB",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            setCategoryForm({ ...categoryForm, imageUrl: result });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      data-testid="input-category-image"
+                    />
+                  </div>
+                  <div className="flex-1 text-xs text-muted-foreground">
+                    <p>Upload an image for this category.</p>
+                    <p className="mt-1">Max size: 2MB. Formats: PNG, JPG, GIF</p>
+                    {!categoryForm.imageUrl && (
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => document.getElementById('category-image-upload')?.click()}
+                        data-testid="button-upload-category-image"
+                      >
+                        <Upload className="w-3 h-3 mr-1" />
+                        Choose File
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center space-x-3">
@@ -376,13 +447,11 @@ export default function CategoryManagement() {
                   <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        {category.imageUrl && (
-                          <img 
-                            src={category.imageUrl} 
-                            alt={category.name}
-                            className="w-8 h-8 rounded object-cover"
-                          />
-                        )}
+                        <img 
+                          src={getCategoryThumbnail(category, storeSettings?.defaultCategoryImage)} 
+                          alt={category.name}
+                          className="w-8 h-8 rounded object-cover"
+                        />
                         {category.name}
                       </div>
                     </TableCell>

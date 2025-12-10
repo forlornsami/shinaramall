@@ -12,7 +12,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Search, AlertTriangle, Package, TrendingUp, TrendingDown } from "lucide-react";
 import { getProductThumbnail } from "@/lib/utils";
-import type { Product, Category } from "@shared/schema";
+import type { Product, Category, StoreSettings } from "@shared/schema";
 
 export default function InventoryManagement() {
   const { toast } = useToast();
@@ -50,6 +50,11 @@ export default function InventoryManagement() {
       if (!response.ok) throw new Error('Failed to fetch categories');
       return response.json();
     },
+  });
+
+  // Fetch store settings for default product image
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   // Stock adjustment mutation
@@ -254,7 +259,7 @@ export default function InventoryManagement() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <img
-                            src={getProductThumbnail(product)}
+                            src={getProductThumbnail(product, storeSettings?.defaultProductImage)}
                             alt={product.name}
                             className="w-12 h-12 object-cover rounded"
                             data-testid={`img-inventory-${product.id}`}

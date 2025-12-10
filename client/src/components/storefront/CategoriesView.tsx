@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Category } from "@shared/schema";
+import { getCategoryThumbnail } from "@/lib/utils";
+import type { Category, StoreSettings } from "@shared/schema";
 import { Grid3X3, ChevronRight, Tag } from "lucide-react";
 import type { StorefrontSection } from "./StorefrontSidebar";
 
@@ -15,8 +16,6 @@ const categoryGradients = [
   "from-cyan-500/80 to-teal-600/80",
 ];
 
-const defaultCategoryImage = "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=600";
-
 interface CategoriesViewProps {
   onCategorySelect: (section: StorefrontSection) => void;
 }
@@ -24,6 +23,10 @@ interface CategoriesViewProps {
 export default function CategoriesView({ onCategorySelect }: CategoriesViewProps) {
   const { data: categories, isLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
+  });
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
   });
 
   return (
@@ -64,7 +67,7 @@ export default function CategoriesView({ onCategorySelect }: CategoriesViewProps
             >
               <div className="relative overflow-hidden">
                 <img 
-                  src={category.imageUrl || defaultCategoryImage} 
+                  src={getCategoryThumbnail(category, storeSettings?.defaultCategoryImage)} 
                   alt={category.name} 
                   className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
                 />
