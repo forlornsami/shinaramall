@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
 import { getDefaultProductPlaceholder } from "@/lib/utils";
+import SEO from "@/components/SEO";
 import { 
   ShoppingCart, 
   Heart, 
@@ -151,17 +152,34 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
   const category = categories?.find(c => c.id === product.categoryId);
 
   return (
-    <div className="space-y-6" data-testid="product-details-view">
-      {/* Breadcrumb */}
-      <Button 
-        variant="ghost" 
-        className="gap-2 -ml-2 text-muted-foreground hover:text-foreground" 
-        onClick={onBack}
-        data-testid="button-back-to-products"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Back to Products
-      </Button>
+    <>
+      <SEO 
+        title={product.name}
+        description={product.description || `Buy ${product.name} at Eshaal Store. Quality products with secure Pakistani payment options.`}
+        type="product"
+        image={images[0]}
+        product={{
+          name: product.name,
+          price: product.price,
+          currency: 'PKR',
+          availability: product.stock > 0 ? 'InStock' : 'OutOfStock',
+          description: product.description || undefined,
+          image: images[0],
+          sku: product.id,
+          category: category?.name,
+        }}
+      />
+      <div className="space-y-6" data-testid="product-details-view">
+        {/* Breadcrumb */}
+        <Button 
+          variant="ghost" 
+          className="gap-2 -ml-2 text-muted-foreground hover:text-foreground" 
+          onClick={onBack}
+          data-testid="button-back-to-products"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Products
+        </Button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         {/* Image Gallery */}
@@ -499,6 +517,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }
