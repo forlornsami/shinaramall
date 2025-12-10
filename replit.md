@@ -74,10 +74,21 @@ Preferred communication style: Simple, everyday language.
   - DELETE /api/admin/payment-accounts/:id - Delete payment account
   - POST /api/admin/orders/:id/verify - Approve or reject payment with notes
 
+## Product Image Management System
+- **File Upload**: Device-based file upload (no URL input) with drag-and-drop support
+- **Multiple Images**: Products support multiple images stored in `imageUrls` JSONB array
+- **Primary Image**: First image in `imageUrls` array is the primary/thumbnail image
+- **Image Reordering**: Drag-and-drop reordering in admin panel; primary selection by moving image to first position
+- **Image Removal**: Remove individual images from the gallery
+- **Validation**: Max 2MB per image, supports JPG, PNG, GIF, WebP formats
+- **Base64 Storage**: Images stored as base64-encoded strings in the database
+- **Thumbnail Consistency**: `getProductThumbnail()` function ensures same image displays across admin and storefront
+- **Product Details Page**: Full image gallery with zoom, navigation arrows, quantity selector, and add-to-cart
+
 ## Key Features
 - **Unified Storefront**: Single consistent UI for both logged-in and guest users with left sidebar navigation
 - **Dual User Roles**: Customer shopping interface and admin management dashboard
-- **Product Management**: Full CRUD operations for products and categories
+- **Product Management**: Full CRUD operations for products and categories with multi-image upload
 - **Featured Categories**: Admin-manageable featured categories displayed on storefront. Admins toggle the Featured switch in category management to show/hide categories
 - **Smart Cart System**: LocalStorage-based cart for guests, database cart for authenticated users with automatic merge on login
 - **Checkout Auth Guard**: Login modal appears when guests attempt checkout, cart persists and merges after sign-in

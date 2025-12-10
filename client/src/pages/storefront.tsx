@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import StorefrontSidebar, { type StorefrontSection } from "@/components/storefront/StorefrontSidebar";
 import MobileHeader from "@/components/storefront/MobileHeader";
 import ProductsView from "@/components/storefront/ProductsView";
+import ProductDetailsView from "@/components/storefront/ProductDetailsView";
 import CategoriesView from "@/components/storefront/CategoriesView";
 import CartView from "@/components/storefront/CartView";
 import OrdersView from "@/components/storefront/OrdersView";
@@ -30,7 +31,7 @@ function isValidSection(section: string): section is StorefrontSection {
     "account",
     "cart",
     "help",
-  ].includes(section) || section.startsWith("category-");
+  ].includes(section) || section.startsWith("category-") || section.startsWith("product-");
 }
 
 export default function Storefront() {
@@ -56,18 +57,28 @@ export default function Storefront() {
   };
 
   const renderContent = () => {
+    if (activeSection.startsWith("product-")) {
+      const productId = activeSection.replace("product-", "");
+      return (
+        <ProductDetailsView 
+          productId={productId} 
+          onBack={() => handleSectionChange("products")} 
+        />
+      );
+    }
+
     if (activeSection.startsWith("category-")) {
       const categoryId = activeSection.replace("category-", "");
-      return <ProductsView categoryId={categoryId} />;
+      return <ProductsView categoryId={categoryId} onProductSelect={handleSectionChange} />;
     }
 
     switch (activeSection) {
       case "products":
-        return <ProductsView />;
+        return <ProductsView onProductSelect={handleSectionChange} />;
       case "categories":
         return <CategoriesView onCategorySelect={handleSectionChange} />;
       case "featured":
-        return <ProductsView featuredOnly title="Featured Products" />;
+        return <ProductsView featuredOnly title="Featured Products" onProductSelect={handleSectionChange} />;
       case "cart":
         return <CartView />;
       case "orders":
@@ -77,7 +88,7 @@ export default function Storefront() {
       case "help":
         return <HelpView />;
       default:
-        return <ProductsView />;
+        return <ProductsView onProductSelect={handleSectionChange} />;
     }
   };
 

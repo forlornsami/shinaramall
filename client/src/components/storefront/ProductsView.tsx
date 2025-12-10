@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Category, Product } from "@shared/schema";
+import type { StorefrontSection } from "./StorefrontSidebar";
 import {
   Search,
   Package,
@@ -34,9 +35,10 @@ interface ProductsViewProps {
   categoryId?: string;
   featuredOnly?: boolean;
   title?: string;
+  onProductSelect?: (section: StorefrontSection) => void;
 }
 
-export default function ProductsView({ categoryId, featuredOnly, title }: ProductsViewProps) {
+export default function ProductsView({ categoryId, featuredOnly, title, onProductSelect }: ProductsViewProps) {
   const { toast } = useToast();
   const { addToCart, isAddingToCart } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
@@ -360,6 +362,7 @@ export default function ProductsView({ categoryId, featuredOnly, title }: Produc
               key={product.id}
               product={product}
               onAddToCart={() => handleAddToCart(product.id, product.name)}
+              onProductClick={() => onProductSelect?.(`product-${product.id}`)}
               isAddingToCart={isAddingToCart}
               size={gridView === "large" ? "large" : "small"}
             />
@@ -373,11 +376,22 @@ export default function ProductsView({ categoryId, featuredOnly, title }: Produc
 interface ProductCardProps {
   product: Product;
   onAddToCart: () => void;
+  onProductClick?: () => void;
   isAddingToCart: boolean;
   size: "large" | "small";
 }
 
-function ProductCard({ product, onAddToCart, isAddingToCart, size }: ProductCardProps) {
+function getProductThumbnail(product: Product): string {
+  if (product.imageUrls && product.imageUrls.length > 0) {
+    return product.imageUrls[0];
+  }
+  if (product.imageUrl) {
+    return product.imageUrl;
+  }
+  return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400";
+}
+
+function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, size }: ProductCardProps) {
   const isSmall = size === "small";
   const hasDiscount = product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(product.price);
   const discountPercent = hasDiscount 
@@ -387,11 +401,12 @@ function ProductCard({ product, onAddToCart, isAddingToCart, size }: ProductCard
   return (
     <Card 
       className="group overflow-hidden border-0 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer bg-background"
+      onClick={onProductClick}
       data-testid={`card-product-${product.id}`}
     >
       <div className="relative overflow-hidden">
         <img
-          src={product.imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400"}
+          src={getProductThumbnail(product)}
           alt={product.name}
           className={cn(
             "w-full object-cover transition-transform duration-500 group-hover:scale-110",

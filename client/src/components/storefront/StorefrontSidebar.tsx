@@ -32,7 +32,8 @@ export type StorefrontSection =
   | "account" 
   | "cart" 
   | "help"
-  | `category-${string}`;
+  | `category-${string}`
+  | `product-${string}`;
 
 interface StorefrontSidebarProps {
   activeSection: StorefrontSection;
