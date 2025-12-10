@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getProductThumbnail } from "@/lib/utils";
 import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X } from "lucide-react";
 import type { Order, OrderItem, Product } from "@shared/schema";
 
@@ -667,7 +668,7 @@ export default function OrderManagement() {
                           <TableCell>
                             <div className="flex items-center space-x-3">
                               <img
-                                src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80"}
+                                src={getProductThumbnail(item.product)}
                                 alt={item.product.name}
                                 className="w-12 h-12 object-cover rounded"
                                 data-testid={`img-order-item-${item.id}`}

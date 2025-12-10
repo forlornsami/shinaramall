@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getProductThumbnail } from "@/lib/utils";
 import { Plus, Edit, Trash2, Search, Power, PowerOff, Upload, X, Star, GripVertical, ImageIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Product, Category } from "@shared/schema";
@@ -387,16 +388,6 @@ export default function ProductManagement() {
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  };
-
-  const getProductThumbnail = (product: Product) => {
-    if (product.imageUrls && product.imageUrls.length > 0) {
-      return product.imageUrls[0];
-    }
-    if (product.imageUrl) {
-      return product.imageUrl;
-    }
-    return "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80";
   };
 
   const filteredProducts = products?.filter((product: Product) => {

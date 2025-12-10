@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
+import { cn, getProductThumbnail } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -381,16 +382,6 @@ interface ProductCardProps {
   size: "large" | "small";
 }
 
-function getProductThumbnail(product: Product): string {
-  if (product.imageUrls && product.imageUrls.length > 0) {
-    return product.imageUrls[0];
-  }
-  if (product.imageUrl) {
-    return product.imageUrl;
-  }
-  return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400";
-}
-
 function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, size }: ProductCardProps) {
   const isSmall = size === "small";
   const hasDiscount = product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(product.price);
@@ -489,8 +480,4 @@ function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, siz
       </CardContent>
     </Card>
   );
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
 }
