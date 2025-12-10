@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/contexts/CartContext";
+import { useWishlistSafe } from "@/contexts/WishlistContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getProductThumbnail } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -389,17 +390,18 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, size, defaultProductImage }: ProductCardProps) {
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const { toast } = useToast();
+  const { isInWishlist, toggleWishlist } = useWishlistSafe();
   const isSmall = size === "small";
   const hasDiscount = product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(product.price);
   const discountPercent = hasDiscount 
     ? Math.round((1 - parseFloat(product.price) / parseFloat(product.compareAtPrice!)) * 100)
     : 0;
+  const isWishlisted = isInWishlist(product.id);
 
   const handleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
+    toggleWishlist(product.id);
     toast({
       title: isWishlisted ? "Removed from wishlist" : "Added to wishlist",
       description: isWishlisted 

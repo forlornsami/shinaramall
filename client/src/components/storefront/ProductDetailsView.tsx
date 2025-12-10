@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
+import { useWishlist } from "@/contexts/WishlistContext";
 import { getDefaultProductPlaceholder } from "@/lib/utils";
 import SEO from "@/components/SEO";
 import { 
@@ -39,7 +40,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
   const [quantity, setQuantity] = useState(1);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
   const { data: product, isLoading } = useQuery<Product>({
     queryKey: ['/api/products', productId],
@@ -108,12 +109,14 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
   };
 
   const handleWishlist = () => {
-    setIsWishlisted(!isWishlisted);
+    if (!product) return;
+    const wasInWishlist = isInWishlist(product.id);
+    toggleWishlist(product.id);
     toast({
-      title: isWishlisted ? "Removed from wishlist" : "Added to wishlist",
-      description: isWishlisted 
-        ? `${product?.name} removed from your wishlist`
-        : `${product?.name} added to your wishlist`,
+      title: wasInWishlist ? "Removed from wishlist" : "Added to wishlist",
+      description: wasInWishlist 
+        ? `${product.name} removed from your wishlist`
+        : `${product.name} added to your wishlist`,
     });
   };
 
@@ -427,13 +430,13 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
               </Button>
               <Button
                 size="lg"
-                variant={isWishlisted ? "default" : "outline"}
+                variant={isInWishlist(product.id) ? "default" : "outline"}
                 className="gap-2"
                 onClick={handleWishlist}
                 data-testid="button-wishlist"
               >
-                <Heart className={`w-5 h-5 ${isWishlisted ? "fill-current" : ""}`} />
-                <span className="sm:hidden lg:inline">{isWishlisted ? "Wishlisted" : "Wishlist"}</span>
+                <Heart className={`w-5 h-5 ${isInWishlist(product.id) ? "fill-current" : ""}`} />
+                <span className="sm:hidden lg:inline">{isInWishlist(product.id) ? "Wishlisted" : "Wishlist"}</span>
               </Button>
               <Button
                 size="lg"

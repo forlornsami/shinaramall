@@ -179,3 +179,18 @@ export function useWishlist() {
   }
   return context;
 }
+
+export function useWishlistSafe() {
+  const context = useContext(WishlistContext);
+  return context ?? {
+    items: [],
+    itemCount: 0,
+    isLoading: false,
+    isInWishlist: () => false,
+    toggleWishlist: () => {},
+    addToWishlist: () => {},
+    removeFromWishlist: () => {},
+    clearWishlist: () => {},
+    isToggling: false,
+  };
+}

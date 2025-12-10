@@ -11,6 +11,7 @@ import AccountView from "@/components/storefront/AccountView";
 import HelpView from "@/components/storefront/HelpView";
 import { ChatWidget } from "@/components/storefront/ChatWidget";
 import { CartProvider } from "@/contexts/CartContext";
+import { WishlistProvider } from "@/contexts/WishlistContext";
 import { useAuth } from "@/hooks/useAuth";
 import SEO from "@/components/SEO";
 
@@ -115,37 +116,39 @@ export default function Storefront() {
 
   return (
     <CartProvider>
-      {seoData && (
-        <SEO 
-          title={seoData.title} 
-          description={seoData.description}
-          url={typeof window !== 'undefined' ? window.location.href : undefined}
-        />
-      )}
-      <div className="min-h-screen bg-background">
-        <StorefrontSidebar
-          activeSection={activeSection}
-          onSectionChange={handleSectionChange}
-        />
-        
-        <MobileHeader
-          activeSection={activeSection}
-          onSectionChange={handleSectionChange}
-        />
-
-        <main className="lg:ml-72 pt-16 lg:pt-0 min-h-screen">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {renderContent()}
-          </div>
-        </main>
-
-        {isAuthenticated && user && (
-          <ChatWidget 
-            userId={user.id} 
-            userName={user.firstName || user.email || 'Customer'} 
+      <WishlistProvider>
+        {seoData && (
+          <SEO 
+            title={seoData.title} 
+            description={seoData.description}
+            url={typeof window !== 'undefined' ? window.location.href : undefined}
           />
         )}
-      </div>
+        <div className="min-h-screen bg-background">
+          <StorefrontSidebar
+            activeSection={activeSection}
+            onSectionChange={handleSectionChange}
+          />
+          
+          <MobileHeader
+            activeSection={activeSection}
+            onSectionChange={handleSectionChange}
+          />
+
+          <main className="lg:ml-72 pt-16 lg:pt-0 min-h-screen">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {renderContent()}
+            </div>
+          </main>
+
+          {isAuthenticated && user && (
+            <ChatWidget 
+              userId={user.id} 
+              userName={user.firstName || user.email || 'Customer'} 
+            />
+          )}
+        </div>
+      </WishlistProvider>
     </CartProvider>
   );
 }
