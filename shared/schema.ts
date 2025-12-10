@@ -326,6 +326,7 @@ export const insertAdminUserSchema = createInsertSchema(adminUsers).pick({
   role: true,
   roleId: true,
   isActive: true,
+  profilePicture: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).pick({
@@ -603,7 +604,9 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
+export const insertNotificationSchema = createInsertSchema(notifications, {
+  data: z.record(z.any()).optional(),
+}).omit({
   id: true,
   createdAt: true,
 });

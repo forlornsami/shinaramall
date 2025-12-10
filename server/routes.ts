@@ -5,6 +5,7 @@ import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateT
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
+import { shouldSendAdminNotification, invalidateNotificationSettingsCache, type NotificationType } from "./notificationHelper";
 
 // Admin JWT middleware
 const adminAuth = async (req: any, res: any, next: any) => {
@@ -373,7 +374,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedAdmin = await storage.updateAdminUser(adminId, {
         profilePicture: imageData,
-        updatedAt: new Date(),
       });
       
       res.json({ success: true, profilePicture: updatedAdmin.profilePicture });
@@ -390,7 +390,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.updateAdminUser(adminId, {
         profilePicture: null,
-        updatedAt: new Date(),
       });
       
       res.json({ success: true, message: "Profile picture deleted" });
@@ -1104,16 +1103,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.increaseProductStock(item.productId, item.quantity);
       }
       
-      // Create admin notification
-      const user = await storage.getUser(userId);
-      const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
-      await storage.createNotification({
-        recipientType: 'admin',
-        type: 'order_status_update',
-        title: 'Order Cancelled by Customer',
-        message: `Order #${order.id.slice(-8).toUpperCase()} was cancelled by ${customerName}`,
-        data: { orderId, userId, reason: 'customer_requested' },
-      });
+      // Create admin notification (respecting preferences)
+      if (await shouldSendAdminNotification('order_status_update')) {
+        const user = await storage.getUser(userId);
+        const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
+        await storage.createNotification({
+          recipientType: 'admin',
+          type: 'order_status_update',
+          title: 'Order Cancelled by Customer',
+          message: `Order #${order.id.slice(-8).toUpperCase()} was cancelled by ${customerName}`,
+          data: { orderId, userId, reason: 'customer_requested' },
+        });
+      }
       
       res.json({ success: true, message: "Order cancelled successfully" });
     } catch (error) {
@@ -1184,29 +1185,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return order with items
       const orderWithItems = await storage.getOrderWithItems(order.id);
       
-      // Create admin notification for new order
+      // Create admin notification for new order (respecting preferences)
       try {
         const user = await storage.getUser(userId);
         const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
-        await storage.createNotification({
-          recipientType: 'admin',
-          type: 'order_placed',
-          title: 'New Order Received',
-          message: `New order #${order.id.slice(-8).toUpperCase()} from ${customerName} for Rs. ${parseFloat(order.total).toLocaleString()}`,
-          data: { orderId: order.id, userId, total: order.total },
-        });
         
-        // Check for low stock and create notifications
-        for (const cartItem of cartItems) {
-          const updatedProduct = await storage.getProduct(cartItem.productId);
-          if (updatedProduct && updatedProduct.stock <= 10) {
-            await storage.createNotification({
-              recipientType: 'admin',
-              type: 'low_stock',
-              title: 'Low Stock Alert',
-              message: `Product "${updatedProduct.name}" is running low. Only ${updatedProduct.stock} units left.`,
-              data: { productId: updatedProduct.id, currentStock: updatedProduct.stock },
-            });
+        if (await shouldSendAdminNotification('order_placed')) {
+          await storage.createNotification({
+            recipientType: 'admin',
+            type: 'order_placed',
+            title: 'New Order Received',
+            message: `New order #${order.id.slice(-8).toUpperCase()} from ${customerName} for Rs. ${parseFloat(order.total).toLocaleString()}`,
+            data: { orderId: order.id, userId, total: order.total },
+          });
+        }
+        
+        // Check for low stock and create notifications (respecting preferences)
+        if (await shouldSendAdminNotification('low_stock')) {
+          for (const cartItem of cartItems) {
+            const updatedProduct = await storage.getProduct(cartItem.productId);
+            if (updatedProduct && updatedProduct.stock <= 10) {
+              await storage.createNotification({
+                recipientType: 'admin',
+                type: 'low_stock',
+                title: 'Low Stock Alert',
+                message: `Product "${updatedProduct.name}" is running low. Only ${updatedProduct.stock} units left.`,
+                data: { productId: updatedProduct.id, currentStock: updatedProduct.stock },
+              });
+            }
           }
         }
       } catch (notificationError) {
@@ -1289,6 +1295,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status,
           paymentStatus,
         });
+      }
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
       }
       
       // Create customer notification for order status update
@@ -2049,7 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'storeName', 'storeLogo', 'storeEmail', 'storePhone', 'storeAddress',
         'currency', 'timezone', 'language',
         'orderNotifications', 'stockAlerts', 'customerRegistrations',
-        'paymentUpdates', 'marketingEmails', 'defaultProductImage'
+        'paymentUpdates', 'marketingEmails', 'defaultProductImage', 'defaultCategoryImage'
       ];
       
       for (const field of allowedFields) {
@@ -2059,6 +2069,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updated = await storage.updateStoreSettings(updateData);
+      
+      // Invalidate notification settings cache when preferences change
+      invalidateNotificationSettingsCache();
+      
       res.json(updated);
     } catch (error) {
       console.error("Error updating store settings:", error);
