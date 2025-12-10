@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
+import { getDefaultProductPlaceholder } from "@/lib/utils";
 import { 
   ShoppingCart, 
   Heart, 
@@ -22,7 +23,7 @@ import {
   ZoomIn,
   X
 } from "lucide-react";
-import type { Product, Category } from "@shared/schema";
+import type { Product, Category, StoreSettings } from "@shared/schema";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface ProductDetailsViewProps {
@@ -51,6 +52,10 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
     queryKey: ['/api/categories'],
   });
 
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
   const getProductImages = (product: Product): string[] => {
     const images: string[] = [];
     
@@ -61,7 +66,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
     }
     
     if (images.length === 0) {
-      images.push("https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800");
+      images.push(getDefaultProductPlaceholder(storeSettings?.defaultProductImage));
     }
     
     return images;
