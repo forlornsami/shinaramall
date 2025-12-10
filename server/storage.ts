@@ -72,7 +72,8 @@ export interface IStorage {
   // User operations (Internal Auth)
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string }): Promise<User>;
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
+  createUser(user: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string; emailVerificationToken?: string; emailVerificationExpires?: Date }): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
   getAllCustomers(): Promise<SafeUser[]>;
   
@@ -244,7 +245,12 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(userData: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string }): Promise<User> {
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.emailVerificationToken, token));
+    return user;
+  }
+
+  async createUser(userData: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string; emailVerificationToken?: string; emailVerificationExpires?: Date }): Promise<User> {
     const [user] = await db
       .insert(users)
       .values({
@@ -254,6 +260,8 @@ export class DatabaseStorage implements IStorage {
         lastName: userData.lastName,
         mobile: userData.mobile,
         isActive: true,
+        emailVerificationToken: userData.emailVerificationToken,
+        emailVerificationExpires: userData.emailVerificationExpires,
       })
       .returning();
     

@@ -4,8 +4,10 @@ import { storage } from "./storage";
 import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateToken, toSafeUser } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
 import { shouldSendAdminNotification, invalidateNotificationSettingsCache, type NotificationType } from "./notificationHelper";
+import { sendVerificationEmail, sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendPaymentVerifiedEmail, sendPasswordResetEmail } from "./emailService";
 
 // Admin JWT middleware
 const adminAuth = async (req: any, res: any, next: any) => {
@@ -51,6 +53,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email already registered" });
       }
 
+      // Generate email verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
       // Hash password and create user
       const passwordHash = await hashPassword(password);
       const user = await storage.createUser({
@@ -59,7 +65,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName,
         lastName,
         mobile,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires,
       });
+
+      // Send verification email (non-blocking)
+      sendVerificationEmail(email, firstName || '', verificationToken)
+        .then(result => {
+          if (!result.success) {
+            console.error('Failed to send verification email:', result.error);
+          }
+        })
+        .catch(err => console.error('Verification email error:', err));
 
       // Generate token
       const token = generateToken({ userId: user.id, email: user.email });
@@ -67,6 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({
         token,
         user: toSafeUser(user),
+        message: "Registration successful! Please check your email to verify your account.",
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -113,6 +131,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Verify email
+  app.get('/api/auth/verify-email', async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ message: "Verification token is required" });
+      }
+
+      const user = await storage.getUserByVerificationToken(token);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+
+      if (user.emailVerificationExpires && new Date() > user.emailVerificationExpires) {
+        return res.status(400).json({ message: "Verification token has expired. Please request a new one." });
+      }
+
+      // Mark email as verified
+      await storage.updateUser(user.id, {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+        updatedAt: new Date(),
+      });
+
+      res.json({ success: true, message: "Email verified successfully!" });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+  // Resend verification email
+  app.post('/api/auth/resend-verification', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ message: "Email is already verified" });
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await storage.updateUser(userId, {
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires,
+        updatedAt: new Date(),
+      });
+
+      // Send verification email
+      const result = await sendVerificationEmail(user.email, user.firstName || '', verificationToken);
+      
+      if (!result.success) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+
+      res.json({ success: true, message: "Verification email sent!" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to send verification email" });
     }
   });
 
@@ -1219,6 +1308,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error creating order notification:", notificationError);
       }
       
+      // Send order confirmation email to customer (non-blocking)
+      try {
+        const user = await storage.getUser(userId);
+        if (user?.email) {
+          sendOrderConfirmationEmail(
+            user.email,
+            user.firstName || '',
+            order.id,
+            order.total,
+            orderData.paymentMethod
+          ).catch(err => console.error('Order confirmation email error:', err));
+        }
+      } catch (emailError) {
+        console.error("Error sending order confirmation email:", emailError);
+      }
+      
       res.json(orderWithItems);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -1320,6 +1425,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: statusMessages[status] || `Your order status changed to ${status}.`,
             data: { orderId: order.id, status, previousStatus: originalOrder.status },
           });
+          
+          // Send order status update email
+          const user = await storage.getUser(order.userId);
+          if (user?.email) {
+            sendOrderStatusUpdateEmail(
+              user.email,
+              user.firstName || '',
+              order.id,
+              status
+            ).catch(err => console.error('Order status email error:', err));
+          }
         } catch (notificationError) {
           console.error("Error creating order update notification:", notificationError);
         }
@@ -2000,6 +2116,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Payment for order #${order.orderNumber} has been ${approved ? 'approved' : 'rejected'}.`,
         data: { orderId: order.id, orderNumber: order.orderNumber },
       });
+
+      // Send payment verified email to customer if approved
+      if (approved && order.userId) {
+        try {
+          const user = await storage.getUser(order.userId);
+          if (user?.email) {
+            sendPaymentVerifiedEmail(
+              user.email,
+              user.firstName || '',
+              order.id,
+              order.total
+            ).catch(err => console.error('Payment verified email error:', err));
+          }
+        } catch (emailError) {
+          console.error("Error sending payment verified email:", emailError);
+        }
+      }
 
       res.json({ 
         message: `Payment ${approved ? 'approved' : 'rejected'} successfully`,
