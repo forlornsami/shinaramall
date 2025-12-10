@@ -19,7 +19,8 @@ import {
   ShoppingBag,
   CreditCard,
   Users,
-  Settings
+  Settings,
+  Heart
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
@@ -27,6 +28,16 @@ const faqItems = [
   {
     question: "How do I add a new product?",
     answer: "Navigate to the Products section from the sidebar, then click the 'Add Product' button. Fill in the product details including name, description, price, category, and images. Click 'Save' to add the product to your catalog.",
+    category: "Products",
+  },
+  {
+    question: "How do customers use the wishlist?",
+    answer: "Customers can add products to their wishlist by clicking the heart icon on product cards or product detail pages. Guest users' wishlists are saved locally and automatically merge with their account when they sign in. Authenticated users' wishlists are saved to their account and persist across devices.",
+    category: "Customers",
+  },
+  {
+    question: "How does product sharing work?",
+    answer: "Customers can share products using the Share button on product detail pages. On mobile devices, this opens the native share menu. On desktop, the product URL is copied to their clipboard. This helps drive organic traffic to your store.",
     category: "Products",
   },
   {
@@ -71,6 +82,7 @@ const quickLinks = [
   { title: "Order Processing Tutorial", icon: ShoppingBag, color: "from-orange-500 to-orange-600" },
   { title: "Payment Setup Guide", icon: CreditCard, color: "from-green-500 to-green-600" },
   { title: "User Roles & Permissions", icon: Users, color: "from-blue-500 to-blue-600" },
+  { title: "Customer Features (Wishlist & Sharing)", icon: Heart, color: "from-pink-500 to-pink-600" },
 ];
 
 export default function HelpCenterSection() {
