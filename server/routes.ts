@@ -934,6 +934,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Wishlist routes
+  app.get('/api/wishlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const wishlistItems = await storage.getWishlistItems(userId);
+      res.json(wishlistItems);
+    } catch (error) {
+      console.error("Error fetching wishlist:", error);
+      res.status(500).json({ message: "Failed to fetch wishlist" });
+    }
+  });
+
+  app.post('/api/wishlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { productId } = req.body;
+      
+      if (!productId) {
+        return res.status(400).json({ message: "Product ID is required" });
+      }
+      
+      const wishlistItem = await storage.addToWishlist({ userId, productId });
+      res.json(wishlistItem);
+    } catch (error) {
+      console.error("Error adding to wishlist:", error);
+      res.status(500).json({ message: "Failed to add to wishlist" });
+    }
+  });
+
+  app.delete('/api/wishlist/:productId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const success = await storage.removeFromWishlist(userId, req.params.productId);
+      if (!success) {
+        return res.status(404).json({ message: "Wishlist item not found" });
+      }
+      res.json({ message: "Item removed from wishlist" });
+    } catch (error) {
+      console.error("Error removing from wishlist:", error);
+      res.status(500).json({ message: "Failed to remove from wishlist" });
+    }
+  });
+
+  app.get('/api/wishlist/check/:productId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const isInWishlist = await storage.isInWishlist(userId, req.params.productId);
+      res.json({ isInWishlist });
+    } catch (error) {
+      console.error("Error checking wishlist:", error);
+      res.status(500).json({ message: "Failed to check wishlist" });
+    }
+  });
+
+  app.delete('/api/wishlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      await storage.clearWishlist(userId);
+      res.json({ message: "Wishlist cleared" });
+    } catch (error) {
+      console.error("Error clearing wishlist:", error);
+      res.status(500).json({ message: "Failed to clear wishlist" });
+    }
+  });
+
+  app.post('/api/wishlist/merge', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { items } = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
+      
+      for (const productId of items) {
+        if (productId) {
+          await storage.addToWishlist({ userId, productId });
+        }
+      }
+      
+      const mergedWishlist = await storage.getWishlistItems(userId);
+      res.json(mergedWishlist);
+    } catch (error) {
+      console.error("Error merging wishlist:", error);
+      res.status(500).json({ message: "Failed to merge wishlist" });
+    }
+  });
+
   // Order routes
   app.get('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
