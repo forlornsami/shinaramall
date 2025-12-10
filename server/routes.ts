@@ -1317,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             user.firstName || '',
             order.id,
             order.total,
-            orderData.paymentMethod
+            orderData.paymentMethod || 'Unknown'
           ).catch(err => console.error('Order confirmation email error:', err));
         }
       } catch (emailError) {

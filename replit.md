@@ -45,10 +45,16 @@ Preferred communication style: Simple, everyday language.
 - **Real-time Communication**:
     - **Live Chat Support**: Customer-to-agent chat with WebSocket, agent assignment, and notification integration.
     - **Team Chat System**: Internal admin communication (direct and group chats) with WebSocket, presence indicators, and unread counts.
-- **Notification System**: In-app notifications for both admin and customer users based on events (e.g., new orders, low stock, chat messages) with polling for updates.
+- **Notification System**: In-app notifications for both admin and customer users based on events (e.g., new orders, low stock, chat messages) with polling for updates. Admin notification preferences are configurable in settings.
+- **Email Service**: Resend-powered transactional emails for:
+    - **Email Verification**: Sent on registration with 24-hour expiry tokens.
+    - **Order Confirmation**: Sent when customer places an order.
+    - **Payment Verified**: Sent when admin approves payment.
+    - **Order Status Updates**: Sent when order status changes (processing, shipped, delivered, cancelled).
+    - **Password Reset**: Available for account recovery.
 - **Wishlist**: Persistent wishlist for authenticated users (DB-backed) and guest users (localStorage), with automatic merge on login.
 - **Store Customization**: Admin can upload store logo and change store name, affecting UI dynamically.
-- **Security**: Password change, active session management, robust validation.
+- **Security**: Password change, active session management, robust validation, email verification.
 
 # External Dependencies
 
