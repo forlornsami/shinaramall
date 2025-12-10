@@ -1,20 +1,37 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Package, Truck, CheckCircle, XCircle } from "lucide-react";
+import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X } from "lucide-react";
 import type { Order, OrderItem, Product } from "@shared/schema";
+
+type SortField = 'orderNumber' | 'customer' | 'amount' | 'status' | 'paymentStatus' | 'date';
+type SortDirection = 'asc' | 'desc';
 
 export default function OrderManagement() {
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  
+  // Sort states
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Fetch orders
   const { data: orders, isLoading } = useQuery({
@@ -65,7 +82,6 @@ export default function OrderManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders', selectedOrder?.id] });
-      // Also invalidate payment transactions to sync status changes
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-analytics'] });
       toast({
@@ -81,6 +97,117 @@ export default function OrderManagement() {
       });
     },
   });
+
+  // Filter and sort orders
+  const filteredAndSortedOrders = useMemo(() => {
+    if (!orders) return [];
+    
+    let filtered = orders.filter((order: Order) => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const customerName = `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.toLowerCase();
+        const orderNum = order.orderNumber?.toLowerCase() || '';
+        if (!customerName.includes(query) && !orderNum.includes(query)) {
+          return false;
+        }
+      }
+      
+      // Status filter
+      if (statusFilter !== "all" && order.status !== statusFilter) {
+        return false;
+      }
+      
+      // Payment status filter
+      if (paymentStatusFilter !== "all" && order.paymentStatus !== paymentStatusFilter) {
+        return false;
+      }
+      
+      // Payment method filter
+      if (paymentMethodFilter !== "all" && order.paymentMethod !== paymentMethodFilter) {
+        return false;
+      }
+      
+      // Date range filter
+      if (dateFrom && order.createdAt) {
+        const orderDate = new Date(order.createdAt);
+        const fromDate = new Date(dateFrom);
+        if (orderDate < fromDate) return false;
+      }
+      
+      if (dateTo && order.createdAt) {
+        const orderDate = new Date(order.createdAt);
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        if (orderDate > toDate) return false;
+      }
+      
+      return true;
+    });
+    
+    // Sort
+    filtered.sort((a: Order, b: Order) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'orderNumber':
+          comparison = (a.orderNumber || '').localeCompare(b.orderNumber || '');
+          break;
+        case 'customer':
+          const nameA = `${a.shippingAddress?.firstName || ''} ${a.shippingAddress?.lastName || ''}`;
+          const nameB = `${b.shippingAddress?.firstName || ''} ${b.shippingAddress?.lastName || ''}`;
+          comparison = nameA.localeCompare(nameB);
+          break;
+        case 'amount':
+          comparison = parseFloat(a.total) - parseFloat(b.total);
+          break;
+        case 'status':
+          comparison = (a.status || '').localeCompare(b.status || '');
+          break;
+        case 'paymentStatus':
+          comparison = (a.paymentStatus || '').localeCompare(b.paymentStatus || '');
+          break;
+        case 'date':
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          comparison = dateA - dateB;
+          break;
+      }
+      
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    
+    return filtered;
+  }, [orders, searchQuery, statusFilter, paymentStatusFilter, paymentMethodFilter, dateFrom, dateTo, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1" />
+      : <ArrowDown className="w-4 h-4 ml-1" />;
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setPaymentStatusFilter("all");
+    setPaymentMethodFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || paymentStatusFilter !== "all" || paymentMethodFilter !== "all" || dateFrom || dateTo;
 
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -149,6 +276,125 @@ export default function OrderManagement() {
         </h2>
       </div>
 
+      {/* Filters */}
+      <Card data-testid="card-filters">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              Filters
+            </CardTitle>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+                <X className="w-4 h-4 mr-1" />
+                Clear All
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {/* Search */}
+            <div className="space-y-2">
+              <Label htmlFor="search">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  placeholder="Order # or customer..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-orders"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="space-y-2">
+              <Label>Order Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger data-testid="select-status-filter">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Status Filter */}
+            <div className="space-y-2">
+              <Label>Payment Status</Label>
+              <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+                <SelectTrigger data-testid="select-payment-status-filter">
+                  <SelectValue placeholder="All Payment Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Payment Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Method Filter */}
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
+                <SelectTrigger data-testid="select-payment-method-filter">
+                  <SelectValue placeholder="All Methods" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  <SelectItem value="easypaisa">EasyPaisa</SelectItem>
+                  <SelectItem value="jazzcash">JazzCash</SelectItem>
+                  <SelectItem value="hbl_bank">HBL Bank</SelectItem>
+                  <SelectItem value="cod">Cash on Delivery</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date From */}
+            <div className="space-y-2">
+              <Label htmlFor="dateFrom">From Date</Label>
+              <Input
+                id="dateFrom"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                data-testid="input-date-from"
+              />
+            </div>
+
+            {/* Date To */}
+            <div className="space-y-2">
+              <Label htmlFor="dateTo">To Date</Label>
+              <Input
+                id="dateTo"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                data-testid="input-date-to"
+              />
+            </div>
+          </div>
+          
+          {/* Results count */}
+          <div className="mt-4 text-sm text-muted-foreground">
+            Showing {filteredAndSortedOrders.length} of {orders?.length || 0} orders
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Orders Table */}
       <Card data-testid="card-orders-table">
         <CardHeader>
@@ -168,101 +414,159 @@ export default function OrderManagement() {
                 ))}
               </div>
             </div>
-          ) : !orders || orders.length === 0 ? (
+          ) : !filteredAndSortedOrders || filteredAndSortedOrders.length === 0 ? (
             <div className="p-6 text-center" data-testid="text-no-orders">
-              <p className="text-muted-foreground">No orders found</p>
+              <p className="text-muted-foreground">
+                {hasActiveFilters ? "No orders match your filters" : "No orders found"}
+              </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead data-testid="header-order-number">Order Number</TableHead>
-                  <TableHead data-testid="header-customer">Customer</TableHead>
-                  <TableHead data-testid="header-amount">Amount</TableHead>
-                  <TableHead data-testid="header-status">Status</TableHead>
-                  <TableHead data-testid="header-payment">Payment</TableHead>
-                  <TableHead data-testid="header-date">Date</TableHead>
-                  <TableHead data-testid="header-actions">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order: Order) => (
-                  <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                    <TableCell className="font-medium" data-testid={`text-order-number-${order.id}`}>
-                      {order.orderNumber}
-                    </TableCell>
-                    <TableCell data-testid={`text-order-customer-${order.id}`}>
-                      {order.shippingAddress?.firstName} {order.shippingAddress?.lastName}
-                    </TableCell>
-                    <TableCell data-testid={`text-order-amount-${order.id}`}>
-                      Rs. {parseFloat(order.total).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(order.status)} data-testid={`badge-order-status-${order.id}`}>
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </Badge>
-                        <Select
-                          value={order.status}
-                          onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, status: value })}
-                        >
-                          <SelectTrigger className="w-32 h-8" data-testid={`select-order-status-${order.id}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending" data-testid="option-pending">Pending</SelectItem>
-                            <SelectItem value="processing" data-testid="option-processing">Processing</SelectItem>
-                            <SelectItem value="shipped" data-testid="option-shipped">Shipped</SelectItem>
-                            <SelectItem value="delivered" data-testid="option-delivered">Delivered</SelectItem>
-                            <SelectItem value="cancelled" data-testid="option-cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('orderNumber')}
+                      data-testid="header-order-number"
+                    >
+                      <div className="flex items-center">
+                        Order Number
+                        <SortIcon field="orderNumber" />
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('customer')}
+                      data-testid="header-customer"
+                    >
+                      <div className="flex items-center">
+                        Customer
+                        <SortIcon field="customer" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('amount')}
+                      data-testid="header-amount"
+                    >
+                      <div className="flex items-center">
+                        Amount
+                        <SortIcon field="amount" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('status')}
+                      data-testid="header-status"
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon field="status" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('paymentStatus')}
+                      data-testid="header-payment"
+                    >
+                      <div className="flex items-center">
+                        Payment
+                        <SortIcon field="paymentStatus" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('date')}
+                      data-testid="header-date"
+                    >
+                      <div className="flex items-center">
+                        Date
+                        <SortIcon field="date" />
+                      </div>
+                    </TableHead>
+                    <TableHead data-testid="header-actions">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedOrders.map((order: Order) => (
+                    <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-order-number-${order.id}`}>
+                        {order.orderNumber}
+                      </TableCell>
+                      <TableCell data-testid={`text-order-customer-${order.id}`}>
+                        {order.shippingAddress?.firstName} {order.shippingAddress?.lastName}
+                      </TableCell>
+                      <TableCell data-testid={`text-order-amount-${order.id}`}>
+                        Rs. {parseFloat(order.total).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
-                            {getPaymentStatusLabel(order.paymentStatus)}
+                          <Badge className={getStatusColor(order.status)} data-testid={`badge-order-status-${order.id}`}>
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                           </Badge>
                           <Select
-                            value={order.paymentStatus}
-                            onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, paymentStatus: value })}
+                            value={order.status}
+                            onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, status: value })}
                           >
-                            <SelectTrigger className="w-28 h-8" data-testid={`select-payment-status-${order.id}`}>
+                            <SelectTrigger className="w-32 h-8" data-testid={`select-order-status-${order.id}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending" data-testid="option-payment-pending">Pending</SelectItem>
-                              <SelectItem value="processing" data-testid="option-payment-processing">Processing</SelectItem>
-                              <SelectItem value="completed" data-testid="option-payment-completed">Completed</SelectItem>
-                              <SelectItem value="failed" data-testid="option-payment-failed">Failed</SelectItem>
-                              <SelectItem value="refunded" data-testid="option-payment-refunded">Refunded</SelectItem>
+                              <SelectItem value="pending" data-testid="option-pending">Pending</SelectItem>
+                              <SelectItem value="processing" data-testid="option-processing">Processing</SelectItem>
+                              <SelectItem value="shipped" data-testid="option-shipped">Shipped</SelectItem>
+                              <SelectItem value="delivered" data-testid="option-delivered">Delivered</SelectItem>
+                              <SelectItem value="cancelled" data-testid="option-cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="text-xs text-muted-foreground" data-testid={`text-payment-method-${order.id}`}>
-                          {order.paymentMethod?.toUpperCase()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center space-x-2">
+                            <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
+                              {getPaymentStatusLabel(order.paymentStatus)}
+                            </Badge>
+                            <Select
+                              value={order.paymentStatus}
+                              onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, paymentStatus: value })}
+                            >
+                              <SelectTrigger className="w-28 h-8" data-testid={`select-payment-status-${order.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending" data-testid="option-payment-pending">Pending</SelectItem>
+                                <SelectItem value="processing" data-testid="option-payment-processing">Processing</SelectItem>
+                                <SelectItem value="completed" data-testid="option-payment-completed">Completed</SelectItem>
+                                <SelectItem value="failed" data-testid="option-payment-failed">Failed</SelectItem>
+                                <SelectItem value="refunded" data-testid="option-payment-refunded">Refunded</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="text-xs text-muted-foreground" data-testid={`text-payment-method-${order.id}`}>
+                            {order.paymentMethod?.toUpperCase()}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm" data-testid={`text-order-date-${order.id}`}>
-                      {formatDate(order.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewOrder(order)}
-                        data-testid={`button-view-order-${order.id}`}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      </TableCell>
+                      <TableCell className="text-sm" data-testid={`text-order-date-${order.id}`}>
+                        {formatDate(order.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewOrder(order)}
+                          data-testid={`button-view-order-${order.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -278,7 +582,7 @@ export default function OrderManagement() {
           {orderDetails && (
             <div className="space-y-6" data-testid="order-details-content">
               {/* Order Summary */}
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Order Information</CardTitle>
