@@ -86,7 +86,7 @@ export default function ProductManagement() {
     mutationFn: async (defaultProductImage: string | null) => {
       const token = localStorage.getItem('adminToken');
       const response = await fetch('/api/admin/store-settings', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
