@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getProductThumbnail } from "@/lib/utils";
-import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X } from "lucide-react";
+import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X, AlertTriangle } from "lucide-react";
 import type { Order, OrderItem, Product, StoreSettings } from "@shared/schema";
 
 type SortField = 'orderNumber' | 'customer' | 'amount' | 'status' | 'paymentStatus' | 'date';
@@ -21,6 +22,11 @@ export default function OrderManagement() {
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  
+  // Cancel order dialog states
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [refundFullToWallet, setRefundFullToWallet] = useState(false);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,10 +74,11 @@ export default function OrderManagement() {
 
   // Update order status
   const updateOrderMutation = useMutation({
-    mutationFn: async ({ orderId, status, paymentStatus }: { 
+    mutationFn: async ({ orderId, status, paymentStatus, refundFullToWallet }: { 
       orderId: string; 
       status?: string; 
-      paymentStatus?: string; 
+      paymentStatus?: string;
+      refundFullToWallet?: boolean;
     }) => {
       const token = localStorage.getItem('adminToken');
       const response = await fetch(`/api/admin/orders/${orderId}`, {
@@ -80,7 +87,7 @@ export default function OrderManagement() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ status, paymentStatus }),
+        body: JSON.stringify({ status, paymentStatus, refundFullToWallet }),
       });
       if (!response.ok) throw new Error('Failed to update order');
       return response.json();
@@ -90,10 +97,15 @@ export default function OrderManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders', selectedOrder?.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/payment-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/wallets'] });
       toast({
         title: "Success",
         description: "Order updated successfully",
       });
+      // Close cancel dialog if open
+      setIsCancelDialogOpen(false);
+      setOrderToCancel(null);
+      setRefundFullToWallet(false);
     },
     onError: (error) => {
       toast({
@@ -103,6 +115,28 @@ export default function OrderManagement() {
       });
     },
   });
+  
+  // Handle status change - intercept cancellation
+  const handleStatusChange = (order: Order, newStatus: string) => {
+    if (newStatus === 'cancelled') {
+      setOrderToCancel(order);
+      setRefundFullToWallet(false);
+      setIsCancelDialogOpen(true);
+    } else {
+      updateOrderMutation.mutate({ orderId: order.id, status: newStatus });
+    }
+  };
+  
+  // Confirm cancellation
+  const handleConfirmCancel = () => {
+    if (orderToCancel) {
+      updateOrderMutation.mutate({
+        orderId: orderToCancel.id,
+        status: 'cancelled',
+        refundFullToWallet,
+      });
+    }
+  };
 
   // Filter and sort orders
   const filteredAndSortedOrders = useMemo(() => {
@@ -513,7 +547,7 @@ export default function OrderManagement() {
                           </Badge>
                           <Select
                             value={order.status}
-                            onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, status: value })}
+                            onValueChange={(value) => handleStatusChange(order, value)}
                           >
                             <SelectTrigger className="w-32 h-8" data-testid={`select-order-status-${order.id}`}>
                               <SelectValue />
@@ -715,6 +749,93 @@ export default function OrderManagement() {
               </Card>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Order Confirmation Dialog */}
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Cancel Order
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel order #{orderToCancel?.orderNumber}?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Order summary */}
+            <div className="bg-muted/50 rounded-lg p-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Order Total:</span>
+                <span className="font-medium">Rs. {orderToCancel ? parseFloat(orderToCancel.total).toLocaleString() : 0}</span>
+              </div>
+              {orderToCancel?.walletAmountUsed && parseFloat(orderToCancel.walletAmountUsed) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Wallet Used:</span>
+                  <span className="font-medium text-green-600">Rs. {parseFloat(orderToCancel.walletAmountUsed).toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Payment Method:</span>
+                <span className="font-medium">{orderToCancel?.paymentMethod?.toUpperCase()}</span>
+              </div>
+            </div>
+
+            {/* Refund option - only show if there's a bank payment portion */}
+            {orderToCancel && orderToCancel.paymentMethod !== 'wallet' && orderToCancel.paymentMethod !== 'cod' && (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="refundFullToWallet"
+                    checked={refundFullToWallet}
+                    onCheckedChange={(checked) => setRefundFullToWallet(checked === true)}
+                    data-testid="checkbox-refund-to-wallet"
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="refundFullToWallet" className="font-medium cursor-pointer">
+                      Refund full amount to wallet
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Credit Rs. {parseFloat(orderToCancel.total).toLocaleString()} to customer's wallet instead of manual bank refund.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Info about automatic wallet refund */}
+            {orderToCancel?.walletAmountUsed && parseFloat(orderToCancel.walletAmountUsed) > 0 && !refundFullToWallet && (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                Wallet amount (Rs. {parseFloat(orderToCancel.walletAmountUsed).toLocaleString()}) will be automatically refunded.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCancelDialogOpen(false);
+                setOrderToCancel(null);
+                setRefundFullToWallet(false);
+              }}
+              data-testid="button-cancel-dialog-close"
+            >
+              Keep Order
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancel}
+              disabled={updateOrderMutation.isPending}
+              data-testid="button-confirm-cancel"
+            >
+              {updateOrderMutation.isPending ? "Cancelling..." : "Cancel Order"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -1479,7 +1479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/admin/orders/:id', adminAuth, async (req, res) => {
     try {
-      const { status, paymentStatus } = req.body;
+      const { status, paymentStatus, refundFullToWallet } = req.body;
       
       // Get original order to check for status change
       const originalOrder = await storage.getOrder(req.params.id);
@@ -1489,29 +1489,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === 'cancelled') {
         order = await storage.cancelOrderAndRestoreInventory(req.params.id);
         
-        // Refund wallet amount if wallet was used for this order
-        if (originalOrder) {
+        // Handle wallet refunds for cancelled order
+        if (originalOrder && originalOrder.userId) {
           const walletAmountUsed = parseFloat(originalOrder.walletAmountUsed || "0");
-          if (walletAmountUsed > 0 && originalOrder.userId) {
-            const wallet = await storage.getWalletByUserId(originalOrder.userId);
-            if (wallet) {
-              const currentBalance = parseFloat(wallet.balance);
-              const newBalance = (currentBalance + walletAmountUsed).toFixed(2);
-              
-              // Refund to wallet
-              await storage.updateWalletBalance(wallet.id, newBalance);
-              
-              // Create wallet transaction for the refund
-              await storage.createWalletTransaction({
-                walletId: wallet.id,
-                type: 'credit',
-                amount: walletAmountUsed.toString(),
-                balanceAfter: newBalance,
-                description: `Refund for cancelled order #${originalOrder.orderNumber || originalOrder.id.slice(-8).toUpperCase()}`,
-                referenceType: 'order',
-                referenceId: originalOrder.id,
-              });
+          const orderTotal = parseFloat(originalOrder.total || "0");
+          
+          // Calculate refund amount: full order amount if refundFullToWallet is true, otherwise just wallet portion
+          let refundAmount = walletAmountUsed;
+          let refundDescription = `Refund for cancelled order #${originalOrder.orderNumber || originalOrder.id.slice(-8).toUpperCase()}`;
+          
+          if (refundFullToWallet && orderTotal > 0) {
+            refundAmount = orderTotal;
+            refundDescription = `Full refund to wallet for cancelled order #${originalOrder.orderNumber || originalOrder.id.slice(-8).toUpperCase()}`;
+          }
+          
+          if (refundAmount > 0) {
+            let wallet = await storage.getWalletByUserId(originalOrder.userId);
+            
+            // Create wallet if it doesn't exist
+            if (!wallet) {
+              wallet = await storage.createWallet(originalOrder.userId);
             }
+            
+            const currentBalance = parseFloat(wallet.balance);
+            const newBalance = (currentBalance + refundAmount).toFixed(2);
+            
+            // Refund to wallet
+            await storage.updateWalletBalance(wallet.id, newBalance);
+            
+            // Create wallet transaction for the refund
+            await storage.createWalletTransaction({
+              walletId: wallet.id,
+              type: 'credit',
+              amount: refundAmount.toString(),
+              balanceAfter: newBalance,
+              description: refundDescription,
+              referenceType: 'order',
+              referenceId: originalOrder.id,
+            });
           }
         }
       } else {
