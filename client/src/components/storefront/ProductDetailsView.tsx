@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { Product, Category, StoreSettings } from "@shared/schema";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import ProductReviews from "./ProductReviews";
 
 interface ProductDetailsViewProps {
   productId: string;
@@ -500,6 +501,13 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
           </CardContent>
         </Card>
       )}
+
+      {/* Product Reviews */}
+      <Card className="mt-8">
+        <CardContent className="p-6">
+          <ProductReviews productId={productId} />
+        </CardContent>
+      </Card>
 
       {/* Zoom Modal */}
       <Dialog open={isZoomed} onOpenChange={setIsZoomed}>
