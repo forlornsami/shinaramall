@@ -106,6 +106,8 @@ export const products = pgTable("products", {
   imageUrls: jsonb("image_urls").$type<string[]>().default([]),
   isActive: boolean("is_active").notNull().default(true),
   isFeatured: boolean("is_featured").notNull().default(false),
+  ratingAverage: decimal("rating_average", { precision: 3, scale: 2 }).default("0"),
+  ratingCount: integer("rating_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -166,6 +168,8 @@ export const orders = pgTable("orders", {
   paymentMethod: varchar("payment_method"), // Changed to varchar to avoid enum conflicts
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  couponCode: varchar("coupon_code"),
   walletAmountUsed: decimal("wallet_amount_used", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   shippingAddress: jsonb("shipping_address").$type<{
@@ -952,4 +956,219 @@ export type WalletWithUser = Wallet & {
 export type WalletTopupRequestWithDetails = WalletTopupRequest & {
   user: User;
   processedByAdmin?: AdminUser | null;
+};
+
+// ==================== COUPON SYSTEM ====================
+
+// Coupon type enum
+export const couponTypeEnum = pgEnum("coupon_type", [
+  "percentage",  // Discount as percentage
+  "fixed"        // Fixed amount discount
+]);
+
+// Coupon scope enum
+export const couponScopeEnum = pgEnum("coupon_scope", [
+  "all",         // Applies to all products
+  "category",    // Applies to specific categories
+  "product"      // Applies to specific products
+]);
+
+// Coupons table
+export const coupons = pgTable("coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull().unique(),
+  description: text("description"),
+  type: couponTypeEnum("type").notNull(),
+  value: decimal("value", { precision: 10, scale: 2 }).notNull(), // Percentage or fixed amount
+  scope: couponScopeEnum("scope").notNull().default("all"),
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }), // Minimum order to apply
+  maxDiscountAmount: decimal("max_discount_amount", { precision: 10, scale: 2 }), // Cap for percentage discounts
+  usageLimit: integer("usage_limit"), // Total times coupon can be used
+  usageCount: integer("usage_count").notNull().default(0),
+  perUserLimit: integer("per_user_limit").default(1), // Times per user
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => adminUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Coupon category restrictions (for category scope)
+export const couponCategories = pgTable("coupon_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").references(() => coupons.id, { onDelete: "cascade" }).notNull(),
+  categoryId: varchar("category_id").references(() => categories.id, { onDelete: "cascade" }).notNull(),
+});
+
+// Coupon product restrictions (for product scope)
+export const couponProducts = pgTable("coupon_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").references(() => coupons.id, { onDelete: "cascade" }).notNull(),
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+});
+
+// Coupon redemptions (tracks who used which coupon)
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").references(() => coupons.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  orderId: varchar("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull(),
+  redeemedAt: timestamp("redeemed_at").defaultNow(),
+});
+
+// Coupon relations
+export const couponsRelations = relations(coupons, ({ one, many }) => ({
+  createdByAdmin: one(adminUsers, {
+    fields: [coupons.createdBy],
+    references: [adminUsers.id],
+  }),
+  categories: many(couponCategories),
+  products: many(couponProducts),
+  redemptions: many(couponRedemptions),
+}));
+
+export const couponCategoriesRelations = relations(couponCategories, ({ one }) => ({
+  coupon: one(coupons, {
+    fields: [couponCategories.couponId],
+    references: [coupons.id],
+  }),
+  category: one(categories, {
+    fields: [couponCategories.categoryId],
+    references: [categories.id],
+  }),
+}));
+
+export const couponProductsRelations = relations(couponProducts, ({ one }) => ({
+  coupon: one(coupons, {
+    fields: [couponProducts.couponId],
+    references: [coupons.id],
+  }),
+  product: one(products, {
+    fields: [couponProducts.productId],
+    references: [products.id],
+  }),
+}));
+
+export const couponRedemptionsRelations = relations(couponRedemptions, ({ one }) => ({
+  coupon: one(coupons, {
+    fields: [couponRedemptions.couponId],
+    references: [coupons.id],
+  }),
+  user: one(users, {
+    fields: [couponRedemptions.userId],
+    references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [couponRedemptions.orderId],
+    references: [orders.id],
+  }),
+}));
+
+// Coupon insert schemas
+export const insertCouponSchema = createInsertSchema(coupons).omit({
+  id: true,
+  usageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCouponCategorySchema = createInsertSchema(couponCategories).omit({
+  id: true,
+});
+
+export const insertCouponProductSchema = createInsertSchema(couponProducts).omit({
+  id: true,
+});
+
+export const insertCouponRedemptionSchema = createInsertSchema(couponRedemptions).omit({
+  id: true,
+  redeemedAt: true,
+});
+
+// Coupon types
+export type Coupon = typeof coupons.$inferSelect;
+export type InsertCoupon = z.infer<typeof insertCouponSchema>;
+export type CouponCategory = typeof couponCategories.$inferSelect;
+export type InsertCouponCategory = z.infer<typeof insertCouponCategorySchema>;
+export type CouponProduct = typeof couponProducts.$inferSelect;
+export type InsertCouponProduct = z.infer<typeof insertCouponProductSchema>;
+export type CouponRedemption = typeof couponRedemptions.$inferSelect;
+export type InsertCouponRedemption = z.infer<typeof insertCouponRedemptionSchema>;
+
+// Extended coupon types
+export type CouponWithDetails = Coupon & {
+  categories?: CouponCategory[];
+  products?: CouponProduct[];
+  redemptions?: CouponRedemption[];
+};
+
+// ==================== PRODUCT REVIEWS ====================
+
+// Review status enum
+export const reviewStatusEnum = pgEnum("review_status", [
+  "pending",    // Awaiting moderation
+  "approved",   // Visible to customers
+  "rejected"    // Not displayed
+]);
+
+// Product reviews table
+export const productReviews = pgTable("product_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  orderId: varchar("order_id").references(() => orders.id), // Optional: link to verified purchase
+  rating: integer("rating").notNull(), // 1-5 stars
+  title: varchar("title"),
+  comment: text("comment"),
+  status: reviewStatusEnum("status").notNull().default("pending"),
+  moderatedBy: varchar("moderated_by").references(() => adminUsers.id),
+  moderatedAt: timestamp("moderated_at"),
+  moderationNote: text("moderation_note"),
+  isVerifiedPurchase: boolean("is_verified_purchase").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Product reviews relations
+export const productReviewsRelations = relations(productReviews, ({ one }) => ({
+  product: one(products, {
+    fields: [productReviews.productId],
+    references: [products.id],
+  }),
+  user: one(users, {
+    fields: [productReviews.userId],
+    references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [productReviews.orderId],
+    references: [orders.id],
+  }),
+  moderatedByAdmin: one(adminUsers, {
+    fields: [productReviews.moderatedBy],
+    references: [adminUsers.id],
+  }),
+}));
+
+// Product review insert schema
+export const insertProductReviewSchema = createInsertSchema(productReviews).omit({
+  id: true,
+  status: true,
+  moderatedBy: true,
+  moderatedAt: true,
+  moderationNote: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Product review types
+export type ProductReview = typeof productReviews.$inferSelect;
+export type InsertProductReview = z.infer<typeof insertProductReviewSchema>;
+
+// Extended review types
+export type ProductReviewWithDetails = ProductReview & {
+  user?: User;
+  product?: Product;
+  moderatedByAdmin?: AdminUser | null;
 };
