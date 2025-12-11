@@ -362,6 +362,7 @@ export const insertOrderSchema = createInsertSchema(orders).pick({
   paymentMethod: true,
   subtotal: true,
   shippingCost: true,
+  walletAmountUsed: true,
   total: true,
   shippingAddress: true,
 });

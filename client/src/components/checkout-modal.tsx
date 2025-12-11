@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2 } from "lucide-react";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { getProductThumbnail } from "@/lib/utils";
-import type { CartItem, Product, PaymentAccount } from "@shared/schema";
+import type { CartItem, Product, PaymentAccount, Wallet as WalletType } from "@shared/schema";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -74,6 +75,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     clearCart: () => void;
   };
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [step, setStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("easypaisa");
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -81,6 +83,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletAmountToUse, setWalletAmountToUse] = useState("0");
   const [shippingInfo, setShippingInfo] = useState({
     firstName: "",
     lastName: "",
@@ -89,6 +93,14 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     postalCode: "",
     phone: "",
   });
+
+  // Fetch wallet balance
+  const { data: wallet, refetch: refetchWallet } = useQuery<WalletType>({
+    queryKey: ["/api/wallet"],
+    enabled: isAuthenticated,
+  });
+  
+  const walletBalance = parseFloat(wallet?.balance || "0");
 
   // Fetch payment accounts for selected method
   const { data: paymentAccounts } = useQuery<PaymentAccount[]>({
@@ -107,7 +119,17 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   ) || 0;
   
   const shippingCost = subtotal > 5000 ? 0 : 300;
-  const total = subtotal + shippingCost;
+  const subtotalWithShipping = subtotal + shippingCost;
+  
+  // Calculate wallet amount to use (can't exceed balance or total)
+  const effectiveWalletAmount = useWallet 
+    ? Math.min(parseFloat(walletAmountToUse) || 0, walletBalance, subtotalWithShipping) 
+    : 0;
+  const remainingAmount = subtotalWithShipping - effectiveWalletAmount;
+  const total = remainingAmount;
+  
+  // If wallet covers full amount, no other payment needed
+  const walletCoversFullAmount = effectiveWalletAmount >= subtotalWithShipping;
 
   const selectedPaymentConfig = paymentMethods.find(m => m.id === paymentMethod);
   const requiresPaymentProof = selectedPaymentConfig?.requiresProof || false;
@@ -115,11 +137,12 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       const orderData = {
-        paymentMethod,
+        paymentMethod: walletCoversFullAmount ? 'wallet' : paymentMethod,
         subtotal: subtotal.toString(),
         shippingCost: shippingCost.toString(),
-        total: total.toString(),
+        total: subtotalWithShipping.toString(),
         shippingAddress: shippingInfo,
+        walletAmountUsed: effectiveWalletAmount.toString(),
       };
       
       const response = await apiRequest('POST', '/api/orders', orderData);
@@ -129,20 +152,40 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       setOrderId(order.id);
       setOrderNumber(order.orderNumber);
       
-      if (requiresPaymentProof) {
-        // Go to payment proof step - don't clear cart yet, wait for proof submission
-        setStep(3);
-      } else {
-        // COD - just show success and clear cart
+      // Invalidate wallet data if wallet was used
+      if (effectiveWalletAmount > 0) {
+        queryClient.invalidateQueries({ queryKey: ['/api/wallet'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/wallet/transactions'] });
+      }
+      
+      // If wallet covers full amount or COD, complete immediately
+      if (walletCoversFullAmount) {
         toast({
           title: "Order Placed Successfully!",
-          description: `Your order #${order.orderNumber} has been placed. Pay on delivery.`,
+          description: `Your order #${order.orderNumber} has been placed. Rs. ${effectiveWalletAmount.toLocaleString()} paid from wallet.`,
         });
         queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
         queryClient.invalidateQueries({ queryKey: ['/api/products'] });
         clearCart();
         onClose();
-        setStep(1);
+        resetCheckoutState();
+      } else if (requiresPaymentProof && remainingAmount > 0) {
+        // Go to payment proof step - don't clear cart yet, wait for proof submission
+        setStep(3);
+      } else {
+        // COD - just show success and clear cart
+        const walletNote = effectiveWalletAmount > 0 
+          ? ` Rs. ${effectiveWalletAmount.toLocaleString()} paid from wallet.` 
+          : '';
+        toast({
+          title: "Order Placed Successfully!",
+          description: `Your order #${order.orderNumber} has been placed.${walletNote} Pay remaining on delivery.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+        clearCart();
+        onClose();
+        resetCheckoutState();
       }
     },
     onError: () => {
@@ -263,6 +306,29 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
   const handlePaymentMethodChange = (value: string) => {
     setPaymentMethod(value as PaymentMethod);
+  };
+
+  const resetCheckoutState = () => {
+    setStep(1);
+    setPaymentScreenshot(null);
+    setTransactionId("");
+    setOrderId(null);
+    setOrderNumber(null);
+    setUseWallet(false);
+    setWalletAmountToUse("0");
+  };
+  
+  const handleApplyWallet = () => {
+    if (walletBalance > 0) {
+      setUseWallet(true);
+      // Apply the maximum possible (min of balance and total)
+      setWalletAmountToUse(Math.min(walletBalance, subtotalWithShipping).toString());
+    }
+  };
+  
+  const handleRemoveWallet = () => {
+    setUseWallet(false);
+    setWalletAmountToUse("0");
   };
 
   if (!isOpen) return null;
@@ -403,10 +469,66 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
+                {/* Wallet Section */}
+                {isAuthenticated && walletBalance > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <WalletMinimal className="w-5 h-5 text-primary" />
+                      Use Wallet Balance
+                    </h3>
+                    <Card className={`border-2 transition-all ${useWallet ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-muted'}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-foreground">Wallet Balance</p>
+                            <p className="text-2xl font-bold text-green-600" data-testid="text-checkout-wallet-balance">
+                              Rs. {walletBalance.toLocaleString()}
+                            </p>
+                          </div>
+                          {useWallet ? (
+                            <div className="flex items-center gap-2">
+                              <div className="text-right">
+                                <p className="text-sm text-muted-foreground">Applied</p>
+                                <p className="font-semibold text-green-600">
+                                  -Rs. {effectiveWalletAmount.toLocaleString()}
+                                </p>
+                              </div>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleRemoveWallet}
+                                className="text-red-600 border-red-300"
+                                data-testid="button-remove-wallet"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              onClick={handleApplyWallet} 
+                              className="bg-green-600 hover:bg-green-700"
+                              data-testid="button-apply-wallet"
+                            >
+                              Apply Wallet
+                            </Button>
+                          )}
+                        </div>
+                        {useWallet && effectiveWalletAmount >= subtotalWithShipping && (
+                          <p className="mt-2 text-sm text-green-600 font-medium">
+                            Your wallet balance covers the full amount!
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+                
+                {/* Payment method selection - only show if wallet doesn't cover full amount */}
+                {!walletCoversFullAmount && (
                 <div>
                   <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                     <CreditCard className="w-5 h-5 text-primary" />
-                    Payment Method
+                    {effectiveWalletAmount > 0 ? `Pay Remaining Rs. ${remainingAmount.toLocaleString()}` : 'Payment Method'}
                   </h3>
                   
                   <RadioGroup 
@@ -440,6 +562,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     ))}
                   </RadioGroup>
                 </div>
+                )}
                 
                 <Separator />
                 
@@ -477,9 +600,19 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                         {shippingCost === 0 ? 'FREE' : `Rs. ${shippingCost.toLocaleString()}`}
                       </span>
                     </div>
+                    {effectiveWalletAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <WalletMinimal className="w-4 h-4" /> Wallet
+                        </span>
+                        <span className="text-green-600 font-medium">
+                          -Rs. {effectiveWalletAmount.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     <Separator className="my-2" />
                     <div className="flex justify-between text-lg font-semibold">
-                      <span className="text-foreground">Total</span>
+                      <span className="text-foreground">{effectiveWalletAmount > 0 ? 'Amount to Pay' : 'Total'}</span>
                       <span className="text-primary" data-testid="text-checkout-total">
                         Rs. {total.toLocaleString()}
                       </span>

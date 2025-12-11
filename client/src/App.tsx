@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Storefront from "@/pages/storefront";
 import ProfilePage from "@/pages/profile";
+import WalletPage from "@/pages/wallet";
 import AuthPage from "@/pages/auth";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -18,6 +19,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Storefront} />
       <Route path="/profile" component={ProfilePage} />
+      <Route path="/wallet" component={WalletPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/login" component={AuthPage} />
       <Route path="/register" component={AuthPage} />

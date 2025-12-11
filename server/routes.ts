@@ -1215,18 +1215,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      const { walletAmountUsed, ...restBody } = req.body;
+      
       const orderData = insertOrderSchema.parse({
-        ...req.body,
+        ...restBody,
         userId,
+        walletAmountUsed: walletAmountUsed ? walletAmountUsed.toString() : "0",
       });
 
-      // Create order
-      const order = await storage.createOrder(orderData);
-
-      // Get cart items and create order items
+      // Get cart items first
       const cartItems = await storage.getCartItems(userId);
       
-      // Check stock availability before processing
+      if (!cartItems || cartItems.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+      
+      // IMPORTANT: Validate stock BEFORE any wallet operations
       for (const cartItem of cartItems) {
         const product = await storage.getProduct(cartItem.productId);
         if (!product || product.stock < cartItem.quantity) {
@@ -1234,6 +1238,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `Insufficient stock for product: ${product?.name || 'Unknown'}. Available: ${product?.stock || 0}, Requested: ${cartItem.quantity}` 
           });
         }
+      }
+
+      // Handle wallet payment if applicable (only after stock is validated)
+      const walletAmount = parseFloat(walletAmountUsed || "0");
+      let walletId: string | null = null;
+      let newWalletBalance: string | null = null;
+      
+      if (walletAmount > 0) {
+        const wallet = await storage.getWalletByUserId(userId);
+        if (!wallet) {
+          return res.status(400).json({ message: "Wallet not found" });
+        }
+        
+        const currentBalance = parseFloat(wallet.balance);
+        if (walletAmount > currentBalance) {
+          return res.status(400).json({ message: "Insufficient wallet balance" });
+        }
+        
+        // Calculate new balance and store for later use
+        newWalletBalance = (currentBalance - walletAmount).toFixed(2);
+        walletId = wallet.id;
+        
+        // Deduct from wallet
+        await storage.updateWalletBalance(wallet.id, newWalletBalance);
+      }
+
+      // Create order
+      const order = await storage.createOrder(orderData);
+      
+      // Create wallet transaction if wallet was used (use stored values, not re-fetch)
+      // Store positive amount for 'purchase' type (debit is implied by transaction type)
+      if (walletAmount > 0 && walletId && newWalletBalance !== null) {
+        await storage.createWalletTransaction({
+          walletId: walletId,
+          type: 'purchase',
+          amount: walletAmount.toString(),
+          balanceAfter: newWalletBalance,
+          description: `Order #${order.orderNumber || order.id.slice(-8).toUpperCase()}`,
+          referenceType: 'order',
+          referenceId: order.id,
+        });
       }
       
       for (const cartItem of cartItems) {
