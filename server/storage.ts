@@ -22,6 +22,11 @@ import {
   wallets,
   walletTransactions,
   walletTopupRequests,
+  coupons,
+  couponCategories,
+  couponProducts,
+  couponRedemptions,
+  productReviews,
   type User,
   type InsertUser,
   type SafeUser,
@@ -75,6 +80,18 @@ import {
   type InsertWalletTopupRequest,
   type WalletWithUser,
   type WalletTopupRequestWithDetails,
+  type Coupon,
+  type InsertCoupon,
+  type CouponCategory,
+  type InsertCouponCategory,
+  type CouponProduct,
+  type InsertCouponProduct,
+  type CouponRedemption,
+  type InsertCouponRedemption,
+  type CouponWithDetails,
+  type ProductReview,
+  type InsertProductReview,
+  type ProductReviewWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
@@ -261,6 +278,32 @@ export interface IStorage {
   createWalletTopupRequest(request: InsertWalletTopupRequest): Promise<WalletTopupRequest>;
   processWalletTopupRequest(id: string, adminId: string, approved: boolean, note?: string): Promise<WalletTopupRequest>;
   getPendingTopupRequestsCount(): Promise<number>;
+  
+  // Coupon operations
+  getCoupons(): Promise<Coupon[]>;
+  getCoupon(id: string): Promise<CouponWithDetails | undefined>;
+  getCouponByCode(code: string): Promise<CouponWithDetails | undefined>;
+  createCoupon(coupon: InsertCoupon): Promise<Coupon>;
+  updateCoupon(id: string, coupon: Partial<InsertCoupon>): Promise<Coupon>;
+  deleteCoupon(id: string): Promise<boolean>;
+  setCouponCategories(couponId: string, categoryIds: string[]): Promise<void>;
+  setCouponProducts(couponId: string, productIds: string[]): Promise<void>;
+  getCouponRedemptionsByUser(couponId: string, userId: string): Promise<CouponRedemption[]>;
+  createCouponRedemption(redemption: InsertCouponRedemption): Promise<CouponRedemption>;
+  incrementCouponUsage(couponId: string): Promise<void>;
+  
+  // Product review operations
+  getProductReviews(productId: string, status?: string): Promise<ProductReviewWithDetails[]>;
+  getAllReviews(status?: string): Promise<ProductReviewWithDetails[]>;
+  getReview(id: string): Promise<ProductReviewWithDetails | undefined>;
+  getUserReviewForProduct(userId: string, productId: string): Promise<ProductReview | undefined>;
+  hasUserPurchasedProduct(userId: string, productId: string): Promise<boolean>;
+  createReview(review: InsertProductReview): Promise<ProductReview>;
+  updateReview(id: string, review: Partial<ProductReview>): Promise<ProductReview>;
+  moderateReview(id: string, adminId: string, status: string, note?: string): Promise<ProductReview>;
+  deleteReview(id: string): Promise<boolean>;
+  updateProductRating(productId: string): Promise<void>;
+  getPendingReviewsCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2014,6 +2057,256 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(walletTopupRequests)
       .where(eq(walletTopupRequests.status, "pending"));
+    return result[0]?.count || 0;
+  }
+
+  // ==================== COUPON OPERATIONS ====================
+
+  async getCoupons(): Promise<Coupon[]> {
+    return db.select().from(coupons).orderBy(desc(coupons.createdAt));
+  }
+
+  async getCoupon(id: string): Promise<CouponWithDetails | undefined> {
+    const [coupon] = await db.select().from(coupons).where(eq(coupons.id, id));
+    if (!coupon) return undefined;
+
+    const cats = await db.select().from(couponCategories).where(eq(couponCategories.couponId, id));
+    const prods = await db.select().from(couponProducts).where(eq(couponProducts.couponId, id));
+    const redemps = await db.select().from(couponRedemptions).where(eq(couponRedemptions.couponId, id));
+
+    return { ...coupon, categories: cats, products: prods, redemptions: redemps };
+  }
+
+  async getCouponByCode(code: string): Promise<CouponWithDetails | undefined> {
+    const [coupon] = await db.select().from(coupons).where(eq(coupons.code, code.toUpperCase()));
+    if (!coupon) return undefined;
+
+    const cats = await db.select().from(couponCategories).where(eq(couponCategories.couponId, coupon.id));
+    const prods = await db.select().from(couponProducts).where(eq(couponProducts.couponId, coupon.id));
+
+    return { ...coupon, categories: cats, products: prods };
+  }
+
+  async createCoupon(coupon: InsertCoupon): Promise<Coupon> {
+    const [created] = await db.insert(coupons).values({
+      ...coupon,
+      code: coupon.code.toUpperCase(),
+    }).returning();
+    return created;
+  }
+
+  async updateCoupon(id: string, coupon: Partial<InsertCoupon>): Promise<Coupon> {
+    const updateData: any = { ...coupon, updatedAt: new Date() };
+    if (coupon.code) updateData.code = coupon.code.toUpperCase();
+    
+    const [updated] = await db.update(coupons).set(updateData).where(eq(coupons.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCoupon(id: string): Promise<boolean> {
+    const result = await db.delete(coupons).where(eq(coupons.id, id));
+    return true;
+  }
+
+  async setCouponCategories(couponId: string, categoryIds: string[]): Promise<void> {
+    await db.delete(couponCategories).where(eq(couponCategories.couponId, couponId));
+    if (categoryIds.length > 0) {
+      await db.insert(couponCategories).values(
+        categoryIds.map(categoryId => ({ couponId, categoryId }))
+      );
+    }
+  }
+
+  async setCouponProducts(couponId: string, productIds: string[]): Promise<void> {
+    await db.delete(couponProducts).where(eq(couponProducts.couponId, couponId));
+    if (productIds.length > 0) {
+      await db.insert(couponProducts).values(
+        productIds.map(productId => ({ couponId, productId }))
+      );
+    }
+  }
+
+  async getCouponRedemptionsByUser(couponId: string, userId: string): Promise<CouponRedemption[]> {
+    return db.select().from(couponRedemptions).where(
+      and(eq(couponRedemptions.couponId, couponId), eq(couponRedemptions.userId, userId))
+    );
+  }
+
+  async createCouponRedemption(redemption: InsertCouponRedemption): Promise<CouponRedemption> {
+    const [created] = await db.insert(couponRedemptions).values(redemption).returning();
+    return created;
+  }
+
+  async incrementCouponUsage(couponId: string): Promise<void> {
+    await db.update(coupons).set({
+      usageCount: sql`${coupons.usageCount} + 1`,
+      updatedAt: new Date(),
+    }).where(eq(coupons.id, couponId));
+  }
+
+  // ==================== PRODUCT REVIEW OPERATIONS ====================
+
+  async getProductReviews(productId: string, status?: string): Promise<ProductReviewWithDetails[]> {
+    const query = db
+      .select()
+      .from(productReviews)
+      .leftJoin(users, eq(productReviews.userId, users.id))
+      .where(eq(productReviews.productId, productId))
+      .orderBy(desc(productReviews.createdAt));
+
+    const results = status 
+      ? await query.where(and(eq(productReviews.productId, productId), eq(productReviews.status, status as any)))
+      : await query;
+
+    return results.map(r => ({
+      ...r.product_reviews,
+      user: r.users ? {
+        id: r.users.id,
+        firstName: r.users.firstName,
+        lastName: r.users.lastName,
+        email: r.users.email,
+      } as any : undefined,
+    }));
+  }
+
+  async getAllReviews(status?: string): Promise<ProductReviewWithDetails[]> {
+    const baseQuery = db
+      .select()
+      .from(productReviews)
+      .leftJoin(users, eq(productReviews.userId, users.id))
+      .leftJoin(products, eq(productReviews.productId, products.id))
+      .orderBy(desc(productReviews.createdAt));
+
+    const results = status
+      ? await baseQuery.where(eq(productReviews.status, status as any))
+      : await baseQuery;
+
+    return results.map(r => ({
+      ...r.product_reviews,
+      user: r.users ? {
+        id: r.users.id,
+        firstName: r.users.firstName,
+        lastName: r.users.lastName,
+        email: r.users.email,
+      } as any : undefined,
+      product: r.products || undefined,
+    }));
+  }
+
+  async getReview(id: string): Promise<ProductReviewWithDetails | undefined> {
+    const [result] = await db
+      .select()
+      .from(productReviews)
+      .leftJoin(users, eq(productReviews.userId, users.id))
+      .leftJoin(products, eq(productReviews.productId, products.id))
+      .where(eq(productReviews.id, id));
+
+    if (!result) return undefined;
+
+    return {
+      ...result.product_reviews,
+      user: result.users ? {
+        id: result.users.id,
+        firstName: result.users.firstName,
+        lastName: result.users.lastName,
+        email: result.users.email,
+      } as any : undefined,
+      product: result.products || undefined,
+    };
+  }
+
+  async getUserReviewForProduct(userId: string, productId: string): Promise<ProductReview | undefined> {
+    const [review] = await db
+      .select()
+      .from(productReviews)
+      .where(and(eq(productReviews.userId, userId), eq(productReviews.productId, productId)));
+    return review;
+  }
+
+  async hasUserPurchasedProduct(userId: string, productId: string): Promise<boolean> {
+    const result = await db
+      .select({ count: count() })
+      .from(orders)
+      .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+      .where(
+        and(
+          eq(orders.userId, userId),
+          eq(orderItems.productId, productId),
+          eq(orders.status, "delivered")
+        )
+      );
+    return (result[0]?.count || 0) > 0;
+  }
+
+  async createReview(review: InsertProductReview): Promise<ProductReview> {
+    const [created] = await db.insert(productReviews).values(review).returning();
+    return created;
+  }
+
+  async updateReview(id: string, review: Partial<ProductReview>): Promise<ProductReview> {
+    const [updated] = await db
+      .update(productReviews)
+      .set({ ...review, updatedAt: new Date() })
+      .where(eq(productReviews.id, id))
+      .returning();
+    return updated;
+  }
+
+  async moderateReview(id: string, adminId: string, status: string, note?: string): Promise<ProductReview> {
+    const [updated] = await db
+      .update(productReviews)
+      .set({
+        status: status as any,
+        moderatedBy: adminId,
+        moderatedAt: new Date(),
+        moderationNote: note,
+        updatedAt: new Date(),
+      })
+      .where(eq(productReviews.id, id))
+      .returning();
+
+    // Update product rating if approved or status changed
+    await this.updateProductRating(updated.productId);
+
+    return updated;
+  }
+
+  async deleteReview(id: string): Promise<boolean> {
+    const [review] = await db.select().from(productReviews).where(eq(productReviews.id, id));
+    if (!review) return false;
+
+    await db.delete(productReviews).where(eq(productReviews.id, id));
+    
+    // Update product rating after deletion
+    await this.updateProductRating(review.productId);
+    
+    return true;
+  }
+
+  async updateProductRating(productId: string): Promise<void> {
+    const result = await db
+      .select({
+        avgRating: sql<string>`AVG(${productReviews.rating})`,
+        count: count(),
+      })
+      .from(productReviews)
+      .where(and(eq(productReviews.productId, productId), eq(productReviews.status, "approved")));
+
+    const avgRating = result[0]?.avgRating ? parseFloat(result[0].avgRating).toFixed(2) : "0";
+    const ratingCount = result[0]?.count || 0;
+
+    await db.update(products).set({
+      ratingAverage: avgRating,
+      ratingCount,
+      updatedAt: new Date(),
+    }).where(eq(products.id, productId));
+  }
+
+  async getPendingReviewsCount(): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(productReviews)
+      .where(eq(productReviews.status, "pending"));
     return result[0]?.count || 0;
   }
 }
