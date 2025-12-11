@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { getProductThumbnail } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -152,7 +153,7 @@ export default function CartView() {
               <CardContent className="p-4">
                 <div className="flex gap-4">
                   <img
-                    src={item.product?.imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200"}
+                    src={item.product ? getProductThumbnail(item.product) : "/placeholder-product.svg"}
                     alt={item.product?.name || "Product"}
                     className="w-24 h-24 rounded-xl object-cover"
                   />
