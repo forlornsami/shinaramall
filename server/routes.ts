@@ -2862,6 +2862,325 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== WALLET ROUTES (CUSTOMER) ====================
+
+  // Get customer's wallet
+  app.get('/api/wallet', isAuthenticated, async (req: any, res) => {
+    try {
+      let wallet = await storage.getWalletByUserId(req.user.id);
+      
+      // Create wallet if it doesn't exist
+      if (!wallet) {
+        wallet = await storage.createWallet(req.user.id);
+      }
+      
+      res.json(wallet);
+    } catch (error) {
+      console.error("Error getting wallet:", error);
+      res.status(500).json({ message: "Failed to get wallet" });
+    }
+  });
+
+  // Get wallet transactions
+  app.get('/api/wallet/transactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const wallet = await storage.getWalletByUserId(req.user.id);
+      
+      if (!wallet) {
+        return res.json([]);
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 50;
+      const transactions = await storage.getWalletTransactions(wallet.id, limit);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error getting wallet transactions:", error);
+      res.status(500).json({ message: "Failed to get wallet transactions" });
+    }
+  });
+
+  // Get customer's topup requests
+  app.get('/api/wallet/topup-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const requests = await storage.getUserTopupRequests(req.user.id);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting topup requests:", error);
+      res.status(500).json({ message: "Failed to get topup requests" });
+    }
+  });
+
+  // Create topup request
+  app.post('/api/wallet/topup-request', isAuthenticated, async (req: any, res) => {
+    try {
+      const { amount, paymentMethod, screenshotUrl, transactionId } = req.body;
+      
+      if (!amount || !paymentMethod || !screenshotUrl) {
+        return res.status(400).json({ message: "Amount, payment method, and screenshot are required" });
+      }
+      
+      if (parseFloat(amount) < 100) {
+        return res.status(400).json({ message: "Minimum topup amount is Rs. 100" });
+      }
+      
+      // Get or create wallet
+      let wallet = await storage.getWalletByUserId(req.user.id);
+      if (!wallet) {
+        wallet = await storage.createWallet(req.user.id);
+      }
+      
+      const request = await storage.createWalletTopupRequest({
+        walletId: wallet.id,
+        userId: req.user.id,
+        amount: amount.toString(),
+        paymentMethod,
+        screenshotUrl,
+        transactionId: transactionId || null,
+      });
+      
+      // Create notification for admins
+      await storage.createNotification({
+        recipientType: 'admin',
+        recipientId: null,
+        type: 'payment_received',
+        title: 'New Wallet Top-up Request',
+        message: `${req.user.firstName || req.user.email} requested Rs. ${parseFloat(amount).toLocaleString()} wallet top-up via ${paymentMethod}`,
+        data: { topupRequestId: request.id, userId: req.user.id, amount },
+      });
+      
+      res.status(201).json(request);
+    } catch (error) {
+      console.error("Error creating topup request:", error);
+      res.status(500).json({ message: "Failed to create topup request" });
+    }
+  });
+
+  // ==================== WALLET ROUTES (ADMIN) ====================
+
+  // Get all wallets with user info
+  app.get('/api/admin/wallets', adminAuth, async (req: any, res) => {
+    try {
+      const wallets = await storage.getAllWallets();
+      res.json(wallets);
+    } catch (error) {
+      console.error("Error getting wallets:", error);
+      res.status(500).json({ message: "Failed to get wallets" });
+    }
+  });
+
+  // Get specific wallet with transactions
+  app.get('/api/admin/wallets/:userId', adminAuth, async (req: any, res) => {
+    try {
+      const wallet = await storage.getWalletByUserId(req.params.userId);
+      
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+      
+      const transactions = await storage.getWalletTransactions(wallet.id, 100);
+      res.json({ wallet, transactions });
+    } catch (error) {
+      console.error("Error getting wallet:", error);
+      res.status(500).json({ message: "Failed to get wallet" });
+    }
+  });
+
+  // Get pending topup requests count
+  app.get('/api/admin/wallets/topup-requests/pending-count', adminAuth, async (req: any, res) => {
+    try {
+      const count = await storage.getPendingTopupRequestsCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Error getting pending count:", error);
+      res.status(500).json({ message: "Failed to get pending count" });
+    }
+  });
+
+  // Get all topup requests
+  app.get('/api/admin/wallets/topup-requests', adminAuth, async (req: any, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const requests = await storage.getWalletTopupRequests(status);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting topup requests:", error);
+      res.status(500).json({ message: "Failed to get topup requests" });
+    }
+  });
+
+  // Process topup request (approve/reject)
+  app.post('/api/admin/wallets/topup-requests/:id/process', adminAuth, async (req: any, res) => {
+    try {
+      const { approved, note } = req.body;
+      
+      if (typeof approved !== 'boolean') {
+        return res.status(400).json({ message: "Approved status is required" });
+      }
+      
+      const request = await storage.getWalletTopupRequest(req.params.id);
+      
+      if (!request) {
+        return res.status(404).json({ message: "Topup request not found" });
+      }
+      
+      if (request.status !== 'pending') {
+        return res.status(400).json({ message: "Request has already been processed" });
+      }
+      
+      // Update the request
+      const updatedRequest = await storage.processWalletTopupRequest(
+        req.params.id,
+        req.admin.id,
+        approved,
+        note
+      );
+      
+      if (approved) {
+        // Get wallet and add balance
+        const wallet = await storage.getWallet(request.walletId);
+        if (wallet) {
+          const currentBalance = parseFloat(wallet.balance);
+          const topupAmount = parseFloat(request.amount);
+          const newBalance = (currentBalance + topupAmount).toFixed(2);
+          
+          // Update wallet balance
+          await storage.updateWalletBalance(wallet.id, newBalance);
+          
+          // Create transaction record
+          await storage.createWalletTransaction({
+            walletId: wallet.id,
+            type: 'topup',
+            amount: request.amount,
+            balanceAfter: newBalance,
+            description: `Wallet top-up via ${request.paymentMethod}`,
+            referenceType: 'topup_request',
+            referenceId: request.id,
+            createdBy: req.admin.id,
+          });
+          
+          // Notify customer
+          await storage.createNotification({
+            recipientType: 'customer',
+            recipientId: request.userId,
+            type: 'payment_received',
+            title: 'Wallet Top-up Approved',
+            message: `Rs. ${topupAmount.toLocaleString()} has been added to your wallet.`,
+            data: { topupRequestId: request.id, amount: request.amount },
+          });
+        }
+      } else {
+        // Notify customer of rejection
+        await storage.createNotification({
+          recipientType: 'customer',
+          recipientId: request.userId,
+          type: 'payment_failed',
+          title: 'Wallet Top-up Rejected',
+          message: note || 'Your wallet top-up request was rejected. Please contact support for more information.',
+          data: { topupRequestId: request.id, amount: request.amount },
+        });
+      }
+      
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error("Error processing topup request:", error);
+      res.status(500).json({ message: "Failed to process topup request" });
+    }
+  });
+
+  // Add funds manually to customer wallet (admin)
+  app.post('/api/admin/wallets/:userId/add-funds', adminAuth, async (req: any, res) => {
+    try {
+      const { amount, description } = req.body;
+      
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      
+      // Get or create wallet
+      let wallet = await storage.getWalletByUserId(req.params.userId);
+      if (!wallet) {
+        wallet = await storage.createWallet(req.params.userId);
+      }
+      
+      const currentBalance = parseFloat(wallet.balance);
+      const addAmount = parseFloat(amount);
+      const newBalance = (currentBalance + addAmount).toFixed(2);
+      
+      // Update wallet balance
+      await storage.updateWalletBalance(wallet.id, newBalance);
+      
+      // Create transaction record
+      await storage.createWalletTransaction({
+        walletId: wallet.id,
+        type: 'credit',
+        amount: amount.toString(),
+        balanceAfter: newBalance,
+        description: description || 'Manual credit by admin',
+        referenceType: 'manual',
+        createdBy: req.admin.id,
+      });
+      
+      // Notify customer
+      await storage.createNotification({
+        recipientType: 'customer',
+        recipientId: req.params.userId,
+        type: 'payment_received',
+        title: 'Funds Added to Wallet',
+        message: `Rs. ${addAmount.toLocaleString()} has been added to your wallet.`,
+        data: { amount },
+      });
+      
+      res.json({ success: true, newBalance });
+    } catch (error) {
+      console.error("Error adding funds:", error);
+      res.status(500).json({ message: "Failed to add funds" });
+    }
+  });
+
+  // Deduct funds from customer wallet (admin)
+  app.post('/api/admin/wallets/:userId/deduct-funds', adminAuth, async (req: any, res) => {
+    try {
+      const { amount, description } = req.body;
+      
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      
+      const wallet = await storage.getWalletByUserId(req.params.userId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+      
+      const currentBalance = parseFloat(wallet.balance);
+      const deductAmount = parseFloat(amount);
+      
+      if (deductAmount > currentBalance) {
+        return res.status(400).json({ message: "Insufficient wallet balance" });
+      }
+      
+      const newBalance = (currentBalance - deductAmount).toFixed(2);
+      
+      // Update wallet balance
+      await storage.updateWalletBalance(wallet.id, newBalance);
+      
+      // Create transaction record
+      await storage.createWalletTransaction({
+        walletId: wallet.id,
+        type: 'adjustment',
+        amount: (-deductAmount).toString(),
+        balanceAfter: newBalance,
+        description: description || 'Manual deduction by admin',
+        referenceType: 'manual',
+        createdBy: req.admin.id,
+      });
+      
+      res.json({ success: true, newBalance });
+    } catch (error) {
+      console.error("Error deducting funds:", error);
+      res.status(500).json({ message: "Failed to deduct funds" });
+    }
+  });
+
   // ============================================
   // SEO ROUTES - Sitemap and Robots.txt
   // ============================================

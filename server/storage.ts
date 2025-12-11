@@ -19,6 +19,9 @@ import {
   teamChatConversations,
   teamChatParticipants,
   teamChatMessages,
+  wallets,
+  walletTransactions,
+  walletTopupRequests,
   type User,
   type InsertUser,
   type SafeUser,
@@ -64,6 +67,14 @@ import {
   type InsertTeamChatMessage,
   type TeamChatConversationWithDetails,
   type TeamChatMessageWithSender,
+  type Wallet,
+  type InsertWallet,
+  type WalletTransaction,
+  type InsertWalletTransaction,
+  type WalletTopupRequest,
+  type InsertWalletTopupRequest,
+  type WalletWithUser,
+  type WalletTopupRequestWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
@@ -231,6 +242,25 @@ export interface IStorage {
   // Order verification operations
   getOrdersPendingVerification(): Promise<Order[]>;
   verifyOrderPayment(orderId: string, adminId: string, approved: boolean, note?: string): Promise<Order>;
+  
+  // Wallet operations
+  getWallet(id: string): Promise<Wallet | undefined>;
+  getWalletByUserId(userId: string): Promise<Wallet | undefined>;
+  createWallet(userId: string): Promise<Wallet>;
+  updateWalletBalance(walletId: string, newBalance: string): Promise<Wallet>;
+  getAllWallets(): Promise<WalletWithUser[]>;
+  
+  // Wallet transaction operations
+  getWalletTransactions(walletId: string, limit?: number): Promise<WalletTransaction[]>;
+  createWalletTransaction(transaction: InsertWalletTransaction): Promise<WalletTransaction>;
+  
+  // Wallet topup request operations
+  getWalletTopupRequests(status?: string): Promise<WalletTopupRequestWithDetails[]>;
+  getWalletTopupRequest(id: string): Promise<WalletTopupRequestWithDetails | undefined>;
+  getUserTopupRequests(userId: string): Promise<WalletTopupRequest[]>;
+  createWalletTopupRequest(request: InsertWalletTopupRequest): Promise<WalletTopupRequest>;
+  processWalletTopupRequest(id: string, adminId: string, approved: boolean, note?: string): Promise<WalletTopupRequest>;
+  getPendingTopupRequestsCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1857,6 +1887,134 @@ export class DatabaseStorage implements IStorage {
     }
 
     return totalUnread;
+  }
+
+  // ==================== WALLET OPERATIONS ====================
+  
+  async getWallet(id: string): Promise<Wallet | undefined> {
+    const [wallet] = await db.select().from(wallets).where(eq(wallets.id, id));
+    return wallet;
+  }
+
+  async getWalletByUserId(userId: string): Promise<Wallet | undefined> {
+    const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, userId));
+    return wallet;
+  }
+
+  async createWallet(userId: string): Promise<Wallet> {
+    const [wallet] = await db.insert(wallets).values({ userId, balance: "0" }).returning();
+    return wallet;
+  }
+
+  async updateWalletBalance(walletId: string, newBalance: string): Promise<Wallet> {
+    const [updated] = await db
+      .update(wallets)
+      .set({ balance: newBalance, updatedAt: new Date() })
+      .where(eq(wallets.id, walletId))
+      .returning();
+    return updated;
+  }
+
+  async getAllWallets(): Promise<WalletWithUser[]> {
+    const result = await db
+      .select()
+      .from(wallets)
+      .leftJoin(users, eq(wallets.userId, users.id))
+      .orderBy(desc(wallets.updatedAt));
+    
+    return result.map(r => ({
+      ...r.wallets,
+      user: r.users!,
+    }));
+  }
+
+  // Wallet transaction operations
+  async getWalletTransactions(walletId: string, limit: number = 50): Promise<WalletTransaction[]> {
+    return db
+      .select()
+      .from(walletTransactions)
+      .where(eq(walletTransactions.walletId, walletId))
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async createWalletTransaction(transaction: InsertWalletTransaction): Promise<WalletTransaction> {
+    const [created] = await db.insert(walletTransactions).values(transaction).returning();
+    return created;
+  }
+
+  // Wallet topup request operations
+  async getWalletTopupRequests(status?: string): Promise<WalletTopupRequestWithDetails[]> {
+    let query = db
+      .select()
+      .from(walletTopupRequests)
+      .leftJoin(users, eq(walletTopupRequests.userId, users.id))
+      .leftJoin(adminUsers, eq(walletTopupRequests.processedBy, adminUsers.id))
+      .orderBy(desc(walletTopupRequests.createdAt));
+    
+    const result = status
+      ? await query.where(eq(walletTopupRequests.status, status as any))
+      : await query;
+    
+    return result.map(r => ({
+      ...r.wallet_topup_requests,
+      user: r.users!,
+      processedByAdmin: r.admin_users || null,
+    }));
+  }
+
+  async getWalletTopupRequest(id: string): Promise<WalletTopupRequestWithDetails | undefined> {
+    const [result] = await db
+      .select()
+      .from(walletTopupRequests)
+      .leftJoin(users, eq(walletTopupRequests.userId, users.id))
+      .leftJoin(adminUsers, eq(walletTopupRequests.processedBy, adminUsers.id))
+      .where(eq(walletTopupRequests.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      ...result.wallet_topup_requests,
+      user: result.users!,
+      processedByAdmin: result.admin_users || null,
+    };
+  }
+
+  async getUserTopupRequests(userId: string): Promise<WalletTopupRequest[]> {
+    return db
+      .select()
+      .from(walletTopupRequests)
+      .where(eq(walletTopupRequests.userId, userId))
+      .orderBy(desc(walletTopupRequests.createdAt));
+  }
+
+  async createWalletTopupRequest(request: InsertWalletTopupRequest): Promise<WalletTopupRequest> {
+    const [created] = await db.insert(walletTopupRequests).values(request).returning();
+    return created;
+  }
+
+  async processWalletTopupRequest(id: string, adminId: string, approved: boolean, note?: string): Promise<WalletTopupRequest> {
+    const [updated] = await db
+      .update(walletTopupRequests)
+      .set({
+        status: approved ? "approved" : "rejected",
+        processedBy: adminId,
+        processedAt: new Date(),
+        adminNote: note,
+        updatedAt: new Date(),
+      })
+      .where(eq(walletTopupRequests.id, id))
+      .returning();
+    
+    return updated;
+  }
+
+  async getPendingTopupRequestsCount(): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(walletTopupRequests)
+      .where(eq(walletTopupRequests.status, "pending"));
+    return result[0]?.count || 0;
   }
 }
 
