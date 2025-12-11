@@ -269,22 +269,6 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
             My Account
           </p>
           {accountNavItems.map(renderNavItem)}
-          
-          {isAuthenticated && (
-            <Link href="/wallet">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-sm font-medium transition-all duration-200 rounded-xl h-12 px-3 group text-muted-foreground hover:text-foreground hover:bg-muted"
-                data-testid="nav-wallet"
-              >
-                <div className="w-8 h-8 mr-3 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-                  <Wallet className="w-4 h-4 text-white" />
-                </div>
-                My Wallet
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-              </Button>
-            </Link>
-          )}
         </div>
         
         <div className="pt-4 mt-4 border-t border-border">
