@@ -447,10 +447,15 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   <h3 className="text-lg font-semibold text-foreground mb-4">Order Summary</h3>
                   
                   <div className="space-y-3 mb-4">
-                    {cartItems?.map((item: CartItemWithProduct) => (
+                    {cartItems?.map((item: CartItemWithProduct) => {
+                      const productImages = item.product.imageUrls as string[] | null;
+                      const thumbnailSrc = productImages && productImages.length > 0 
+                        ? productImages[0] 
+                        : item.product.imageUrl || "/placeholder-product.svg";
+                      return (
                       <div key={item.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
                         <img 
-                          src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43"} 
+                          src={thumbnailSrc} 
                           alt={item.product.name}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
@@ -462,7 +467,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                           Rs. {(parseFloat(item.product.price) * item.quantity).toLocaleString()}
                         </p>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                   <div className="space-y-2 pt-4 border-t border-border">
