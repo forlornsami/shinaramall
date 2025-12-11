@@ -8,6 +8,8 @@ import CategoryManagement from "@/components/admin/category-management";
 import InventoryManagement from "@/components/admin/inventory-management";
 import PaymentManagement from "@/components/admin/payment-management";
 import WalletManagement from "@/components/admin/wallet-management";
+import CouponManagement from "@/components/admin/coupon-management";
+import ReviewManagement from "@/components/admin/review-management";
 import UserManagement from "@/components/admin/user-management";
 import RoleManagement from "@/components/admin/role-management";
 import SettingsSection from "@/components/admin/settings";
@@ -45,11 +47,13 @@ import {
   UserCog,
   MessageCircle,
   MessagesSquare,
-  Wallet
+  Wallet,
+  Ticket,
+  Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "wallets" | "users" | "roles" | "settings" | "help" | "chat" | "team-chat";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "wallets" | "coupons" | "reviews" | "users" | "roles" | "settings" | "help" | "chat" | "team-chat";
 
 const sidebarItems = [
   { id: "overview", label: "Dashboard", icon: BarChart3, color: "from-blue-500 to-blue-600" },
@@ -60,6 +64,8 @@ const sidebarItems = [
   { id: "inventory", label: "Inventory", icon: Warehouse, color: "from-cyan-500 to-cyan-600" },
   { id: "payments", label: "Payments", icon: CreditCard, color: "from-emerald-500 to-emerald-600" },
   { id: "wallets", label: "Wallets", icon: Wallet, color: "from-yellow-500 to-yellow-600" },
+  { id: "coupons", label: "Coupons", icon: Ticket, color: "from-rose-500 to-rose-600" },
+  { id: "reviews", label: "Reviews", icon: Star, color: "from-amber-500 to-amber-600" },
   { id: "chat", label: "Chat Support", icon: MessageCircle, color: "from-violet-500 to-violet-600" },
   { id: "team-chat", label: "Team Chat", icon: MessagesSquare, color: "from-sky-500 to-sky-600" },
 ];
@@ -229,10 +235,14 @@ export default function AdminDashboard() {
       customers: 'customers',
       inventory: 'inventory',
       payments: 'payments',
+      wallets: 'wallets',
+      coupons: 'payments',
+      reviews: 'products',
       users: 'users',
       roles: 'roles',
       settings: 'settings',
       chat: 'chat',
+      'team-chat': 'chat',
     };
     
     const permKey = sectionMap[section];
@@ -380,6 +390,10 @@ export default function AdminDashboard() {
         return <PaymentManagement />;
       case "wallets":
         return <WalletManagement />;
+      case "coupons":
+        return <CouponManagement />;
+      case "reviews":
+        return <ReviewManagement />;
       case "users":
         return <UserManagement />;
       case "roles":

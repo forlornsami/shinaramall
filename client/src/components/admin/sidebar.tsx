@@ -18,7 +18,9 @@ import {
   UserCog,
   MessageCircle,
   MessagesSquare,
-  Wallet
+  Wallet,
+  Ticket,
+  Star
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
@@ -73,6 +75,8 @@ const sectionToPermissionKey: Record<string, string> = {
   inventory: 'inventory',
   payments: 'payments',
   wallets: 'wallets',
+  coupons: 'payments',
+  reviews: 'products',
   users: 'users',
   roles: 'roles',
   settings: 'settings',
@@ -129,6 +133,18 @@ const sidebarItems = [
     label: "Wallets",
     icon: Wallet,
     color: "from-lime-500 to-lime-600",
+  },
+  {
+    id: "coupons",
+    label: "Coupons",
+    icon: Ticket,
+    color: "from-rose-500 to-rose-600",
+  },
+  {
+    id: "reviews",
+    label: "Reviews",
+    icon: Star,
+    color: "from-yellow-500 to-yellow-600",
   },
   {
     id: "chat",

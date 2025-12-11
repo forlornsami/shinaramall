@@ -3231,7 +3231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // Get all coupons (admin only)
-  app.get('/api/admin/coupons', requireAdmin, async (req, res) => {
+  app.get('/api/admin/coupons', adminAuth, async (req: any, res) => {
     try {
       const coupons = await storage.getCoupons();
       res.json(coupons);
@@ -3242,7 +3242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single coupon with details (admin only)
-  app.get('/api/admin/coupons/:id', requireAdmin, async (req, res) => {
+  app.get('/api/admin/coupons/:id', adminAuth, async (req: any, res) => {
     try {
       const coupon = await storage.getCoupon(req.params.id);
       if (!coupon) {
@@ -3256,7 +3256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create coupon (admin only)
-  app.post('/api/admin/coupons', requireAdmin, async (req, res) => {
+  app.post('/api/admin/coupons', adminAuth, async (req: any, res) => {
     try {
       const { categoryIds, productIds, ...couponData } = req.body;
       
@@ -3284,7 +3284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update coupon (admin only)
-  app.patch('/api/admin/coupons/:id', requireAdmin, async (req, res) => {
+  app.patch('/api/admin/coupons/:id', adminAuth, async (req: any, res) => {
     try {
       const { categoryIds, productIds, ...couponData } = req.body;
       
@@ -3314,7 +3314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete coupon (admin only)
-  app.delete('/api/admin/coupons/:id', requireAdmin, async (req, res) => {
+  app.delete('/api/admin/coupons/:id', adminAuth, async (req: any, res) => {
     try {
       await storage.deleteCoupon(req.params.id);
       res.json({ success: true });
@@ -3447,9 +3447,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check if user can review a product (authenticated customer)
-  app.get('/api/products/:productId/can-review', requireAuth, async (req, res) => {
+  app.get('/api/products/:productId/can-review', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user.id;
       const productId = req.params.productId;
       
       // Check if user already reviewed
@@ -3472,9 +3472,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Submit a review (authenticated customer)
-  app.post('/api/products/:productId/reviews', requireAuth, async (req, res) => {
+  app.post('/api/products/:productId/reviews', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user.id;
       const productId = req.params.productId;
       const { rating, title, comment } = req.body;
       
@@ -3521,7 +3521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all reviews (admin only)
-  app.get('/api/admin/reviews', requireAdmin, async (req, res) => {
+  app.get('/api/admin/reviews', adminAuth, async (req: any, res) => {
     try {
       const status = req.query.status as string | undefined;
       const reviews = await storage.getAllReviews(status);
@@ -3533,7 +3533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get pending reviews count (admin only)
-  app.get('/api/admin/reviews/pending-count', requireAdmin, async (req, res) => {
+  app.get('/api/admin/reviews/pending-count', adminAuth, async (req: any, res) => {
     try {
       const count = await storage.getPendingReviewsCount();
       res.json({ count });
@@ -3544,7 +3544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Moderate a review (admin only)
-  app.post('/api/admin/reviews/:id/moderate', requireAdmin, async (req, res) => {
+  app.post('/api/admin/reviews/:id/moderate', adminAuth, async (req: any, res) => {
     try {
       const { status, note } = req.body;
       
@@ -3561,7 +3561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a review (admin only)
-  app.delete('/api/admin/reviews/:id', requireAdmin, async (req, res) => {
+  app.delete('/api/admin/reviews/:id', adminAuth, async (req: any, res) => {
     try {
       await storage.deleteReview(req.params.id);
       res.json({ success: true });
