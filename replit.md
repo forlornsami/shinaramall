@@ -31,6 +31,7 @@ Preferred communication style: Simple, everyday language.
 ## Database Design
 - **Core Entities**: Users (customers), Admin Users, Products, Categories, Orders, Order Items, Cart Items.
 - **Payment**: `payment_accounts` for method details, extended `orders` table for verification status.
+- **Wallet System**: `wallets` (user balances), `wallet_transactions` (history), `wallet_topup_requests` (pending requests).
 - **Communication**: `chat_conversations`, `chat_messages`, `team_chat_conversations`, `team_chat_participants`, `team_chat_messages` for real-time chat.
 - **Notifications**: `notifications` table for system alerts.
 - **Wishlist**: `wishlistItems` for user preferences.
@@ -53,6 +54,7 @@ Preferred communication style: Simple, everyday language.
     - **Order Status Updates**: Sent when order status changes (processing, shipped, delivered, cancelled).
     - **Password Reset**: Available for account recovery.
 - **Wishlist**: Persistent wishlist for authenticated users (DB-backed) and guest users (localStorage), with automatic merge on login.
+- **Wallet System**: Internal wallet for customers with top-up requests, balance usage at checkout (full or partial payment), transaction history, and admin management including credits, deductions, and refunds.
 - **Store Customization**: Admin can upload store logo and change store name, affecting UI dynamically.
 - **Security**: Password change, active session management, robust validation, email verification.
 
