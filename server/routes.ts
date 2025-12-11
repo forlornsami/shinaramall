@@ -1186,6 +1186,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Refund wallet amount if wallet was used for this order
+      const walletAmountUsed = parseFloat(order.walletAmountUsed || "0");
+      if (walletAmountUsed > 0 && order.userId) {
+        const wallet = await storage.getWalletByUserId(order.userId);
+        if (wallet) {
+          const currentBalance = parseFloat(wallet.balance);
+          const newBalance = (currentBalance + walletAmountUsed).toFixed(2);
+          
+          // Refund to wallet
+          await storage.updateWalletBalance(wallet.id, newBalance);
+          
+          // Create wallet transaction for the refund
+          await storage.createWalletTransaction({
+            walletId: wallet.id,
+            type: 'credit',
+            amount: walletAmountUsed.toString(),
+            balanceAfter: newBalance,
+            description: `Refund for cancelled order #${order.orderNumber || order.id.slice(-8).toUpperCase()}`,
+            referenceType: 'order',
+            referenceId: order.id,
+          });
+        }
+      }
+      
       // Restore product stock
       const orderItems = await storage.getOrderItems(orderId);
       for (const item of orderItems) {
@@ -1461,9 +1485,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const originalOrder = await storage.getOrder(req.params.id);
       
       let order;
-      // If status is being changed to cancelled, restore inventory
+      // If status is being changed to cancelled, restore inventory and refund wallet
       if (status === 'cancelled') {
         order = await storage.cancelOrderAndRestoreInventory(req.params.id);
+        
+        // Refund wallet amount if wallet was used for this order
+        if (originalOrder) {
+          const walletAmountUsed = parseFloat(originalOrder.walletAmountUsed || "0");
+          if (walletAmountUsed > 0 && originalOrder.userId) {
+            const wallet = await storage.getWalletByUserId(originalOrder.userId);
+            if (wallet) {
+              const currentBalance = parseFloat(wallet.balance);
+              const newBalance = (currentBalance + walletAmountUsed).toFixed(2);
+              
+              // Refund to wallet
+              await storage.updateWalletBalance(wallet.id, newBalance);
+              
+              // Create wallet transaction for the refund
+              await storage.createWalletTransaction({
+                walletId: wallet.id,
+                type: 'credit',
+                amount: walletAmountUsed.toString(),
+                balanceAfter: newBalance,
+                description: `Refund for cancelled order #${originalOrder.orderNumber || originalOrder.id.slice(-8).toUpperCase()}`,
+                referenceType: 'order',
+                referenceId: originalOrder.id,
+              });
+            }
+          }
+        }
       } else {
         order = await storage.updateOrder(req.params.id, {
           status,
