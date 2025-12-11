@@ -1215,12 +1215,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { walletAmountUsed, ...restBody } = req.body;
+      const { walletAmountUsed, couponId, couponCode, couponDiscount, ...restBody } = req.body;
       
       const orderData = insertOrderSchema.parse({
         ...restBody,
         userId,
         walletAmountUsed: walletAmountUsed ? walletAmountUsed.toString() : "0",
+        couponCode: couponCode || null,
+        discountAmount: couponDiscount ? couponDiscount.toString() : "0",
       });
 
       // Get cart items first
@@ -1279,6 +1281,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           referenceType: 'order',
           referenceId: order.id,
         });
+      }
+      
+      // Track coupon redemption if coupon was used
+      if (couponId) {
+        try {
+          await storage.recordCouponRedemption({
+            couponId,
+            userId,
+            orderId: order.id,
+            discountAmount: couponDiscount ? couponDiscount.toString() : "0",
+          });
+        } catch (couponError) {
+          console.error("Error recording coupon redemption:", couponError);
+        }
       }
       
       for (const cartItem of cartItems) {

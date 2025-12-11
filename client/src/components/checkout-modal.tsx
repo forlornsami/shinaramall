@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal } from "lucide-react";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal, Ticket } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -85,6 +85,15 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [walletAmountToUse, setWalletAmountToUse] = useState("0");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    id: string;
+    code: string;
+    discountType: string;
+    discountValue: string;
+    discountAmount: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [shippingInfo, setShippingInfo] = useState({
     firstName: "",
     lastName: "",
@@ -119,20 +128,83 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   ) || 0;
   
   const shippingCost = subtotal > 5000 ? 0 : 300;
-  const subtotalWithShipping = subtotal + shippingCost;
   
-  // Calculate wallet amount to use (can't exceed balance or total)
+  // Calculate coupon discount
+  const couponDiscount = appliedCoupon?.discountAmount || 0;
+  
+  // Subtotal with shipping minus coupon discount
+  const subtotalWithShipping = subtotal + shippingCost;
+  const subtotalAfterCoupon = Math.max(0, subtotalWithShipping - couponDiscount);
+  
+  // Calculate wallet amount to use (can't exceed balance or total after coupon)
   const effectiveWalletAmount = useWallet 
-    ? Math.min(parseFloat(walletAmountToUse) || 0, walletBalance, subtotalWithShipping) 
+    ? Math.min(parseFloat(walletAmountToUse) || 0, walletBalance, subtotalAfterCoupon) 
     : 0;
-  const remainingAmount = subtotalWithShipping - effectiveWalletAmount;
+  const remainingAmount = subtotalAfterCoupon - effectiveWalletAmount;
   const total = remainingAmount;
   
   // If wallet covers full amount, no other payment needed
-  const walletCoversFullAmount = effectiveWalletAmount >= subtotalWithShipping;
+  const walletCoversFullAmount = effectiveWalletAmount >= subtotalAfterCoupon;
 
   const selectedPaymentConfig = paymentMethods.find(m => m.id === paymentMethod);
   const requiresPaymentProof = selectedPaymentConfig?.requiresProof || false;
+
+  // Coupon validation mutation
+  const validateCouponMutation = useMutation({
+    mutationFn: async (code: string) => {
+      // Build cart items with product and category info for validation
+      const cartData = cartItems?.map(item => ({
+        productId: item.product.id,
+        categoryId: item.product.categoryId,
+        price: parseFloat(item.product.price),
+        quantity: item.quantity,
+      })) || [];
+      
+      const response = await apiRequest('POST', '/api/coupons/validate', {
+        code,
+        cartItems: cartData,
+        subtotal,
+      });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      if (data.valid) {
+        setAppliedCoupon({
+          id: data.couponId,
+          code: data.code,
+          discountType: data.discountType,
+          discountValue: data.discountValue,
+          discountAmount: data.discountAmount,
+        });
+        setCouponError(null);
+        setCouponCode("");
+        toast({
+          title: "Coupon Applied!",
+          description: `You saved Rs. ${data.discountAmount.toLocaleString()}`,
+        });
+      } else {
+        setCouponError(data.message || "Invalid coupon code");
+      }
+    },
+    onError: (error: Error) => {
+      setCouponError(error.message || "Failed to validate coupon");
+    },
+  });
+
+  const handleApplyCoupon = () => {
+    if (!couponCode.trim()) {
+      setCouponError("Please enter a coupon code");
+      return;
+    }
+    setCouponError(null);
+    validateCouponMutation.mutate(couponCode.trim().toUpperCase());
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError(null);
+  };
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -140,9 +212,12 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         paymentMethod: walletCoversFullAmount ? 'wallet' : paymentMethod,
         subtotal: subtotal.toString(),
         shippingCost: shippingCost.toString(),
-        total: subtotalWithShipping.toString(),
+        total: subtotalAfterCoupon.toString(),
         shippingAddress: shippingInfo,
         walletAmountUsed: effectiveWalletAmount.toString(),
+        couponId: appliedCoupon?.id || null,
+        couponCode: appliedCoupon?.code || null,
+        couponDiscount: appliedCoupon?.discountAmount?.toString() || "0",
       };
       
       const response = await apiRequest('POST', '/api/orders', orderData);
@@ -316,6 +391,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setOrderNumber(null);
     setUseWallet(false);
     setWalletAmountToUse("0");
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError(null);
   };
   
   const handleApplyWallet = () => {
@@ -469,6 +547,77 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
+                {/* Coupon Section */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-primary" />
+                    Apply Coupon Code
+                  </h3>
+                  {appliedCoupon ? (
+                    <Card className="border-2 border-green-500 bg-green-50 dark:bg-green-900/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-green-700 dark:text-green-400" data-testid="text-applied-coupon">
+                                {appliedCoupon.code}
+                              </span>
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {appliedCoupon.discountType === 'percentage' 
+                                ? `${appliedCoupon.discountValue}% off` 
+                                : `Rs. ${parseFloat(appliedCoupon.discountValue).toLocaleString()} off`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-green-600" data-testid="text-coupon-savings">
+                              -Rs. {appliedCoupon.discountAmount.toLocaleString()}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleRemoveCoupon}
+                              className="text-red-600 border-red-300 hover:bg-red-50"
+                              data-testid="button-remove-coupon"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        value={couponCode}
+                        onChange={(e) => {
+                          setCouponCode(e.target.value.toUpperCase());
+                          setCouponError(null);
+                        }}
+                        placeholder="Enter coupon code"
+                        className={`flex-1 h-12 rounded-xl border-2 font-mono uppercase ${couponError ? 'border-red-500' : ''}`}
+                        data-testid="input-coupon-code"
+                      />
+                      <Button
+                        onClick={handleApplyCoupon}
+                        disabled={validateCouponMutation.isPending || !couponCode.trim()}
+                        className="h-12 px-6 rounded-xl"
+                        data-testid="button-apply-coupon"
+                      >
+                        {validateCouponMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Apply'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {couponError && (
+                    <p className="text-sm text-red-500 mt-2" data-testid="text-coupon-error">{couponError}</p>
+                  )}
+                </div>
+
                 {/* Wallet Section */}
                 {isAuthenticated && walletBalance > 0 && (
                   <div className="mb-6">
@@ -600,6 +749,16 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                         {shippingCost === 0 ? 'FREE' : `Rs. ${shippingCost.toLocaleString()}`}
                       </span>
                     </div>
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Ticket className="w-4 h-4" /> Coupon ({appliedCoupon?.code})
+                        </span>
+                        <span className="text-green-600 font-medium" data-testid="text-summary-coupon-discount">
+                          -Rs. {couponDiscount.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     {effectiveWalletAmount > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1">
