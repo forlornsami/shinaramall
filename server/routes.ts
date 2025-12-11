@@ -3227,6 +3227,351 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // COUPON ROUTES
+  // ============================================
+
+  // Get all coupons (admin only)
+  app.get('/api/admin/coupons', requireAdmin, async (req, res) => {
+    try {
+      const coupons = await storage.getCoupons();
+      res.json(coupons);
+    } catch (error) {
+      console.error("Error fetching coupons:", error);
+      res.status(500).json({ message: "Failed to fetch coupons" });
+    }
+  });
+
+  // Get single coupon with details (admin only)
+  app.get('/api/admin/coupons/:id', requireAdmin, async (req, res) => {
+    try {
+      const coupon = await storage.getCoupon(req.params.id);
+      if (!coupon) {
+        return res.status(404).json({ message: "Coupon not found" });
+      }
+      res.json(coupon);
+    } catch (error) {
+      console.error("Error fetching coupon:", error);
+      res.status(500).json({ message: "Failed to fetch coupon" });
+    }
+  });
+
+  // Create coupon (admin only)
+  app.post('/api/admin/coupons', requireAdmin, async (req, res) => {
+    try {
+      const { categoryIds, productIds, ...couponData } = req.body;
+      
+      // Check if code already exists
+      const existing = await storage.getCouponByCode(couponData.code);
+      if (existing) {
+        return res.status(400).json({ message: "Coupon code already exists" });
+      }
+      
+      const coupon = await storage.createCoupon(couponData);
+      
+      // Set category/product scope if applicable
+      if (couponData.scope === 'category' && categoryIds?.length > 0) {
+        await storage.setCouponCategories(coupon.id, categoryIds);
+      }
+      if (couponData.scope === 'product' && productIds?.length > 0) {
+        await storage.setCouponProducts(coupon.id, productIds);
+      }
+      
+      res.json(coupon);
+    } catch (error) {
+      console.error("Error creating coupon:", error);
+      res.status(500).json({ message: "Failed to create coupon" });
+    }
+  });
+
+  // Update coupon (admin only)
+  app.patch('/api/admin/coupons/:id', requireAdmin, async (req, res) => {
+    try {
+      const { categoryIds, productIds, ...couponData } = req.body;
+      
+      // Check if changing to a code that already exists
+      if (couponData.code) {
+        const existing = await storage.getCouponByCode(couponData.code);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(400).json({ message: "Coupon code already exists" });
+        }
+      }
+      
+      const coupon = await storage.updateCoupon(req.params.id, couponData);
+      
+      // Update category/product scope
+      if (categoryIds !== undefined) {
+        await storage.setCouponCategories(coupon.id, categoryIds || []);
+      }
+      if (productIds !== undefined) {
+        await storage.setCouponProducts(coupon.id, productIds || []);
+      }
+      
+      res.json(coupon);
+    } catch (error) {
+      console.error("Error updating coupon:", error);
+      res.status(500).json({ message: "Failed to update coupon" });
+    }
+  });
+
+  // Delete coupon (admin only)
+  app.delete('/api/admin/coupons/:id', requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteCoupon(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting coupon:", error);
+      res.status(500).json({ message: "Failed to delete coupon" });
+    }
+  });
+
+  // Validate and apply coupon (customer)
+  app.post('/api/coupons/validate', async (req, res) => {
+    try {
+      const { code, cartItems, userId } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ message: "Coupon code is required" });
+      }
+      
+      const coupon = await storage.getCouponByCode(code);
+      if (!coupon) {
+        return res.status(404).json({ message: "Invalid coupon code" });
+      }
+      
+      // Check if coupon is active
+      if (!coupon.isActive) {
+        return res.status(400).json({ message: "This coupon is no longer active" });
+      }
+      
+      // Check date validity
+      const now = new Date();
+      if (coupon.startsAt && new Date(coupon.startsAt) > now) {
+        return res.status(400).json({ message: "This coupon is not yet active" });
+      }
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < now) {
+        return res.status(400).json({ message: "This coupon has expired" });
+      }
+      
+      // Check usage limit
+      if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+        return res.status(400).json({ message: "This coupon has reached its usage limit" });
+      }
+      
+      // Check per-user usage limit
+      if (userId && coupon.usageLimitPerUser) {
+        const userRedemptions = await storage.getCouponRedemptionsByUser(coupon.id, userId);
+        if (userRedemptions.length >= coupon.usageLimitPerUser) {
+          return res.status(400).json({ message: "You have already used this coupon the maximum number of times" });
+        }
+      }
+      
+      // Calculate discount based on scope
+      let eligibleTotal = 0;
+      let applicableItems: string[] = [];
+      
+      if (!cartItems || cartItems.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+      
+      for (const item of cartItems) {
+        let isEligible = false;
+        
+        if (coupon.scope === 'all') {
+          isEligible = true;
+        } else if (coupon.scope === 'category' && coupon.categories) {
+          const product = await storage.getProduct(item.productId);
+          isEligible = product ? coupon.categories.some((c: any) => c.categoryId === product.categoryId) : false;
+        } else if (coupon.scope === 'product' && coupon.products) {
+          isEligible = coupon.products.some((p: any) => p.productId === item.productId);
+        }
+        
+        if (isEligible) {
+          eligibleTotal += parseFloat(item.price) * item.quantity;
+          applicableItems.push(item.productId);
+        }
+      }
+      
+      if (eligibleTotal === 0) {
+        return res.status(400).json({ message: "No items in your cart are eligible for this coupon" });
+      }
+      
+      // Check minimum order amount
+      if (coupon.minOrderAmount && eligibleTotal < parseFloat(coupon.minOrderAmount)) {
+        return res.status(400).json({ 
+          message: `Minimum order amount of Rs. ${coupon.minOrderAmount} required for this coupon` 
+        });
+      }
+      
+      // Calculate discount
+      let discount = 0;
+      if (coupon.discountType === 'percentage') {
+        discount = (eligibleTotal * parseFloat(coupon.discountValue)) / 100;
+        if (coupon.maxDiscount) {
+          discount = Math.min(discount, parseFloat(coupon.maxDiscount));
+        }
+      } else {
+        discount = Math.min(parseFloat(coupon.discountValue), eligibleTotal);
+      }
+      
+      res.json({
+        valid: true,
+        coupon: {
+          id: coupon.id,
+          code: coupon.code,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+        },
+        discount: discount.toFixed(2),
+        applicableItems,
+        message: `Coupon applied! You save Rs. ${discount.toFixed(2)}`,
+      });
+    } catch (error) {
+      console.error("Error validating coupon:", error);
+      res.status(500).json({ message: "Failed to validate coupon" });
+    }
+  });
+
+  // ============================================
+  // PRODUCT REVIEW ROUTES
+  // ============================================
+
+  // Get reviews for a product (public - approved only)
+  app.get('/api/products/:productId/reviews', async (req, res) => {
+    try {
+      const reviews = await storage.getProductReviews(req.params.productId, 'approved');
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  // Check if user can review a product (authenticated customer)
+  app.get('/api/products/:productId/can-review', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const productId = req.params.productId;
+      
+      // Check if user already reviewed
+      const existingReview = await storage.getUserReviewForProduct(userId, productId);
+      if (existingReview) {
+        return res.json({ canReview: false, reason: "You have already reviewed this product", existingReview });
+      }
+      
+      // Check if user has purchased and received the product
+      const hasPurchased = await storage.hasUserPurchasedProduct(userId, productId);
+      if (!hasPurchased) {
+        return res.json({ canReview: false, reason: "You can only review products you have purchased and received" });
+      }
+      
+      res.json({ canReview: true });
+    } catch (error) {
+      console.error("Error checking review eligibility:", error);
+      res.status(500).json({ message: "Failed to check review eligibility" });
+    }
+  });
+
+  // Submit a review (authenticated customer)
+  app.post('/api/products/:productId/reviews', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const productId = req.params.productId;
+      const { rating, title, comment } = req.body;
+      
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      
+      // Check if user already reviewed
+      const existingReview = await storage.getUserReviewForProduct(userId, productId);
+      if (existingReview) {
+        return res.status(400).json({ message: "You have already reviewed this product" });
+      }
+      
+      // Check if user has purchased and received the product
+      const hasPurchased = await storage.hasUserPurchasedProduct(userId, productId);
+      if (!hasPurchased) {
+        return res.status(400).json({ message: "You can only review products you have purchased and received" });
+      }
+      
+      const review = await storage.createReview({
+        productId,
+        userId,
+        rating,
+        title: title || null,
+        comment: comment || null,
+        isVerifiedPurchase: true,
+        status: 'pending',
+      });
+      
+      // Create notification for admin
+      await storage.createNotification({
+        recipientType: 'admin',
+        type: 'review_submitted',
+        title: 'New Product Review',
+        message: `A new review has been submitted and is pending moderation.`,
+        data: { reviewId: review.id, productId },
+      });
+      
+      res.json({ success: true, message: "Review submitted successfully and is pending approval" });
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      res.status(500).json({ message: "Failed to submit review" });
+    }
+  });
+
+  // Get all reviews (admin only)
+  app.get('/api/admin/reviews', requireAdmin, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const reviews = await storage.getAllReviews(status);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  // Get pending reviews count (admin only)
+  app.get('/api/admin/reviews/pending-count', requireAdmin, async (req, res) => {
+    try {
+      const count = await storage.getPendingReviewsCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching pending reviews count:", error);
+      res.status(500).json({ message: "Failed to fetch pending reviews count" });
+    }
+  });
+
+  // Moderate a review (admin only)
+  app.post('/api/admin/reviews/:id/moderate', requireAdmin, async (req, res) => {
+    try {
+      const { status, note } = req.body;
+      
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Status must be 'approved' or 'rejected'" });
+      }
+      
+      const review = await storage.moderateReview(req.params.id, req.admin.id, status, note);
+      res.json(review);
+    } catch (error) {
+      console.error("Error moderating review:", error);
+      res.status(500).json({ message: "Failed to moderate review" });
+    }
+  });
+
+  // Delete a review (admin only)
+  app.delete('/api/admin/reviews/:id', requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteReview(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting review:", error);
+      res.status(500).json({ message: "Failed to delete review" });
+    }
+  });
+
+  // ============================================
   // SEO ROUTES - Sitemap and Robots.txt
   // ============================================
 
