@@ -33,6 +33,7 @@ export type StorefrontSection =
   | "orders" 
   | "account" 
   | "cart" 
+  | "wallet"
   | "help"
   | `category-${string}`
   | `product-${string}`;
@@ -70,6 +71,13 @@ const accountNavItems = [
     label: "My Orders",
     icon: ClipboardList,
     color: "from-green-500 to-emerald-600",
+    requiresAuth: true,
+  },
+  {
+    id: "wallet" as StorefrontSection,
+    label: "My Wallet",
+    icon: Wallet,
+    color: "from-amber-500 to-yellow-600",
     requiresAuth: true,
   },
   {

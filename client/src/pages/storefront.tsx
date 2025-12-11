@@ -9,6 +9,7 @@ import CartView from "@/components/storefront/CartView";
 import OrdersView from "@/components/storefront/OrdersView";
 import AccountView from "@/components/storefront/AccountView";
 import HelpView from "@/components/storefront/HelpView";
+import WalletView from "@/components/storefront/WalletView";
 import { ChatWidget } from "@/components/storefront/ChatWidget";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
@@ -32,6 +33,7 @@ function isValidSection(section: string): section is StorefrontSection {
     "orders",
     "account",
     "cart",
+    "wallet",
     "help",
   ].includes(section) || section.startsWith("category-") || section.startsWith("product-");
 }
@@ -65,6 +67,7 @@ export default function Storefront() {
       featured: { title: "Featured Products", description: "Discover our hand-picked featured products and best sellers." },
       cart: { title: "Shopping Cart", description: "Review your shopping cart and proceed to checkout." },
       orders: { title: "My Orders", description: "Track and manage your orders." },
+      wallet: { title: "My Wallet", description: "Manage your wallet balance and transactions." },
       account: { title: "My Account", description: "Manage your account settings and preferences." },
       help: { title: "Help & Support", description: "Get help and support for your shopping experience." },
     };
@@ -105,6 +108,8 @@ export default function Storefront() {
         return <CartView />;
       case "orders":
         return <OrdersView />;
+      case "wallet":
+        return <WalletView />;
       case "account":
         return <AccountView />;
       case "help":

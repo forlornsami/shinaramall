@@ -21,6 +21,7 @@ import {
   Tag,
   ChevronDown,
   ChevronUp,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import type { StorefrontSection } from "./StorefrontSidebar";
@@ -38,6 +39,7 @@ const mainNavItems = [
 
 const accountNavItems = [
   { id: "orders" as StorefrontSection, label: "My Orders", icon: ClipboardList, color: "from-green-500 to-emerald-600", requiresAuth: true },
+  { id: "wallet" as StorefrontSection, label: "My Wallet", icon: Wallet, color: "from-amber-500 to-yellow-600", requiresAuth: true },
   { id: "account" as StorefrontSection, label: "My Account", icon: User, color: "from-indigo-500 to-violet-600", requiresAuth: true },
   { id: "cart" as StorefrontSection, label: "Cart", icon: ShoppingCart, color: "from-pink-500 to-rose-600" },
 ];
