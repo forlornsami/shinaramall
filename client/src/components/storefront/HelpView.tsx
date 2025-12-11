@@ -24,6 +24,7 @@ import {
   Package,
   RotateCcw,
   HeadphonesIcon,
+  Wallet,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -97,6 +98,32 @@ const faqs = [
       {
         q: "How do I update my profile?",
         a: "Go to 'My Account' section in the sidebar, click 'Edit Profile', make your changes, and click 'Save'."
+      },
+    ]
+  },
+  {
+    category: "Wallet",
+    icon: Wallet,
+    questions: [
+      {
+        q: "What is the wallet and how does it work?",
+        a: "Your wallet is a store credit balance that you can use for purchases. Add funds via EasyPaisa, JazzCash, or bank transfer, and use the balance at checkout for faster payments."
+      },
+      {
+        q: "How do I add money to my wallet?",
+        a: "Go to 'My Wallet' from the sidebar, click 'Top Up', select your payment method, enter the amount, make the payment, and upload the screenshot. Once verified by our team (usually within 24 hours), the balance will be added."
+      },
+      {
+        q: "Can I withdraw money from my wallet?",
+        a: "No, wallet balance is store credit only and cannot be withdrawn. It can only be used for purchases on this store. This helps us keep prices low and processing fast."
+      },
+      {
+        q: "What happens to refunds?",
+        a: "When an order is cancelled or returned, the refund amount is credited to your wallet automatically. You can use this balance for future purchases."
+      },
+      {
+        q: "Can I use wallet balance for partial payment?",
+        a: "Yes! During checkout, you can choose to pay partially with your wallet and the remaining amount via another payment method like EasyPaisa, JazzCash, or COD."
       },
     ]
   },

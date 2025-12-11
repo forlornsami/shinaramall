@@ -151,6 +151,14 @@ export default function WalletPage() {
           </div>
         </div>
 
+        <Card className="mb-4 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="p-4">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              <strong>Store Credit Policy:</strong> Your wallet balance is store credit that can be used for purchases on this store. Withdrawals are not available - balance can only be used for shopping. For refunds on cancelled orders, the amount is credited back to your wallet.
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

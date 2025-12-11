@@ -75,6 +75,26 @@ const faqItems = [
     answer: "The Dashboard shows key metrics including total orders, revenue, and product statistics. For detailed payment analytics, visit the Payments section where you can see transaction history and gateway performance.",
     category: "Analytics",
   },
+  {
+    question: "How does the customer wallet system work?",
+    answer: "Customers can add funds to their wallet using EasyPaisa, JazzCash, or bank transfer. They submit a top-up request with payment proof, which you verify in Wallets > Top-up Requests. Once approved, the balance is added to their wallet for use at checkout.",
+    category: "Wallet",
+  },
+  {
+    question: "Can customers withdraw money from their wallet?",
+    answer: "No, wallet balances are store credit only. Customers cannot withdraw funds - they can only use the balance for purchases. This policy is clearly communicated to customers on their wallet page and in Help & Support.",
+    category: "Wallet",
+  },
+  {
+    question: "How do I process wallet top-up requests?",
+    answer: "Go to Wallets section and click on 'Top-up Requests'. Review the payment screenshot and transaction ID submitted by the customer. Click 'Approve' to add the balance, or 'Reject' with a reason if the payment cannot be verified.",
+    category: "Wallet",
+  },
+  {
+    question: "How do refunds work with the wallet?",
+    answer: "When you cancel or refund an order that was paid (fully or partially) with wallet balance, use the 'Add Credit' feature in Wallets to refund the amount back to the customer's wallet. This is tracked as a 'refund' transaction in their history.",
+    category: "Wallet",
+  },
 ];
 
 const quickLinks = [
