@@ -530,26 +530,9 @@ export default function OrderManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
-                              {getPaymentStatusLabel(order.paymentStatus)}
-                            </Badge>
-                            <Select
-                              value={order.paymentStatus}
-                              onValueChange={(value) => updateOrderMutation.mutate({ orderId: order.id, paymentStatus: value })}
-                            >
-                              <SelectTrigger className="w-28 h-8" data-testid={`select-payment-status-${order.id}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending" data-testid="option-payment-pending">Pending</SelectItem>
-                                <SelectItem value="processing" data-testid="option-payment-processing">Processing</SelectItem>
-                                <SelectItem value="completed" data-testid="option-payment-completed">Completed</SelectItem>
-                                <SelectItem value="failed" data-testid="option-payment-failed">Failed</SelectItem>
-                                <SelectItem value="refunded" data-testid="option-payment-refunded">Refunded</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Badge className={getPaymentStatusColor(order.paymentStatus)} data-testid={`badge-payment-status-${order.id}`}>
+                            {getPaymentStatusLabel(order.paymentStatus)}
+                          </Badge>
                           <div className="text-xs text-muted-foreground" data-testid={`text-payment-method-${order.id}`}>
                             {order.paymentMethod?.toUpperCase()}
                           </div>
