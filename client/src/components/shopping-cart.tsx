@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
+import { getProductThumbnail } from "@/lib/utils";
 import type { CartItem, Product } from "@shared/schema";
 
 interface ShoppingCartProps {
@@ -113,7 +114,7 @@ export default function ShoppingCart({ isOpen, onClose, onCheckout }: ShoppingCa
                     {/* Product Image */}
                     <div className="relative">
                       <img 
-                        src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80"} 
+                        src={getProductThumbnail(item.product)} 
                         alt={item.product.name} 
                         className="w-20 h-20 object-cover rounded-xl shadow-sm"
                         data-testid={`img-cart-item-${item.id}`}
