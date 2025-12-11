@@ -1268,11 +1268,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const order = await storage.createOrder(orderData);
       
       // Create wallet transaction if wallet was used (use stored values, not re-fetch)
-      // Store positive amount for 'purchase' type (debit is implied by transaction type)
+      // Store positive amount for 'debit' type (indicates money used from wallet)
       if (walletAmount > 0 && walletId && newWalletBalance !== null) {
         await storage.createWalletTransaction({
           walletId: walletId,
-          type: 'purchase',
+          type: 'debit',
           amount: walletAmount.toString(),
           balanceAfter: newWalletBalance,
           description: `Order #${order.orderNumber || order.id.slice(-8).toUpperCase()}`,
@@ -3013,7 +3013,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get specific wallet with transactions
+  // Get pending topup requests count (MUST be before :userId route)
+  app.get('/api/admin/wallets/topup-requests/pending-count', adminAuth, async (req: any, res) => {
+    try {
+      const count = await storage.getPendingTopupRequestsCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Error getting pending count:", error);
+      res.status(500).json({ message: "Failed to get pending count" });
+    }
+  });
+
+  // Get all topup requests (MUST be before :userId route)
+  app.get('/api/admin/wallets/topup-requests', adminAuth, async (req: any, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const requests = await storage.getWalletTopupRequests(status);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting topup requests:", error);
+      res.status(500).json({ message: "Failed to get topup requests" });
+    }
+  });
+
+  // Get specific wallet with transactions (parameterized route MUST come after specific routes)
   app.get('/api/admin/wallets/:userId', adminAuth, async (req: any, res) => {
     try {
       const wallet = await storage.getWalletByUserId(req.params.userId);
@@ -3027,29 +3050,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting wallet:", error);
       res.status(500).json({ message: "Failed to get wallet" });
-    }
-  });
-
-  // Get pending topup requests count
-  app.get('/api/admin/wallets/topup-requests/pending-count', adminAuth, async (req: any, res) => {
-    try {
-      const count = await storage.getPendingTopupRequestsCount();
-      res.json({ count });
-    } catch (error) {
-      console.error("Error getting pending count:", error);
-      res.status(500).json({ message: "Failed to get pending count" });
-    }
-  });
-
-  // Get all topup requests
-  app.get('/api/admin/wallets/topup-requests', adminAuth, async (req: any, res) => {
-    try {
-      const status = req.query.status as string | undefined;
-      const requests = await storage.getWalletTopupRequests(status);
-      res.json(requests);
-    } catch (error) {
-      console.error("Error getting topup requests:", error);
-      res.status(500).json({ message: "Failed to get topup requests" });
     }
   });
 
