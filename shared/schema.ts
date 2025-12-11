@@ -52,6 +52,7 @@ export const roles = pgTable("roles", {
     customers: { view: boolean };
     inventory: { view: boolean; adjust: boolean };
     payments: { view: boolean; manage: boolean };
+    wallets?: { view: boolean; manage: boolean };
     users: { view: boolean; create: boolean; edit: boolean; delete: boolean };
     roles: { view: boolean; create: boolean; edit: boolean; delete: boolean };
     settings: { view: boolean; edit: boolean };
@@ -404,6 +405,7 @@ export type RolePermissions = {
   customers: { view: boolean };
   inventory: { view: boolean; adjust: boolean };
   payments: { view: boolean; manage: boolean };
+  wallets?: { view: boolean; manage: boolean };
   users: { view: boolean; create: boolean; edit: boolean; delete: boolean };
   roles: { view: boolean; create: boolean; edit: boolean; delete: boolean };
   settings: { view: boolean; edit: boolean };

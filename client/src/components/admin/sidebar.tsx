@@ -39,6 +39,7 @@ interface Permissions {
   customers?: Permission;
   inventory?: Permission;
   payments?: Permission;
+  wallets?: Permission;
   users?: Permission;
   roles?: Permission;
   settings?: Permission;
@@ -71,7 +72,7 @@ const sectionToPermissionKey: Record<string, string> = {
   customers: 'customers',
   inventory: 'inventory',
   payments: 'payments',
-  wallets: 'payments',
+  wallets: 'wallets',
   users: 'users',
   roles: 'roles',
   settings: 'settings',
