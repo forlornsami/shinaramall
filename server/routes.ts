@@ -1269,6 +1269,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create order
       const order = await storage.createOrder(orderData);
       
+      // Auto-approve wallet and COD orders (no manual payment verification needed)
+      if (orderData.paymentMethod === 'wallet' || orderData.paymentMethod === 'cod') {
+        await storage.updateOrder(order.id, {
+          verificationStatus: 'approved',
+          paymentStatus: orderData.paymentMethod === 'wallet' ? 'completed' : 'pending',
+        });
+      }
+      
       // Create wallet transaction if wallet was used (use stored values, not re-fetch)
       // Store positive amount for 'debit' type (indicates money used from wallet)
       if (walletAmount > 0 && walletId && newWalletBalance !== null) {

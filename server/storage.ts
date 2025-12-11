@@ -1561,7 +1561,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(orders.verificationStatus, 'pending'),
-          sql`${orders.paymentMethod} != 'cod'`
+          sql`${orders.paymentMethod} != 'cod'`,
+          sql`${orders.paymentMethod} != 'wallet'`
         )
       )
       .orderBy(desc(orders.createdAt));
