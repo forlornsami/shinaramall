@@ -165,6 +165,7 @@ export const orders = pgTable("orders", {
   paymentMethod: varchar("payment_method"), // Changed to varchar to avoid enum conflicts
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull().default("0"),
+  walletAmountUsed: decimal("wallet_amount_used", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   shippingAddress: jsonb("shipping_address").$type<{
     firstName: string;
@@ -820,4 +821,132 @@ export type TeamChatConversationWithDetails = TeamChatConversation & {
 export type TeamChatMessageWithSender = TeamChatMessage & {
   sender?: AdminUser | null;
   replyToMessage?: TeamChatMessage | null;
+};
+
+// ==================== WALLET SYSTEM ====================
+
+// Wallet transaction type enum
+export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", [
+  "credit",      // Money added to wallet
+  "debit",       // Money used from wallet
+  "refund",      // Refund credited to wallet
+  "topup",       // Top-up credited after admin approval
+  "adjustment"   // Manual adjustment by admin
+]);
+
+// Wallet topup request status enum
+export const walletTopupStatusEnum = pgEnum("wallet_topup_status", [
+  "pending",
+  "approved",
+  "rejected"
+]);
+
+// Wallets table - one per customer
+export const wallets = pgTable("wallets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default("0"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Wallet transactions table - records all wallet activity
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  walletId: varchar("wallet_id").references(() => wallets.id, { onDelete: "cascade" }).notNull(),
+  type: walletTransactionTypeEnum("type").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  balanceAfter: decimal("balance_after", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
+  referenceType: varchar("reference_type"), // 'order', 'topup_request', 'refund', 'manual'
+  referenceId: varchar("reference_id"), // orderId, topupRequestId, etc.
+  createdBy: varchar("created_by"), // adminUserId for manual adjustments
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Wallet topup requests table
+export const walletTopupRequests = pgTable("wallet_topup_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  walletId: varchar("wallet_id").references(() => wallets.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method").notNull(), // 'easypaisa', 'jazzcash', 'hbl'
+  screenshotUrl: text("screenshot_url"),
+  transactionId: varchar("transaction_id"),
+  status: walletTopupStatusEnum("status").notNull().default("pending"),
+  adminNote: text("admin_note"),
+  processedBy: varchar("processed_by").references(() => adminUsers.id),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Wallet relations
+export const walletsRelations = relations(wallets, ({ one, many }) => ({
+  user: one(users, {
+    fields: [wallets.userId],
+    references: [users.id],
+  }),
+  transactions: many(walletTransactions),
+  topupRequests: many(walletTopupRequests),
+}));
+
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(wallets, {
+    fields: [walletTransactions.walletId],
+    references: [wallets.id],
+  }),
+}));
+
+export const walletTopupRequestsRelations = relations(walletTopupRequests, ({ one }) => ({
+  wallet: one(wallets, {
+    fields: [walletTopupRequests.walletId],
+    references: [wallets.id],
+  }),
+  user: one(users, {
+    fields: [walletTopupRequests.userId],
+    references: [users.id],
+  }),
+  processedByAdmin: one(adminUsers, {
+    fields: [walletTopupRequests.processedBy],
+    references: [adminUsers.id],
+  }),
+}));
+
+// Wallet insert schemas
+export const insertWalletSchema = createInsertSchema(wallets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWalletTransactionSchema = createInsertSchema(walletTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWalletTopupRequestSchema = createInsertSchema(walletTopupRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  processedAt: true,
+});
+
+// Wallet types
+export type Wallet = typeof wallets.$inferSelect;
+export type InsertWallet = z.infer<typeof insertWalletSchema>;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
+export type WalletTopupRequest = typeof walletTopupRequests.$inferSelect;
+export type InsertWalletTopupRequest = z.infer<typeof insertWalletTopupRequestSchema>;
+
+// Extended wallet types with relations
+export type WalletWithUser = Wallet & {
+  user: User;
+};
+
+export type WalletTopupRequestWithDetails = WalletTopupRequest & {
+  user: User;
+  processedByAdmin?: AdminUser | null;
 };
