@@ -268,7 +268,9 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">
             My Account
           </p>
-          {accountNavItems.map(renderNavItem)}
+          {accountNavItems
+            .filter(item => !item.requiresAuth || isAuthenticated)
+            .map(renderNavItem)}
         </div>
         
         <div className="pt-4 mt-4 border-t border-border">
