@@ -67,7 +67,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
-  const { data: canReview } = useQuery<{ canReview: boolean; reason?: string }>({
+  const { data: canReview } = useQuery<{ canReview: boolean; reason?: string; existingReview?: Review }>({
     queryKey: ["/api/products", productId, "can-review"],
     queryFn: async () => {
       const token = getToken();
@@ -105,8 +105,8 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
     },
   });
 
-  // Find the current user's review
-  const userReview = reviews?.find(r => r.userId === user?.id);
+  // Find the current user's review (from approved reviews or from can-review response for pending)
+  const userReview = reviews?.find(r => r.userId === user?.id) || canReview?.existingReview;
 
   const calculateStats = (): ReviewStats => {
     if (!reviews || reviews.length === 0) {
