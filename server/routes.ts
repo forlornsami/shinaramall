@@ -1654,6 +1654,371 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SUPPLIER MANAGEMENT ROUTES ====================
+  
+  // Get all suppliers
+  app.get('/api/admin/suppliers', adminAuth, async (req, res) => {
+    try {
+      const suppliers = await storage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      res.status(500).json({ message: "Failed to fetch suppliers" });
+    }
+  });
+
+  // Get single supplier
+  app.get('/api/admin/suppliers/:id', adminAuth, async (req, res) => {
+    try {
+      const supplier = await storage.getSupplier(req.params.id);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error fetching supplier:", error);
+      res.status(500).json({ message: "Failed to fetch supplier" });
+    }
+  });
+
+  // Create supplier
+  app.post('/api/admin/suppliers', adminAuth, async (req, res) => {
+    try {
+      const { name, contactPerson, email, phone, address, city, notes, isActive } = req.body;
+      
+      if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Supplier name is required" });
+      }
+      
+      const supplier = await storage.createSupplier({
+        name: name.trim(),
+        contactPerson: contactPerson?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        address: address?.trim() || null,
+        city: city?.trim() || null,
+        notes: notes?.trim() || null,
+        isActive: isActive !== false,
+      });
+      
+      res.status(201).json(supplier);
+    } catch (error) {
+      console.error("Error creating supplier:", error);
+      res.status(500).json({ message: "Failed to create supplier" });
+    }
+  });
+
+  // Update supplier
+  app.patch('/api/admin/suppliers/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, contactPerson, email, phone, address, city, notes, isActive } = req.body;
+      
+      const existingSupplier = await storage.getSupplier(id);
+      if (!existingSupplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      
+      const updates: any = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name.trim();
+      if (contactPerson !== undefined) updates.contactPerson = contactPerson?.trim() || null;
+      if (email !== undefined) updates.email = email?.trim() || null;
+      if (phone !== undefined) updates.phone = phone?.trim() || null;
+      if (address !== undefined) updates.address = address?.trim() || null;
+      if (city !== undefined) updates.city = city?.trim() || null;
+      if (notes !== undefined) updates.notes = notes?.trim() || null;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const supplier = await storage.updateSupplier(id, updates);
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      res.status(500).json({ message: "Failed to update supplier" });
+    }
+  });
+
+  // Delete supplier
+  app.delete('/api/admin/suppliers/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const existingSupplier = await storage.getSupplier(id);
+      if (!existingSupplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      
+      await storage.deleteSupplier(id);
+      res.json({ message: "Supplier deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      res.status(500).json({ message: "Failed to delete supplier" });
+    }
+  });
+
+  // ==================== PURCHASE ORDER ROUTES ====================
+  
+  // Get all purchases
+  app.get('/api/admin/purchases', adminAuth, async (req, res) => {
+    try {
+      const purchases = await storage.getPurchases();
+      res.json(purchases);
+    } catch (error) {
+      console.error("Error fetching purchases:", error);
+      res.status(500).json({ message: "Failed to fetch purchases" });
+    }
+  });
+
+  // Get single purchase with items
+  app.get('/api/admin/purchases/:id', adminAuth, async (req, res) => {
+    try {
+      const purchase = await storage.getPurchase(req.params.id);
+      if (!purchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+      res.json(purchase);
+    } catch (error) {
+      console.error("Error fetching purchase:", error);
+      res.status(500).json({ message: "Failed to fetch purchase" });
+    }
+  });
+
+  // Create purchase order
+  app.post('/api/admin/purchases', adminAuth, async (req: any, res) => {
+    try {
+      const { supplierId, items, shippingCost, otherCosts, notes, expectedDate } = req.body;
+      
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+      
+      // Calculate subtotal
+      let subtotal = 0;
+      for (const item of items) {
+        if (!item.productId || !item.quantity || !item.costPrice) {
+          return res.status(400).json({ message: "Each item must have productId, quantity, and costPrice" });
+        }
+        subtotal += item.quantity * parseFloat(item.costPrice);
+      }
+      
+      const total = subtotal + parseFloat(shippingCost || 0) + parseFloat(otherCosts || 0);
+      
+      const purchase = await storage.createPurchase({
+        supplierId: supplierId || null,
+        status: 'pending',
+        subtotal: subtotal.toString(),
+        shippingCost: (shippingCost || 0).toString(),
+        otherCosts: (otherCosts || 0).toString(),
+        total: total.toString(),
+        notes: notes || null,
+        expectedDate: expectedDate ? new Date(expectedDate) : null,
+      }, items, req.admin.id);
+      
+      res.status(201).json(purchase);
+    } catch (error) {
+      console.error("Error creating purchase:", error);
+      res.status(500).json({ message: "Failed to create purchase" });
+    }
+  });
+
+  // Update purchase order
+  app.patch('/api/admin/purchases/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { supplierId, shippingCost, otherCosts, notes, expectedDate } = req.body;
+      
+      const existingPurchase = await storage.getPurchase(id);
+      if (!existingPurchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+      
+      // Don't allow updates if purchase is received or cancelled
+      if (existingPurchase.status === 'received' || existingPurchase.status === 'cancelled') {
+        return res.status(400).json({ message: "Cannot update a received or cancelled purchase" });
+      }
+      
+      const updates: any = { updatedAt: new Date() };
+      if (supplierId !== undefined) updates.supplierId = supplierId;
+      if (shippingCost !== undefined) updates.shippingCost = shippingCost.toString();
+      if (otherCosts !== undefined) updates.otherCosts = otherCosts.toString();
+      if (notes !== undefined) updates.notes = notes;
+      if (expectedDate !== undefined) updates.expectedDate = expectedDate ? new Date(expectedDate) : null;
+      
+      // Recalculate total if costs changed
+      if (shippingCost !== undefined || otherCosts !== undefined) {
+        const subtotal = parseFloat(existingPurchase.subtotal);
+        const newShipping = shippingCost !== undefined ? parseFloat(shippingCost) : parseFloat(existingPurchase.shippingCost || '0');
+        const newOther = otherCosts !== undefined ? parseFloat(otherCosts) : parseFloat(existingPurchase.otherCosts || '0');
+        updates.total = (subtotal + newShipping + newOther).toString();
+      }
+      
+      const purchase = await storage.updatePurchase(id, updates);
+      res.json(purchase);
+    } catch (error) {
+      console.error("Error updating purchase:", error);
+      res.status(500).json({ message: "Failed to update purchase" });
+    }
+  });
+
+  // Update purchase status
+  app.patch('/api/admin/purchases/:id/status', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      const validStatuses = ['pending', 'ordered', 'received', 'partially_received', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      const existingPurchase = await storage.getPurchase(id);
+      if (!existingPurchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+      
+      const purchase = await storage.updatePurchaseStatus(id, status);
+      res.json(purchase);
+    } catch (error) {
+      console.error("Error updating purchase status:", error);
+      res.status(500).json({ message: "Failed to update purchase status" });
+    }
+  });
+
+  // Receive purchase (adds stock to products)
+  app.post('/api/admin/purchases/:id/receive', adminAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { receivedItems } = req.body; // Array of { purchaseItemId, receivedQuantity }
+      
+      const existingPurchase = await storage.getPurchase(id);
+      if (!existingPurchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+      
+      if (existingPurchase.status === 'cancelled') {
+        return res.status(400).json({ message: "Cannot receive a cancelled purchase" });
+      }
+      
+      const purchase = await storage.receivePurchase(id, receivedItems, req.admin.id);
+      res.json(purchase);
+    } catch (error) {
+      console.error("Error receiving purchase:", error);
+      res.status(500).json({ message: "Failed to receive purchase" });
+    }
+  });
+
+  // Delete purchase order
+  app.delete('/api/admin/purchases/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const existingPurchase = await storage.getPurchase(id);
+      if (!existingPurchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+      
+      // Don't allow deletion if purchase is received (stock already added)
+      if (existingPurchase.status === 'received' || existingPurchase.status === 'partially_received') {
+        return res.status(400).json({ message: "Cannot delete a received purchase" });
+      }
+      
+      await storage.deletePurchase(id);
+      res.json({ message: "Purchase deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting purchase:", error);
+      res.status(500).json({ message: "Failed to delete purchase" });
+    }
+  });
+
+  // ==================== INVENTORY DASHBOARD ROUTES ====================
+  
+  // Get inventory summary
+  app.get('/api/admin/inventory/summary', adminAuth, async (req, res) => {
+    try {
+      const summary = await storage.getInventorySummary();
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching inventory summary:", error);
+      res.status(500).json({ message: "Failed to fetch inventory summary" });
+    }
+  });
+
+  // Get low stock products
+  app.get('/api/admin/inventory/low-stock', adminAuth, async (req, res) => {
+    try {
+      const products = await storage.getLowStockProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching low stock products:", error);
+      res.status(500).json({ message: "Failed to fetch low stock products" });
+    }
+  });
+
+  // Get stock adjustments history
+  app.get('/api/admin/inventory/adjustments', adminAuth, async (req, res) => {
+    try {
+      const { productId, limit } = req.query;
+      const adjustments = await storage.getStockAdjustments(
+        productId as string | undefined,
+        limit ? parseInt(limit as string) : undefined
+      );
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Error fetching stock adjustments:", error);
+      res.status(500).json({ message: "Failed to fetch stock adjustments" });
+    }
+  });
+
+  // Create manual stock adjustment
+  app.post('/api/admin/inventory/adjust', adminAuth, async (req: any, res) => {
+    try {
+      const { productId, newStock, reason, adjustmentType } = req.body;
+      
+      if (!productId) {
+        return res.status(400).json({ message: "Product ID is required" });
+      }
+      
+      if (typeof newStock !== 'number' || newStock < 0) {
+        return res.status(400).json({ message: "New stock must be a non-negative number" });
+      }
+      
+      const validTypes = ['manual', 'damage', 'return', 'correction', 'other'];
+      if (adjustmentType && !validTypes.includes(adjustmentType)) {
+        return res.status(400).json({ message: "Invalid adjustment type" });
+      }
+      
+      const result = await storage.adjustProductStock(
+        productId,
+        newStock,
+        adjustmentType || 'manual',
+        reason || null,
+        req.admin.id
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error adjusting stock:", error);
+      res.status(500).json({ message: "Failed to adjust stock" });
+    }
+  });
+
+  // ==================== PROFIT ANALYTICS ROUTES ====================
+  
+  // Get profit analytics
+  app.get('/api/admin/profit-analytics', adminAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const analytics = await storage.getProfitAnalytics(start, end);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching profit analytics:", error);
+      res.status(500).json({ message: "Failed to fetch profit analytics" });
+    }
+  });
+
   // Admin dashboard stats
   app.get('/api/admin/stats', adminAuth, async (req, res) => {
     try {
