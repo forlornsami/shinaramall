@@ -304,22 +304,28 @@ export default function PurchaseManagement() {
 
                 <div>
                   <Label className="mb-2 block">Items</Label>
+                  <div className="flex gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                    <div className="flex-1">Product</div>
+                    <div className="w-20 text-center">Quantity</div>
+                    <div className="w-28 text-center">Cost (Rs.)</div>
+                    <div className="w-9"></div>
+                  </div>
                   {purchaseItems.map((item, index) => (
                     <div key={index} className="flex gap-2 mb-2">
                       <Select value={item.productId} onValueChange={(v) => updateItem(index, 'productId', v)}>
-                        <SelectTrigger className="flex-1"><SelectValue placeholder="Select product" /></SelectTrigger>
+                        <SelectTrigger className="flex-1" data-testid={`select-product-${index}`}><SelectValue placeholder="Select product" /></SelectTrigger>
                         <SelectContent>
                           {products?.map(p => (
                             <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <Input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)} className="w-20" placeholder="Qty" />
-                      <Input type="number" min="0" step="0.01" value={item.costPrice} onChange={(e) => updateItem(index, 'costPrice', e.target.value)} className="w-28" placeholder="Cost" />
-                      <Button variant="ghost" size="icon" onClick={() => removeItem(index)} disabled={purchaseItems.length === 1}><Trash2 className="h-4 w-4" /></Button>
+                      <Input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)} className="w-20" data-testid={`input-quantity-${index}`} />
+                      <Input type="number" min="0" step="0.01" value={item.costPrice} onChange={(e) => updateItem(index, 'costPrice', e.target.value)} className="w-28" data-testid={`input-cost-${index}`} />
+                      <Button variant="ghost" size="icon" onClick={() => removeItem(index)} disabled={purchaseItems.length === 1} data-testid={`button-remove-item-${index}`}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={addItem}><Plus className="h-4 w-4 mr-1" />Add Item</Button>
+                  <Button variant="outline" size="sm" onClick={addItem} data-testid="button-add-item"><Plus className="h-4 w-4 mr-1" />Add Item</Button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
