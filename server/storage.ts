@@ -4,6 +4,10 @@ import {
   roles,
   categories,
   products,
+  suppliers,
+  purchases,
+  purchaseItems,
+  stockAdjustments,
   orders,
   orderItems,
   cartItems,
@@ -92,6 +96,14 @@ import {
   type ProductReview,
   type InsertProductReview,
   type ProductReviewWithDetails,
+  type Supplier,
+  type InsertSupplier,
+  type Purchase,
+  type InsertPurchase,
+  type PurchaseItem,
+  type InsertPurchaseItem,
+  type StockAdjustment,
+  type InsertStockAdjustment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
@@ -304,6 +316,32 @@ export interface IStorage {
   deleteReview(id: string): Promise<boolean>;
   updateProductRating(productId: string): Promise<void>;
   getPendingReviewsCount(): Promise<number>;
+  
+  // Supplier operations
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier>;
+  deleteSupplier(id: string): Promise<boolean>;
+  
+  // Purchase operations
+  getPurchases(): Promise<(Purchase & { supplier?: Supplier; itemCount?: number })[]>;
+  getPurchase(id: string): Promise<(Purchase & { supplier?: Supplier; items: (PurchaseItem & { product?: Product })[] }) | undefined>;
+  createPurchase(purchase: InsertPurchase, items: { productId: string; quantity: number; costPrice: string }[], adminId: string): Promise<Purchase>;
+  updatePurchase(id: string, purchase: Partial<InsertPurchase>): Promise<Purchase>;
+  updatePurchaseStatus(id: string, status: string): Promise<Purchase>;
+  receivePurchase(id: string, receivedItems: { purchaseItemId: string; receivedQuantity: number }[], adminId: string): Promise<Purchase>;
+  deletePurchase(id: string): Promise<boolean>;
+  
+  // Stock adjustment operations
+  getStockAdjustments(productId?: string): Promise<(StockAdjustment & { product?: Product })[]>;
+  createStockAdjustment(adjustment: InsertStockAdjustment, adminId: string): Promise<StockAdjustment>;
+  adjustProductStock(productId: string, newStock: number, type: string, reason: string, adminId: string, referenceId?: string, referenceType?: string): Promise<Product>;
+  
+  // Inventory & profit analytics
+  getLowStockProducts(): Promise<Product[]>;
+  getInventorySummary(): Promise<{ totalProducts: number; totalStock: number; lowStockCount: number; outOfStockCount: number; totalValue: number; totalCostValue: number }>;
+  getProfitAnalytics(startDate?: Date, endDate?: Date): Promise<{ totalRevenue: number; totalCost: number; profit: number; margin: number; orderCount: number; topProfitProducts: { product: Product; profit: number; quantity: number }[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2309,6 +2347,377 @@ export class DatabaseStorage implements IStorage {
       .from(productReviews)
       .where(eq(productReviews.status, "pending"));
     return result[0]?.count || 0;
+  }
+
+  // Supplier operations
+  async getSuppliers(): Promise<Supplier[]> {
+    return db.select().from(suppliers).orderBy(desc(suppliers.createdAt));
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier;
+  }
+
+  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+    const [created] = await db.insert(suppliers).values(supplier).returning();
+    return created;
+  }
+
+  async updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier> {
+    const [updated] = await db
+      .update(suppliers)
+      .set({ ...supplier, updatedAt: new Date() })
+      .where(eq(suppliers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSupplier(id: string): Promise<boolean> {
+    await db.delete(suppliers).where(eq(suppliers.id, id));
+    return true;
+  }
+
+  // Purchase operations
+  async getPurchases(): Promise<(Purchase & { supplier?: Supplier; itemCount?: number })[]> {
+    const purchaseList = await db.select().from(purchases).orderBy(desc(purchases.createdAt));
+    
+    const result = await Promise.all(purchaseList.map(async (purchase) => {
+      let supplier: Supplier | undefined;
+      if (purchase.supplierId) {
+        const [s] = await db.select().from(suppliers).where(eq(suppliers.id, purchase.supplierId));
+        supplier = s;
+      }
+      
+      const itemCountResult = await db
+        .select({ count: count() })
+        .from(purchaseItems)
+        .where(eq(purchaseItems.purchaseId, purchase.id));
+      
+      return {
+        ...purchase,
+        supplier,
+        itemCount: itemCountResult[0]?.count || 0,
+      };
+    }));
+    
+    return result;
+  }
+
+  async getPurchase(id: string): Promise<(Purchase & { supplier?: Supplier; items: (PurchaseItem & { product?: Product })[] }) | undefined> {
+    const [purchase] = await db.select().from(purchases).where(eq(purchases.id, id));
+    if (!purchase) return undefined;
+    
+    let supplier: Supplier | undefined;
+    if (purchase.supplierId) {
+      const [s] = await db.select().from(suppliers).where(eq(suppliers.id, purchase.supplierId));
+      supplier = s;
+    }
+    
+    const items = await db.select().from(purchaseItems).where(eq(purchaseItems.purchaseId, id));
+    const itemsWithProducts = await Promise.all(items.map(async (item) => {
+      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+      return { ...item, product };
+    }));
+    
+    return { ...purchase, supplier, items: itemsWithProducts };
+  }
+
+  async createPurchase(purchase: InsertPurchase, items: { productId: string; quantity: number; costPrice: string }[], adminId: string): Promise<Purchase> {
+    // Generate purchase number
+    const purchaseNumber = `PO-${Date.now().toString(36).toUpperCase()}`;
+    
+    // Calculate totals
+    const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.costPrice) * item.quantity), 0);
+    const total = subtotal + parseFloat(purchase.shippingCost || "0") + parseFloat(purchase.otherCosts || "0");
+    
+    const [created] = await db.insert(purchases).values({
+      ...purchase,
+      purchaseNumber,
+      subtotal: subtotal.toString(),
+      total: total.toString(),
+      createdBy: adminId,
+    }).returning();
+    
+    // Insert purchase items
+    for (const item of items) {
+      await db.insert(purchaseItems).values({
+        purchaseId: created.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        costPrice: item.costPrice,
+        total: (parseFloat(item.costPrice) * item.quantity).toString(),
+      });
+    }
+    
+    return created;
+  }
+
+  async updatePurchase(id: string, purchase: Partial<InsertPurchase>): Promise<Purchase> {
+    const [updated] = await db
+      .update(purchases)
+      .set({ ...purchase, updatedAt: new Date() })
+      .where(eq(purchases.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updatePurchaseStatus(id: string, status: string): Promise<Purchase> {
+    const updateData: any = { status, updatedAt: new Date() };
+    if (status === 'received') {
+      updateData.receivedDate = new Date();
+    }
+    const [updated] = await db
+      .update(purchases)
+      .set(updateData)
+      .where(eq(purchases.id, id))
+      .returning();
+    return updated;
+  }
+
+  async receivePurchase(id: string, receivedItems: { purchaseItemId: string; receivedQuantity: number }[], adminId: string): Promise<Purchase> {
+    const purchase = await this.getPurchase(id);
+    if (!purchase) throw new Error('Purchase not found');
+    
+    let allReceived = true;
+    let anyReceived = false;
+    
+    for (const receivedItem of receivedItems) {
+      const purchaseItem = purchase.items.find(i => i.id === receivedItem.purchaseItemId);
+      if (!purchaseItem) continue;
+      
+      const newReceivedQty = (purchaseItem.receivedQuantity || 0) + receivedItem.receivedQuantity;
+      
+      // Update purchase item
+      await db.update(purchaseItems)
+        .set({ receivedQuantity: newReceivedQty })
+        .where(eq(purchaseItems.id, receivedItem.purchaseItemId));
+      
+      // Update product stock
+      if (receivedItem.receivedQuantity > 0 && purchaseItem.product) {
+        const newStock = purchaseItem.product.stock + receivedItem.receivedQuantity;
+        await this.adjustProductStock(
+          purchaseItem.productId,
+          newStock,
+          'purchase',
+          `Received from purchase ${purchase.purchaseNumber}`,
+          adminId,
+          id,
+          'purchase'
+        );
+        
+        // Update product cost price if provided
+        if (purchaseItem.costPrice) {
+          await db.update(products)
+            .set({ costPrice: purchaseItem.costPrice, updatedAt: new Date() })
+            .where(eq(products.id, purchaseItem.productId));
+        }
+      }
+      
+      if (newReceivedQty < purchaseItem.quantity) {
+        allReceived = false;
+      }
+      if (newReceivedQty > 0) {
+        anyReceived = true;
+      }
+    }
+    
+    // Update purchase status
+    let newStatus = 'ordered';
+    if (allReceived) {
+      newStatus = 'received';
+    } else if (anyReceived) {
+      newStatus = 'partially_received';
+    }
+    
+    return this.updatePurchaseStatus(id, newStatus);
+  }
+
+  async deletePurchase(id: string): Promise<boolean> {
+    await db.delete(purchaseItems).where(eq(purchaseItems.purchaseId, id));
+    await db.delete(purchases).where(eq(purchases.id, id));
+    return true;
+  }
+
+  // Stock adjustment operations
+  async getStockAdjustments(productId?: string): Promise<(StockAdjustment & { product?: Product })[]> {
+    let query = db.select().from(stockAdjustments).orderBy(desc(stockAdjustments.createdAt));
+    
+    let adjustments;
+    if (productId) {
+      adjustments = await db.select().from(stockAdjustments)
+        .where(eq(stockAdjustments.productId, productId))
+        .orderBy(desc(stockAdjustments.createdAt));
+    } else {
+      adjustments = await db.select().from(stockAdjustments).orderBy(desc(stockAdjustments.createdAt));
+    }
+    
+    const result = await Promise.all(adjustments.map(async (adj) => {
+      const [product] = await db.select().from(products).where(eq(products.id, adj.productId));
+      return { ...adj, product };
+    }));
+    
+    return result;
+  }
+
+  async createStockAdjustment(adjustment: InsertStockAdjustment, adminId: string): Promise<StockAdjustment> {
+    const [created] = await db.insert(stockAdjustments).values({
+      ...adjustment,
+      createdBy: adminId,
+    }).returning();
+    return created;
+  }
+
+  async adjustProductStock(productId: string, newStock: number, type: string, reason: string, adminId: string, referenceId?: string, referenceType?: string): Promise<Product> {
+    // Get current stock
+    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    if (!product) throw new Error('Product not found');
+    
+    const previousStock = product.stock;
+    
+    // Update product stock
+    const [updated] = await db.update(products)
+      .set({ stock: newStock, updatedAt: new Date() })
+      .where(eq(products.id, productId))
+      .returning();
+    
+    // Create stock adjustment record
+    await this.createStockAdjustment({
+      productId,
+      previousStock,
+      newStock,
+      adjustmentType: type,
+      reason,
+      referenceId,
+      referenceType,
+    }, adminId);
+    
+    // Check for low stock notification
+    const threshold = product.lowStockThreshold || 10;
+    if (newStock <= threshold && newStock > 0 && previousStock > threshold) {
+      await this.createNotification({
+        recipientType: 'admin',
+        type: 'low_stock',
+        title: 'Low Stock Alert',
+        message: `${product.name} is running low on stock (${newStock} remaining).`,
+        data: { productId, stock: newStock, threshold },
+      });
+    } else if (newStock === 0 && previousStock > 0) {
+      await this.createNotification({
+        recipientType: 'admin',
+        type: 'low_stock',
+        title: 'Out of Stock Alert',
+        message: `${product.name} is now out of stock.`,
+        data: { productId, stock: 0 },
+      });
+    }
+    
+    return updated;
+  }
+
+  // Inventory & profit analytics
+  async getLowStockProducts(): Promise<Product[]> {
+    return db.select().from(products)
+      .where(sql`${products.stock} <= COALESCE(${products.lowStockThreshold}, 10) AND ${products.isActive} = true`)
+      .orderBy(products.stock);
+  }
+
+  async getInventorySummary(): Promise<{ totalProducts: number; totalStock: number; lowStockCount: number; outOfStockCount: number; totalValue: number; totalCostValue: number }> {
+    const allProducts = await db.select().from(products).where(eq(products.isActive, true));
+    
+    let totalStock = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+    let totalValue = 0;
+    let totalCostValue = 0;
+    
+    for (const product of allProducts) {
+      totalStock += product.stock;
+      
+      const threshold = product.lowStockThreshold || 10;
+      if (product.stock === 0) {
+        outOfStockCount++;
+      } else if (product.stock <= threshold) {
+        lowStockCount++;
+      }
+      
+      totalValue += parseFloat(product.price) * product.stock;
+      if (product.costPrice) {
+        totalCostValue += parseFloat(product.costPrice) * product.stock;
+      }
+    }
+    
+    return {
+      totalProducts: allProducts.length,
+      totalStock,
+      lowStockCount,
+      outOfStockCount,
+      totalValue,
+      totalCostValue,
+    };
+  }
+
+  async getProfitAnalytics(startDate?: Date, endDate?: Date): Promise<{ totalRevenue: number; totalCost: number; profit: number; margin: number; orderCount: number; topProfitProducts: { product: Product; profit: number; quantity: number }[] }> {
+    // Get delivered orders within date range
+    let ordersQuery = db.select().from(orders).where(eq(orders.status, 'delivered'));
+    
+    const deliveredOrders = await ordersQuery;
+    
+    // Filter by date if provided
+    const filteredOrders = deliveredOrders.filter(order => {
+      if (!order.createdAt) return true;
+      const orderDate = new Date(order.createdAt);
+      if (startDate && orderDate < startDate) return false;
+      if (endDate && orderDate > endDate) return false;
+      return true;
+    });
+    
+    let totalRevenue = 0;
+    let totalCost = 0;
+    const productProfits: Map<string, { product: Product; profit: number; quantity: number }> = new Map();
+    
+    for (const order of filteredOrders) {
+      totalRevenue += parseFloat(order.total);
+      
+      // Get order items
+      const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+      
+      for (const item of items) {
+        const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+        if (product) {
+          const costPrice = product.costPrice ? parseFloat(product.costPrice) : 0;
+          const itemCost = costPrice * item.quantity;
+          const itemProfit = parseFloat(item.total) - itemCost;
+          
+          totalCost += itemCost;
+          
+          const existing = productProfits.get(product.id);
+          if (existing) {
+            existing.profit += itemProfit;
+            existing.quantity += item.quantity;
+          } else {
+            productProfits.set(product.id, { product, profit: itemProfit, quantity: item.quantity });
+          }
+        }
+      }
+    }
+    
+    const profit = totalRevenue - totalCost;
+    const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+    
+    // Get top 10 profitable products
+    const topProfitProducts = Array.from(productProfits.values())
+      .sort((a, b) => b.profit - a.profit)
+      .slice(0, 10);
+    
+    return {
+      totalRevenue,
+      totalCost,
+      profit,
+      margin,
+      orderCount: filteredOrders.length,
+      topProfitProducts,
+    };
   }
 }
 
