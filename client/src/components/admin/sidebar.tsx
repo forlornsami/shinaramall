@@ -20,7 +20,10 @@ import {
   MessagesSquare,
   Wallet,
   Ticket,
-  Star
+  Star,
+  Truck,
+  PieChart,
+  Building2
 } from "lucide-react";
 import type { StoreSettings } from "@shared/schema";
 
@@ -73,6 +76,9 @@ const sectionToPermissionKey: Record<string, string> = {
   orders: 'orders',
   customers: 'customers',
   inventory: 'inventory',
+  suppliers: 'inventory',
+  purchases: 'inventory',
+  'profit-analytics': 'inventory',
   payments: 'payments',
   wallets: 'wallets',
   coupons: 'payments',
@@ -121,6 +127,24 @@ const sidebarItems = [
     label: "Inventory",
     icon: Warehouse,
     color: "from-cyan-500 to-cyan-600",
+  },
+  {
+    id: "suppliers",
+    label: "Suppliers",
+    icon: Building2,
+    color: "from-lime-500 to-lime-600",
+  },
+  {
+    id: "purchases",
+    label: "Purchases",
+    icon: Truck,
+    color: "from-teal-500 to-teal-600",
+  },
+  {
+    id: "profit-analytics",
+    label: "Profit & Analytics",
+    icon: PieChart,
+    color: "from-fuchsia-500 to-fuchsia-600",
   },
   {
     id: "payments",
