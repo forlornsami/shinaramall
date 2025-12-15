@@ -177,15 +177,15 @@ export default function SuppliersManagement() {
     );
   }
 
-  const SupplierForm = ({ isEdit = false }: { isEdit?: boolean }) => (
-    <div className="space-y-4">
+  const renderSupplierFormFields = () => (
+    <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="name">Supplier Name *</Label>
           <Input
             id="name"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
             placeholder="Enter supplier name"
             data-testid="input-supplier-name"
           />
@@ -195,7 +195,7 @@ export default function SuppliersManagement() {
           <Input
             id="contactPerson"
             value={formData.contactPerson}
-            onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, contactPerson: e.target.value }))}
             placeholder="Enter contact person name"
             data-testid="input-contact-person"
           />
@@ -209,7 +209,7 @@ export default function SuppliersManagement() {
             id="email"
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
             placeholder="supplier@email.com"
             data-testid="input-supplier-email"
           />
@@ -219,7 +219,7 @@ export default function SuppliersManagement() {
           <Input
             id="phone"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
             placeholder="+92 300 1234567"
             data-testid="input-supplier-phone"
           />
@@ -232,7 +232,7 @@ export default function SuppliersManagement() {
           <Input
             id="city"
             value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
             placeholder="Enter city"
             data-testid="input-supplier-city"
           />
@@ -241,7 +241,7 @@ export default function SuppliersManagement() {
           <Switch
             id="isActive"
             checked={formData.isActive}
-            onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
             data-testid="switch-supplier-active"
           />
           <Label htmlFor="isActive">Active Supplier</Label>
@@ -253,7 +253,7 @@ export default function SuppliersManagement() {
         <Textarea
           id="address"
           value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
           placeholder="Enter full address"
           rows={2}
           data-testid="input-supplier-address"
@@ -265,44 +265,13 @@ export default function SuppliersManagement() {
         <Textarea
           id="notes"
           value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
           placeholder="Additional notes about this supplier"
           rows={3}
           data-testid="input-supplier-notes"
         />
       </div>
-
-      <div className="flex justify-end gap-2 pt-4">
-        <Button
-          variant="outline"
-          onClick={() => {
-            if (isEdit) {
-              setIsEditModalOpen(false);
-              setEditingSupplier(null);
-            } else {
-              setIsCreateModalOpen(false);
-            }
-            resetForm();
-          }}
-          data-testid="button-cancel-supplier"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={() => {
-            if (isEdit && editingSupplier) {
-              updateMutation.mutate({ id: editingSupplier.id, data: formData });
-            } else {
-              createMutation.mutate(formData);
-            }
-          }}
-          disabled={!formData.name.trim() || createMutation.isPending || updateMutation.isPending}
-          data-testid="button-save-supplier"
-        >
-          {createMutation.isPending || updateMutation.isPending ? 'Saving...' : isEdit ? 'Update Supplier' : 'Create Supplier'}
-        </Button>
-      </div>
-    </div>
+    </>
   );
 
   return (
@@ -353,7 +322,28 @@ export default function SuppliersManagement() {
               <DialogHeader>
                 <DialogTitle>Add New Supplier</DialogTitle>
               </DialogHeader>
-              <SupplierForm />
+              <div className="space-y-4">
+                {renderSupplierFormFields()}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsCreateModalOpen(false);
+                      resetForm();
+                    }}
+                    data-testid="button-cancel-supplier"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => createMutation.mutate(formData)}
+                    disabled={!formData.name.trim() || createMutation.isPending}
+                    data-testid="button-save-supplier"
+                  >
+                    {createMutation.isPending ? 'Saving...' : 'Create Supplier'}
+                  </Button>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
         </CardHeader>
@@ -466,7 +456,33 @@ export default function SuppliersManagement() {
           <DialogHeader>
             <DialogTitle>Edit Supplier</DialogTitle>
           </DialogHeader>
-          <SupplierForm isEdit />
+          <div className="space-y-4">
+            {renderSupplierFormFields()}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingSupplier(null);
+                  resetForm();
+                }}
+                data-testid="button-cancel-edit-supplier"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (editingSupplier) {
+                    updateMutation.mutate({ id: editingSupplier.id, data: formData });
+                  }
+                }}
+                disabled={!formData.name.trim() || updateMutation.isPending}
+                data-testid="button-update-supplier"
+              >
+                {updateMutation.isPending ? 'Saving...' : 'Update Supplier'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
