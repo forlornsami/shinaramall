@@ -3974,6 +3974,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Edit a review (authenticated customer - can only edit their own reviews)
+  app.patch('/api/products/:productId/reviews', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const productId = req.params.productId;
+      const { rating, title, comment } = req.body;
+      
+      // Find user's existing review for this product
+      const existingReview = await storage.getUserReviewForProduct(userId, productId);
+      if (!existingReview) {
+        return res.status(404).json({ message: "You haven't reviewed this product yet" });
+      }
+      
+      if (rating && (rating < 1 || rating > 5)) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      
+      // Update the review - reset status to pending for re-moderation
+      const updatedReview = await storage.updateReview(existingReview.id, {
+        rating: rating || existingReview.rating,
+        title: title !== undefined ? (title || null) : existingReview.title,
+        comment: comment !== undefined ? (comment || null) : existingReview.comment,
+        status: 'pending', // Reset to pending for re-moderation
+        moderatedBy: null,
+        moderatedAt: null,
+        moderationNote: null,
+      });
+      
+      // Create notification for admin about edited review
+      await storage.createNotification({
+        recipientType: 'admin',
+        type: 'review_submitted',
+        title: 'Review Updated',
+        message: `A customer has updated their review and it requires re-moderation.`,
+        data: { reviewId: updatedReview.id, productId },
+      });
+      
+      res.json({ success: true, message: "Review updated successfully and is pending re-approval", review: updatedReview });
+    } catch (error) {
+      console.error("Error updating review:", error);
+      res.status(500).json({ message: "Failed to update review" });
+    }
+  });
+
   // Get all reviews (admin only)
   app.get('/api/admin/reviews', adminAuth, async (req: any, res) => {
     try {

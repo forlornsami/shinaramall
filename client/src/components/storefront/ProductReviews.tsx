@@ -18,7 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Star, ShieldCheck, MessageSquare, ThumbsUp, Loader2, AlertCircle, User } from "lucide-react";
+import { Star, ShieldCheck, MessageSquare, ThumbsUp, Loader2, AlertCircle, User, Edit2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Review {
@@ -51,6 +51,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuth();
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [title, setTitle] = useState("");
@@ -63,6 +64,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
       if (!response.ok) throw new Error("Failed to fetch reviews");
       return response.json();
     },
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
   const { data: canReview } = useQuery<{ canReview: boolean; reason?: string }>({
@@ -80,7 +82,8 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
 
   const submitReviewMutation = useMutation({
     mutationFn: async (reviewData: { rating: number; title?: string; comment?: string }) => {
-      const response = await apiRequest("POST", `/api/products/${productId}/reviews`, reviewData);
+      const method = isEditing ? "PATCH" : "POST";
+      const response = await apiRequest(method, `/api/products/${productId}/reviews`, reviewData);
       return await response.json();
     },
     onSuccess: () => {
@@ -88,15 +91,22 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "can-review"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products", productId] });
       setReviewDialogOpen(false);
+      setIsEditing(false);
       setRating(0);
       setTitle("");
       setComment("");
-      toast({ title: "Review Submitted", description: "Your review has been submitted for approval." });
+      toast({ 
+        title: isEditing ? "Review Updated" : "Review Submitted", 
+        description: isEditing ? "Your review has been updated and is pending re-approval." : "Your review has been submitted for approval." 
+      });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to submit review", variant: "destructive" });
     },
   });
+
+  // Find the current user's review
+  const userReview = reviews?.find(r => r.userId === user?.id);
 
   const calculateStats = (): ReviewStats => {
     if (!reviews || reviews.length === 0) {
@@ -180,6 +190,22 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
     submitReviewMutation.mutate({ rating, title: title.trim() || undefined, comment: comment.trim() || undefined });
   };
 
+  const handleEditReview = (review: Review) => {
+    setIsEditing(true);
+    setRating(review.rating);
+    setTitle(review.title || "");
+    setComment(review.comment || "");
+    setReviewDialogOpen(true);
+  };
+
+  const handleOpenNewReview = () => {
+    setIsEditing(false);
+    setRating(0);
+    setTitle("");
+    setComment("");
+    setReviewDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -189,9 +215,15 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
         </div>
         
         {isAuthenticated && canReview?.canReview && (
-          <Button onClick={() => setReviewDialogOpen(true)} data-testid="button-write-review">
+          <Button onClick={handleOpenNewReview} data-testid="button-write-review">
             <Star className="h-4 w-4 mr-2" />
             Write a Review
+          </Button>
+        )}
+        {isAuthenticated && userReview && (
+          <Button variant="outline" onClick={() => handleEditReview(userReview)} data-testid="button-edit-review">
+            <Edit2 className="h-4 w-4 mr-2" />
+            Edit Your Review
           </Button>
         )}
       </div>
@@ -289,12 +321,20 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
         </div>
       </div>
 
-      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+      <Dialog open={reviewDialogOpen} onOpenChange={(open) => {
+        setReviewDialogOpen(open);
+        if (!open) {
+          setIsEditing(false);
+          setRating(0);
+          setTitle("");
+          setComment("");
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Write a Review</DialogTitle>
+            <DialogTitle>{isEditing ? "Edit Your Review" : "Write a Review"}</DialogTitle>
             <DialogDescription>
-              Share your experience with this product
+              {isEditing ? "Update your review for this product" : "Share your experience with this product"}
             </DialogDescription>
           </DialogHeader>
 
@@ -354,10 +394,10 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
               {submitReviewMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
+                  {isEditing ? "Updating..." : "Submitting..."}
                 </>
               ) : (
-                "Submit Review"
+                isEditing ? "Update Review" : "Submit Review"
               )}
             </Button>
           </DialogFooter>
