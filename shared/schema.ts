@@ -90,6 +90,21 @@ export const categories = pgTable("categories", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Suppliers table
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  contactPerson: varchar("contact_person"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  address: text("address"),
+  city: varchar("city"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Products
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -98,10 +113,13 @@ export const products = pgTable("products", {
   description: text("description"),
   shortDescription: varchar("short_description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   sku: varchar("sku").unique(),
   stock: integer("stock").notNull().default(0),
+  lowStockThreshold: integer("low_stock_threshold").default(10),
   categoryId: varchar("category_id").references(() => categories.id),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
   imageUrl: varchar("image_url"),
   imageUrls: jsonb("image_urls").$type<string[]>().default([]),
   isActive: boolean("is_active").notNull().default(true),
@@ -219,6 +237,58 @@ export const wishlistItems = pgTable("wishlist_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Purchase status enum
+export const purchaseStatusEnum = pgEnum("purchase_status", [
+  "pending",
+  "ordered",
+  "received",
+  "partially_received",
+  "cancelled"
+]);
+
+// Purchases (stock purchases from suppliers)
+export const purchases = pgTable("purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  purchaseNumber: varchar("purchase_number").notNull().unique(),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  status: varchar("status").notNull().default("pending"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0"),
+  otherCosts: decimal("other_costs", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  notes: text("notes"),
+  expectedDate: timestamp("expected_date"),
+  receivedDate: timestamp("received_date"),
+  createdBy: varchar("created_by").references(() => adminUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Purchase items
+export const purchaseItems = pgTable("purchase_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  purchaseId: varchar("purchase_id").references(() => purchases.id, { onDelete: "cascade" }).notNull(),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  receivedQuantity: integer("received_quantity").default(0),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+});
+
+// Stock adjustments for tracking inventory changes
+export const stockAdjustments = pgTable("stock_adjustments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  previousStock: integer("previous_stock").notNull(),
+  newStock: integer("new_stock").notNull(),
+  adjustmentType: varchar("adjustment_type").notNull(), // 'purchase', 'sale', 'manual', 'return', 'damage'
+  reason: text("reason"),
+  referenceId: varchar("reference_id"), // orderId or purchaseId
+  referenceType: varchar("reference_type"), // 'order' or 'purchase'
+  createdBy: varchar("created_by").references(() => adminUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -352,10 +422,13 @@ export const insertProductSchema = createInsertSchema(products).pick({
   description: true,
   shortDescription: true,
   price: true,
+  costPrice: true,
   compareAtPrice: true,
   sku: true,
   stock: true,
+  lowStockThreshold: true,
   categoryId: true,
+  supplierId: true,
   imageUrl: true,
   imageUrls: true,
   isActive: true,
@@ -389,6 +462,47 @@ export const insertCartItemSchema = createInsertSchema(cartItems).pick({
 export const insertWishlistItemSchema = createInsertSchema(wishlistItems).pick({
   userId: true,
   productId: true,
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).pick({
+  name: true,
+  contactPerson: true,
+  email: true,
+  phone: true,
+  address: true,
+  city: true,
+  notes: true,
+  isActive: true,
+});
+
+export const insertPurchaseSchema = createInsertSchema(purchases).pick({
+  supplierId: true,
+  status: true,
+  subtotal: true,
+  shippingCost: true,
+  otherCosts: true,
+  total: true,
+  notes: true,
+  expectedDate: true,
+});
+
+export const insertPurchaseItemSchema = createInsertSchema(purchaseItems).pick({
+  purchaseId: true,
+  productId: true,
+  quantity: true,
+  receivedQuantity: true,
+  costPrice: true,
+  total: true,
+});
+
+export const insertStockAdjustmentSchema = createInsertSchema(stockAdjustments).pick({
+  productId: true,
+  previousStock: true,
+  newStock: true,
+  adjustmentType: true,
+  reason: true,
+  referenceId: true,
+  referenceType: true,
 });
 
 // Types
@@ -438,6 +552,15 @@ export type CartItem = typeof cartItems.$inferSelect;
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 export type WishlistItem = typeof wishlistItems.$inferSelect;
 export type InsertWishlistItem = z.infer<typeof insertWishlistItemSchema>;
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Purchase = typeof purchases.$inferSelect;
+export type InsertPurchase = z.infer<typeof insertPurchaseSchema>;
+export type PurchaseItem = typeof purchaseItems.$inferSelect;
+export type InsertPurchaseItem = z.infer<typeof insertPurchaseItemSchema>;
+export type StockAdjustment = typeof stockAdjustments.$inferSelect;
+export type InsertStockAdjustment = z.infer<typeof insertStockAdjustmentSchema>;
 
 // Payment accounts schemas and types
 export const insertPaymentAccountSchema = createInsertSchema(paymentAccounts).pick({
