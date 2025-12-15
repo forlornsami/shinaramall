@@ -16,6 +16,9 @@ import SettingsSection from "@/components/admin/settings";
 import HelpCenterSection from "@/components/admin/help-center";
 import ChatSupport from "@/components/admin/chat-support";
 import TeamChat from "@/components/admin/team-chat";
+import SuppliersManagement from "@/components/admin/suppliers-management";
+import PurchaseManagement from "@/components/admin/purchase-management";
+import ProfitAnalytics from "@/components/admin/profit-analytics";
 import { AdminNotificationBell } from "@/components/admin/notification-bell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,11 +52,14 @@ import {
   MessagesSquare,
   Wallet,
   Ticket,
-  Star
+  Star,
+  Truck,
+  PieChart,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "payments" | "wallets" | "coupons" | "reviews" | "users" | "roles" | "settings" | "help" | "chat" | "team-chat";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "suppliers" | "purchases" | "profit-analytics" | "payments" | "wallets" | "coupons" | "reviews" | "users" | "roles" | "settings" | "help" | "chat" | "team-chat";
 
 const sidebarItems = [
   { id: "overview", label: "Dashboard", icon: BarChart3, color: "from-blue-500 to-blue-600" },
@@ -62,6 +68,9 @@ const sidebarItems = [
   { id: "orders", label: "Orders", icon: ShoppingBag, color: "from-orange-500 to-orange-600" },
   { id: "customers", label: "Customers", icon: Users, color: "from-green-500 to-green-600" },
   { id: "inventory", label: "Inventory", icon: Warehouse, color: "from-cyan-500 to-cyan-600" },
+  { id: "suppliers", label: "Suppliers", icon: Building2, color: "from-lime-500 to-lime-600" },
+  { id: "purchases", label: "Purchases", icon: Truck, color: "from-teal-500 to-teal-600" },
+  { id: "profit-analytics", label: "Profit & Analytics", icon: PieChart, color: "from-fuchsia-500 to-fuchsia-600" },
   { id: "payments", label: "Payments", icon: CreditCard, color: "from-emerald-500 to-emerald-600" },
   { id: "wallets", label: "Wallets", icon: Wallet, color: "from-yellow-500 to-yellow-600" },
   { id: "coupons", label: "Coupons", icon: Ticket, color: "from-rose-500 to-rose-600" },
@@ -234,6 +243,9 @@ export default function AdminDashboard() {
       orders: 'orders',
       customers: 'customers',
       inventory: 'inventory',
+      suppliers: 'inventory',
+      purchases: 'inventory',
+      'profit-analytics': 'inventory',
       payments: 'payments',
       wallets: 'wallets',
       coupons: 'payments',
@@ -386,6 +398,12 @@ export default function AdminDashboard() {
         return <CustomerManagement />;
       case "inventory":
         return <InventoryManagement />;
+      case "suppliers":
+        return <SuppliersManagement />;
+      case "purchases":
+        return <PurchaseManagement />;
+      case "profit-analytics":
+        return <ProfitAnalytics />;
       case "payments":
         return <PaymentManagement />;
       case "wallets":

@@ -37,8 +37,10 @@ export default function ProductManagement() {
     shortDescription: "",
     price: "",
     compareAtPrice: "",
+    costPrice: "",
     sku: "",
     stock: "",
+    lowStockThreshold: "",
     categoryId: "",
     imageUrls: [] as string[],
     isActive: true,
@@ -319,8 +321,10 @@ export default function ProductManagement() {
       shortDescription: "",
       price: "",
       compareAtPrice: "",
+      costPrice: "",
       sku: "",
       stock: "",
+      lowStockThreshold: "",
       categoryId: "",
       imageUrls: [],
       isActive: true,
@@ -440,7 +444,9 @@ export default function ProductManagement() {
       ...productForm,
       price: parseFloat(productForm.price).toString(),
       compareAtPrice: productForm.compareAtPrice ? parseFloat(productForm.compareAtPrice).toString() : undefined,
+      costPrice: productForm.costPrice ? parseFloat(productForm.costPrice).toString() : undefined,
       stock: parseInt(productForm.stock),
+      lowStockThreshold: productForm.lowStockThreshold ? parseInt(productForm.lowStockThreshold) : undefined,
       imageUrl: productForm.imageUrls[0] || null,
       imageUrls: productForm.imageUrls,
     };
@@ -469,8 +475,10 @@ export default function ProductManagement() {
       shortDescription: product.shortDescription || "",
       price: product.price,
       compareAtPrice: product.compareAtPrice || "",
+      costPrice: (product as any).costPrice || "",
       sku: product.sku || "",
       stock: product.stock.toString(),
+      lowStockThreshold: (product as any).lowStockThreshold?.toString() || "",
       categoryId: product.categoryId || "",
       imageUrls,
       isActive: product.isActive,
@@ -571,9 +579,9 @@ export default function ProductManagement() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="price" data-testid="label-price">Price (Rs.)</Label>
+                  <Label htmlFor="price" data-testid="label-price">Selling Price (Rs.)</Label>
                   <Input
                     id="price"
                     type="number"
@@ -584,6 +592,19 @@ export default function ProductManagement() {
                     placeholder="0.00"
                     required
                     data-testid="input-price"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="costPrice" data-testid="label-cost-price">Cost Price (Rs.)</Label>
+                  <Input
+                    id="costPrice"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={productForm.costPrice}
+                    onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })}
+                    placeholder="0.00"
+                    data-testid="input-cost-price"
                   />
                 </div>
                 <div>
@@ -610,6 +631,21 @@ export default function ProductManagement() {
                     placeholder="0"
                     required
                     data-testid="input-stock"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="lowStockThreshold" data-testid="label-low-stock">Low Stock Alert</Label>
+                  <Input
+                    id="lowStockThreshold"
+                    type="number"
+                    min="0"
+                    value={productForm.lowStockThreshold}
+                    onChange={(e) => setProductForm({ ...productForm, lowStockThreshold: e.target.value })}
+                    placeholder="Alert when stock below this"
+                    data-testid="input-low-stock-threshold"
                   />
                 </div>
               </div>
