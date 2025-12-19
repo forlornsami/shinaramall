@@ -43,6 +43,7 @@ import {
   Shield,
   Eye,
   EyeOff,
+  KeyRound,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -73,6 +74,9 @@ export default function UserManagement() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -195,6 +199,38 @@ export default function UserManagement() {
     onError: (error: any) => {
       toast({
         title: "Failed to delete user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: string; password: string }) => {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to reset password");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Password reset successfully" });
+      setResetPasswordUser(null);
+      setNewPassword("");
+      setShowNewPassword(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to reset password",
         description: error.message,
         variant: "destructive",
       });
@@ -344,6 +380,16 @@ export default function UserManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setResetPasswordUser(user)}
+                      className="rounded-xl hover:bg-amber-500/10 text-amber-600"
+                      title="Reset Password"
+                      data-testid={`button-reset-password-${user.id}`}
+                    >
+                      <KeyRound className="w-4 h-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -529,6 +575,91 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!resetPasswordUser} onOpenChange={() => {
+        setResetPasswordUser(null);
+        setNewPassword("");
+        setShowNewPassword(false);
+      }}>
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-auto max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <strong>{resetPasswordUser?.username}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  className="rounded-xl pr-10"
+                  data-testid="input-new-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 6 characters long
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setResetPasswordUser(null);
+                setNewPassword("");
+                setShowNewPassword(false);
+              }} 
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newPassword.length < 6) {
+                  toast({
+                    title: "Password too short",
+                    description: "Password must be at least 6 characters long",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                if (resetPasswordUser) {
+                  resetPasswordMutation.mutate({ id: resetPasswordUser.id, password: newPassword });
+                }
+              }}
+              className="rounded-xl gradient-primary"
+              disabled={resetPasswordMutation.isPending || newPassword.length < 6}
+              data-testid="button-confirm-reset-password"
+            >
+              {resetPasswordMutation.isPending ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              ) : null}
+              Reset Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
