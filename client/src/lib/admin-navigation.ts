@@ -172,7 +172,8 @@ export const canAccessSection = (
   role: string, 
   sectionId: string
 ): boolean => {
-  const isSuperAdmin = role.toLowerCase() === 'super_admin';
+  const normalizedRole = role.toLowerCase().replace(/\s+/g, '_');
+  const isSuperAdmin = normalizedRole === 'super_admin';
   if (isSuperAdmin) return true;
   if (sectionId === 'help') return true;
   return hasPermission(permissions, sectionId);
