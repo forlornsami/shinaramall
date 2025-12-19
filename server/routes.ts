@@ -1332,7 +1332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Track coupon redemption if coupon was used
       if (couponId) {
         try {
-          await storage.recordCouponRedemption({
+          await storage.createCouponRedemption({
             couponId,
             userId,
             orderId: order.id,
@@ -1970,10 +1970,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get stock adjustments history
   app.get('/api/admin/inventory/adjustments', adminAuth, async (req, res) => {
     try {
-      const { productId, limit } = req.query;
+      const { productId } = req.query;
       const adjustments = await storage.getStockAdjustments(
-        productId as string | undefined,
-        limit ? parseInt(limit as string) : undefined
+        productId as string | undefined
       );
       res.json(adjustments);
     } catch (error) {
@@ -3813,10 +3812,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check date validity
       const now = new Date();
-      if (coupon.startsAt && new Date(coupon.startsAt) > now) {
+      if (coupon.validFrom && new Date(coupon.validFrom) > now) {
         return res.status(400).json({ message: "This coupon is not yet active" });
       }
-      if (coupon.expiresAt && new Date(coupon.expiresAt) < now) {
+      if (coupon.validUntil && new Date(coupon.validUntil) < now) {
         return res.status(400).json({ message: "This coupon has expired" });
       }
       
@@ -3826,9 +3825,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check per-user usage limit
-      if (userId && coupon.usageLimitPerUser) {
+      if (userId && coupon.perUserLimit) {
         const userRedemptions = await storage.getCouponRedemptionsByUser(coupon.id, userId);
-        if (userRedemptions.length >= coupon.usageLimitPerUser) {
+        if (userRedemptions.length >= coupon.perUserLimit) {
           return res.status(400).json({ message: "You have already used this coupon the maximum number of times" });
         }
       }
@@ -3872,13 +3871,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Calculate discount
       let discount = 0;
-      if (coupon.discountType === 'percentage') {
-        discount = (eligibleTotal * parseFloat(coupon.discountValue)) / 100;
-        if (coupon.maxDiscount) {
-          discount = Math.min(discount, parseFloat(coupon.maxDiscount));
+      if (coupon.type === 'percentage') {
+        discount = (eligibleTotal * parseFloat(coupon.value)) / 100;
+        if (coupon.maxDiscountAmount) {
+          discount = Math.min(discount, parseFloat(coupon.maxDiscountAmount));
         }
       } else {
-        discount = Math.min(parseFloat(coupon.discountValue), eligibleTotal);
+        discount = Math.min(parseFloat(coupon.value), eligibleTotal);
       }
       
       res.json({
@@ -3886,8 +3885,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         coupon: {
           id: coupon.id,
           code: coupon.code,
-          discountType: coupon.discountType,
-          discountValue: coupon.discountValue,
+          discountType: coupon.type,
+          discountValue: coupon.value,
         },
         discount: discount.toFixed(2),
         applicableItems,
@@ -3969,7 +3968,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: title || null,
         comment: comment || null,
         isVerifiedPurchase: true,
-        status: 'pending',
       });
       
       // Create notification for admin
