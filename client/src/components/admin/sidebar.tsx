@@ -40,15 +40,21 @@ interface Permissions {
   dashboard?: boolean;
   products?: Permission;
   categories?: Permission;
+  reviews?: Permission;
   orders?: Permission;
   customers?: Permission;
   inventory?: Permission;
+  suppliers?: Permission;
+  purchases?: Permission;
+  profitAnalytics?: Permission;
   payments?: Permission;
   wallets?: Permission;
+  coupons?: Permission;
   users?: Permission;
   roles?: Permission;
   settings?: Permission;
   chat?: Permission;
+  teamChat?: Permission;
 }
 
 interface AdminSidebarProps {
@@ -73,22 +79,22 @@ const sectionToPermissionKey: Record<string, string> = {
   overview: 'dashboard',
   products: 'products',
   categories: 'categories',
+  reviews: 'reviews',
   orders: 'orders',
   customers: 'customers',
   inventory: 'inventory',
-  suppliers: 'inventory',
-  purchases: 'inventory',
-  'profit-analytics': 'inventory',
+  suppliers: 'suppliers',
+  purchases: 'purchases',
+  'profit-analytics': 'profitAnalytics',
   payments: 'payments',
   wallets: 'wallets',
-  coupons: 'payments',
-  reviews: 'products',
+  coupons: 'coupons',
   users: 'users',
   roles: 'roles',
   settings: 'settings',
   help: 'help',
   chat: 'chat',
-  'team-chat': 'chat',
+  'team-chat': 'teamChat',
 };
 
 interface NavItem {

@@ -60,34 +60,108 @@ interface Role {
 }
 
 const defaultPermissions: Record<string, boolean | Permission> = {
+  // Dashboard
   dashboard: true,
+  // Catalog
   products: { view: true, create: false, edit: false, delete: false },
   categories: { view: true, create: false, edit: false, delete: false },
+  reviews: { view: false, manage: false },
+  // Sales
   orders: { view: true, edit: false },
   customers: { view: true },
+  // Inventory
   inventory: { view: true, adjust: false },
+  suppliers: { view: false, create: false, edit: false, delete: false },
+  purchases: { view: false, create: false, edit: false },
+  // Finance
+  profitAnalytics: { view: false },
   payments: { view: false, manage: false },
   wallets: { view: false, manage: false },
+  coupons: { view: false, create: false, edit: false, delete: false },
+  // Communication
+  chat: { view: false, respond: false },
+  teamChat: { view: false },
+  // Access Control
   users: { view: false, create: false, edit: false, delete: false },
   roles: { view: false, create: false, edit: false, delete: false },
+  // Settings
   settings: { view: false, edit: false },
-  chat: { view: false, respond: false },
 };
 
-const permissionLabels: Record<string, string> = {
-  dashboard: "Dashboard Access",
-  products: "Product Management",
-  categories: "Category Management",
-  orders: "Order Management",
-  customers: "Customer Access",
-  inventory: "Inventory Management",
-  payments: "Payment Management",
-  wallets: "Wallet Management",
-  users: "User Management",
-  roles: "Role Management",
-  settings: "Settings Access",
-  chat: "Chat Support",
+interface PermissionCategory {
+  title: string;
+  permissions: { key: string; label: string }[];
+}
+
+// Helper to get label for a permission key
+const getPermissionLabel = (key: string): string => {
+  for (const category of permissionCategories) {
+    const found = category.permissions.find(p => p.key === key);
+    if (found) return found.label;
+  }
+  return key;
 };
+
+const permissionCategories: PermissionCategory[] = [
+  {
+    title: "Dashboard",
+    permissions: [
+      { key: "dashboard", label: "Dashboard Access" },
+    ],
+  },
+  {
+    title: "Catalog",
+    permissions: [
+      { key: "products", label: "Products" },
+      { key: "categories", label: "Categories" },
+      { key: "reviews", label: "Reviews" },
+    ],
+  },
+  {
+    title: "Sales",
+    permissions: [
+      { key: "orders", label: "Orders" },
+      { key: "customers", label: "Customers" },
+    ],
+  },
+  {
+    title: "Inventory",
+    permissions: [
+      { key: "inventory", label: "Stock" },
+      { key: "suppliers", label: "Suppliers" },
+      { key: "purchases", label: "Purchases" },
+    ],
+  },
+  {
+    title: "Finance",
+    permissions: [
+      { key: "profitAnalytics", label: "Profit & Analytics" },
+      { key: "payments", label: "Payments" },
+      { key: "wallets", label: "Wallets" },
+      { key: "coupons", label: "Coupons" },
+    ],
+  },
+  {
+    title: "Communication",
+    permissions: [
+      { key: "chat", label: "Chat Support" },
+      { key: "teamChat", label: "Team Chat" },
+    ],
+  },
+  {
+    title: "Access Control",
+    permissions: [
+      { key: "users", label: "User Management" },
+      { key: "roles", label: "Roles & Permissions" },
+    ],
+  },
+  {
+    title: "Settings",
+    permissions: [
+      { key: "settings", label: "Settings" },
+    ],
+  },
+];
 
 export default function RoleManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -407,7 +481,7 @@ export default function RoleManagement() {
                           {Object.keys(role.permissions).filter((k) => {
                             const p = role.permissions[k];
                             return typeof p === "boolean" ? p : Object.values(p as Permission).some(Boolean);
-                          }).map((k) => permissionLabels[k] || k).slice(0, 3).join(", ")}
+                          }).map((k) => getPermissionLabel(k)).slice(0, 3).join(", ")}
                           {Object.keys(role.permissions).length > 3 && "..."}
                         </span>
                       </div>
@@ -522,51 +596,59 @@ export default function RoleManagement() {
 
             <div className="space-y-4">
               <Label>Permissions</Label>
-              <div className="space-y-3">
-                {Object.entries(permissionLabels).map(([key, label]) => {
-                  const perm = formData.permissions[key];
-                  // Skip if permission doesn't exist
-                  if (perm === undefined) return null;
-                  const isBoolean = typeof perm === "boolean";
+              <div className="space-y-4">
+                {permissionCategories.map((category) => (
+                  <div key={category.title} className="space-y-2">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      {category.title}
+                    </h4>
+                    <div className="space-y-2">
+                      {category.permissions.map(({ key, label }) => {
+                        const perm = formData.permissions[key];
+                        if (perm === undefined) return null;
+                        const isBoolean = typeof perm === "boolean";
 
-                  return (
-                    <Card key={key} className="border p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">{label}</span>
-                        {isBoolean && (
-                          <Switch
-                            checked={perm as boolean}
-                            onCheckedChange={() => togglePermission(key)}
-                            data-testid={`switch-permission-${key}`}
-                          />
-                        )}
-                      </div>
-                      {!isBoolean && perm && typeof perm === "object" && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                          {Object.keys(perm as Permission).map((subKey) => (
-                            <div
-                              key={subKey}
-                              className="flex items-center gap-2"
-                            >
-                              <Switch
-                                id={`${key}-${subKey}`}
-                                checked={(perm as Permission)[subKey as keyof Permission] ?? false}
-                                onCheckedChange={() => togglePermission(key, subKey)}
-                                data-testid={`switch-permission-${key}-${subKey}`}
-                              />
-                              <Label
-                                htmlFor={`${key}-${subKey}`}
-                                className="text-sm capitalize"
-                              >
-                                {subKey}
-                              </Label>
+                        return (
+                          <Card key={key} className="border p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm">{label}</span>
+                              {isBoolean && (
+                                <Switch
+                                  checked={perm as boolean}
+                                  onCheckedChange={() => togglePermission(key)}
+                                  data-testid={`switch-permission-${key}`}
+                                />
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </Card>
-                  );
-                })}
+                            {!isBoolean && perm && typeof perm === "object" && (
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 pt-2 border-t">
+                                {Object.keys(perm as Permission).map((subKey) => (
+                                  <div
+                                    key={subKey}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Switch
+                                      id={`${key}-${subKey}`}
+                                      checked={(perm as Permission)[subKey as keyof Permission] ?? false}
+                                      onCheckedChange={() => togglePermission(key, subKey)}
+                                      data-testid={`switch-permission-${key}-${subKey}`}
+                                    />
+                                    <Label
+                                      htmlFor={`${key}-${subKey}`}
+                                      className="text-xs capitalize"
+                                    >
+                                      {subKey}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
