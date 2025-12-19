@@ -176,7 +176,8 @@ const settingsSection: NavSection = {
 export default function AdminSidebar({ activeSection, onSectionChange, adminUser, onLogout }: AdminSidebarProps) {
   const permissions = adminUser?.permissions;
   const role = adminUser?.role?.toLowerCase() || '';
-  const isAdmin = role === 'admin' || role === 'super_admin' || role.includes('admin');
+  // Only super_admin bypasses permission checks - all other roles use their assigned permissions
+  const isSuperAdmin = role === 'super_admin';
   
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
@@ -200,8 +201,11 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
   });
 
   const canAccessSection = (sectionId: string): boolean => {
-    if (isAdmin) return true;
+    // Super admin has full access to everything
+    if (isSuperAdmin) return true;
+    // Help is always accessible
     if (sectionId === 'help') return true;
+    // Check specific permission for this section
     const permKey = sectionToPermissionKey[sectionId];
     return hasPermission(permissions, permKey);
   };
