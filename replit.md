@@ -55,6 +55,7 @@ Preferred communication style: Simple, everyday language.
     - **Password Reset**: Available for account recovery.
 - **Wishlist**: Persistent wishlist for authenticated users (DB-backed) and guest users (localStorage), with automatic merge on login.
 - **Wallet System**: Internal wallet for customers with top-up requests, balance usage at checkout (full or partial payment), transaction history, and admin management including credits, deductions, and refunds.
+- **Balance Sheet**: Comprehensive financial reporting showing assets (cash from orders, inventory value, pending payments), liabilities (customer wallet balances, pending refunds/topups), equity (retained earnings, net profit), order summary, and period-over-period comparison. Optimized with batch queries for performance.
 - **Store Customization**: Admin can upload store logo and change store name, affecting UI dynamically.
 - **Security**: Password change, active session management, robust validation, email verification.
 
