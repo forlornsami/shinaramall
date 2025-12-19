@@ -248,11 +248,30 @@ export default function RoleManagement() {
 
   const handleEdit = (role: Role) => {
     setEditingRole(role);
+    // Merge role permissions with defaults to ensure all keys exist
+    const mergedPermissions: Record<string, boolean | Permission> = { ...defaultPermissions };
+    if (role.permissions) {
+      Object.keys(role.permissions).forEach((key) => {
+        const rolePermValue = role.permissions[key];
+        const defaultValue = defaultPermissions[key];
+        
+        if (typeof rolePermValue === "boolean") {
+          mergedPermissions[key] = rolePermValue;
+        } else if (typeof rolePermValue === "object" && rolePermValue !== null) {
+          // Merge sub-permissions with defaults
+          mergedPermissions[key] = {
+            ...(typeof defaultValue === "object" ? defaultValue : {}),
+            ...rolePermValue,
+          };
+        }
+      });
+    }
+    
     setFormData({
       name: role.name,
       displayName: role.displayName,
       description: role.description || "",
-      permissions: role.permissions || { ...defaultPermissions },
+      permissions: mergedPermissions,
     });
     setIsDialogOpen(true);
   };
@@ -506,6 +525,8 @@ export default function RoleManagement() {
               <div className="space-y-3">
                 {Object.entries(permissionLabels).map(([key, label]) => {
                   const perm = formData.permissions[key];
+                  // Skip if permission doesn't exist
+                  if (perm === undefined) return null;
                   const isBoolean = typeof perm === "boolean";
 
                   return (
@@ -520,7 +541,7 @@ export default function RoleManagement() {
                           />
                         )}
                       </div>
-                      {!isBoolean && (
+                      {!isBoolean && perm && typeof perm === "object" && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                           {Object.keys(perm as Permission).map((subKey) => (
                             <div
