@@ -9,6 +9,20 @@ import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCar
 import { shouldSendAdminNotification, invalidateNotificationSettingsCache, type NotificationType } from "./notificationHelper";
 import { sendVerificationEmail, sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendPaymentVerifiedEmail, sendPasswordResetEmail } from "./emailService";
 
+// Generate a secure JWT secret - use environment variable or generate a secure random secret
+const getJwtSecret = (): string => {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  // Generate a secure random secret for this server instance
+  // Note: This will change on server restart, logging out all admin users
+  const generatedSecret = crypto.randomBytes(64).toString('hex');
+  console.warn('WARNING: JWT_SECRET not set in environment. Using generated secret. Admin sessions will not persist across server restarts.');
+  return generatedSecret;
+};
+
+const JWT_SECRET = getJwtSecret();
+
 // Admin JWT middleware
 const adminAuth = async (req: any, res: any, next: any) => {
   try {
@@ -17,7 +31,7 @@ const adminAuth = async (req: any, res: any, next: any) => {
       return res.status(401).json({ message: "Admin access token required" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'admin-secret') as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
     const admin = await storage.getAdminUser(decoded.adminId);
     
     if (!admin) {
@@ -315,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const token = jwt.sign(
         { adminId: admin.id, username: admin.username },
-        process.env.JWT_SECRET || 'admin-secret',
+        JWT_SECRET,
         { expiresIn: '24h' }
       );
 
