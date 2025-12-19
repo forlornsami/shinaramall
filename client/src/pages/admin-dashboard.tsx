@@ -228,45 +228,53 @@ export default function AdminDashboard() {
     },
   ];
 
+  const sectionToPermissionKey: Record<string, string> = {
+    overview: 'dashboard',
+    products: 'products',
+    categories: 'categories',
+    reviews: 'reviews',
+    orders: 'orders',
+    customers: 'customers',
+    inventory: 'inventory',
+    suppliers: 'suppliers',
+    purchases: 'purchases',
+    'profit-analytics': 'profitAnalytics',
+    payments: 'payments',
+    wallets: 'wallets',
+    coupons: 'coupons',
+    users: 'users',
+    roles: 'roles',
+    settings: 'settings',
+    help: 'help',
+    chat: 'chat',
+    'team-chat': 'teamChat',
+  };
+
   const hasPermission = (section: string): boolean => {
     const role = adminUser?.role?.toLowerCase() || '';
-    if (role === 'admin' || role === 'super_admin' || role.includes('admin')) return true;
+    // Only super_admin bypasses permission checks
+    if (role === 'super_admin') return true;
+    // Help is always accessible
     if (section === 'help') return true;
     
     const permissions = adminUser?.permissions;
     if (!permissions) return false;
     
-    const sectionMap: Record<string, string> = {
-      overview: 'dashboard',
-      products: 'products',
-      categories: 'categories',
-      orders: 'orders',
-      customers: 'customers',
-      inventory: 'inventory',
-      suppliers: 'inventory',
-      purchases: 'inventory',
-      'profit-analytics': 'inventory',
-      payments: 'payments',
-      wallets: 'wallets',
-      coupons: 'payments',
-      reviews: 'products',
-      users: 'users',
-      roles: 'roles',
-      settings: 'settings',
-      chat: 'chat',
-      'team-chat': 'chat',
-    };
-    
-    const permKey = sectionMap[section];
+    const permKey = sectionToPermissionKey[section];
     if (!permKey) return false;
     
-    const perm = permissions[permKey];
+    const perm = permissions[permKey as keyof typeof permissions];
     if (typeof perm === 'boolean') return perm;
     if (typeof perm === 'object' && perm !== null) {
       return (perm as Record<string, boolean>).view === true;
     }
     return false;
   };
+
+  // Filter sidebar items based on permissions
+  const visibleSidebarItems = sidebarItems.filter(item => hasPermission(item.id));
+  const visibleAccessControlItems = accessControlItems.filter(item => hasPermission(item.id));
+  const visibleSettingsItems = settingsItems.filter(item => hasPermission(item.id));
 
   const renderAccessDenied = () => (
     <div className="flex flex-col items-center justify-center h-[60vh] text-center">
@@ -484,8 +492,10 @@ export default function AdminDashboard() {
                   
                   {/* Navigation */}
                   <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Main Menu</p>
-                    {sidebarItems.map((item) => {
+                    {visibleSidebarItems.length > 0 && (
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Main Menu</p>
+                    )}
+                    {visibleSidebarItems.map((item) => {
                       const Icon = item.icon;
                       const isActive = activeSection === item.id;
                       return (
@@ -521,9 +531,10 @@ export default function AdminDashboard() {
                       );
                     })}
                     
+                    {visibleAccessControlItems.length > 0 && (
                     <div className="pt-4 mt-4 border-t border-border">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Access Control</p>
-                      {accessControlItems.map((item) => {
+                      {visibleAccessControlItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeSection === item.id;
                         return (
@@ -554,10 +565,12 @@ export default function AdminDashboard() {
                         );
                       })}
                     </div>
+                    )}
                     
+                    {visibleSettingsItems.length > 0 && (
                     <div className="pt-4 mt-4 border-t border-border">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-3">Settings</p>
-                      {settingsItems.map((item) => {
+                      {visibleSettingsItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeSection === item.id;
                         return (
@@ -588,6 +601,7 @@ export default function AdminDashboard() {
                         );
                       })}
                     </div>
+                    )}
                   </nav>
                   
                   {/* User Profile Section */}
