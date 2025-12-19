@@ -43,9 +43,11 @@ export default function ProductManagement() {
     lowStockThreshold: "",
     categoryId: "",
     imageUrls: [] as string[],
+    tags: [] as string[],
     isActive: true,
     isFeatured: false,
   });
+  const [tagInput, setTagInput] = useState("");
 
   // Fetch products
   const { data: products, isLoading: productsLoading } = useQuery({
@@ -327,9 +329,11 @@ export default function ProductManagement() {
       lowStockThreshold: "",
       categoryId: "",
       imageUrls: [],
+      tags: [],
       isActive: true,
       isFeatured: false,
     });
+    setTagInput("");
   };
 
   const handleFileSelect = useCallback(async (files: FileList | null) => {
@@ -449,6 +453,7 @@ export default function ProductManagement() {
       lowStockThreshold: productForm.lowStockThreshold ? parseInt(productForm.lowStockThreshold) : undefined,
       imageUrl: productForm.imageUrls[0] || null,
       imageUrls: productForm.imageUrls,
+      tags: productForm.tags,
     };
 
     if (editingProduct) {
@@ -481,9 +486,11 @@ export default function ProductManagement() {
       lowStockThreshold: (product as any).lowStockThreshold?.toString() || "",
       categoryId: product.categoryId || "",
       imageUrls,
+      tags: (product as any).tags || [],
       isActive: product.isActive,
       isFeatured: product.isFeatured,
     });
+    setTagInput("");
     setIsAddModalOpen(true);
   };
 
@@ -577,6 +584,62 @@ export default function ProductManagement() {
                   rows={3}
                   data-testid="textarea-description"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="tags" data-testid="label-tags">Tags (for SEO)</Label>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    id="tags"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const tag = tagInput.trim().toLowerCase();
+                        if (tag && !productForm.tags.includes(tag)) {
+                          setProductForm({ ...productForm, tags: [...productForm.tags, tag] });
+                          setTagInput("");
+                        }
+                      }
+                    }}
+                    placeholder="Type a tag and press Enter"
+                    data-testid="input-tags"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const tag = tagInput.trim().toLowerCase();
+                      if (tag && !productForm.tags.includes(tag)) {
+                        setProductForm({ ...productForm, tags: [...productForm.tags, tag] });
+                        setTagInput("");
+                      }
+                    }}
+                    data-testid="button-add-tag"
+                  >
+                    Add
+                  </Button>
+                </div>
+                {productForm.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {productForm.tags.map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1" data-testid={`tag-${tag}`}>
+                        {tag}
+                        <X
+                          className="w-3 h-3 cursor-pointer hover:text-destructive"
+                          onClick={() => {
+                            setProductForm({
+                              ...productForm,
+                              tags: productForm.tags.filter((_, i) => i !== index)
+                            });
+                          }}
+                          data-testid={`button-remove-tag-${tag}`}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

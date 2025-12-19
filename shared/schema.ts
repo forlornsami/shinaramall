@@ -122,6 +122,7 @@ export const products = pgTable("products", {
   supplierId: varchar("supplier_id").references(() => suppliers.id),
   imageUrl: varchar("image_url"),
   imageUrls: jsonb("image_urls").$type<string[]>().default([]),
+  tags: text("tags").array().default([]),
   isActive: boolean("is_active").notNull().default(true),
   isFeatured: boolean("is_featured").notNull().default(false),
   ratingAverage: decimal("rating_average", { precision: 3, scale: 2 }).default("0"),
