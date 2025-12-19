@@ -17,7 +17,8 @@ import {
   Star,
   Truck,
   PieChart,
-  Building2
+  Building2,
+  FileText
 } from "lucide-react";
 
 export interface NavItem {
@@ -53,6 +54,7 @@ export interface Permissions {
   suppliers?: Permission;
   purchases?: Permission;
   profitAnalytics?: Permission;
+  balanceSheet?: Permission;
   payments?: Permission;
   wallets?: Permission;
   coupons?: Permission;
@@ -74,6 +76,7 @@ export const sectionToPermissionKey: Record<string, string> = {
   suppliers: 'suppliers',
   purchases: 'purchases',
   'profit-analytics': 'profitAnalytics',
+  'balance-sheet': 'balanceSheet',
   payments: 'payments',
   wallets: 'wallets',
   coupons: 'coupons',
@@ -119,6 +122,7 @@ export const navigationSections: NavSection[] = [
     title: "Finance",
     items: [
       { id: "profit-analytics", label: "Profit & Analytics", icon: PieChart, color: "from-fuchsia-500 to-fuchsia-600" },
+      { id: "balance-sheet", label: "Balance Sheet", icon: FileText, color: "from-indigo-500 to-indigo-600" },
       { id: "payments", label: "Payments", icon: CreditCard, color: "from-emerald-500 to-emerald-600" },
       { id: "wallets", label: "Wallets", icon: Wallet, color: "from-amber-500 to-amber-600" },
       { id: "coupons", label: "Coupons", icon: Ticket, color: "from-rose-500 to-rose-600" },

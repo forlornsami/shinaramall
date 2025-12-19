@@ -523,6 +523,8 @@ export type RolePermissions = {
   orders: { view: boolean; edit: boolean };
   customers: { view: boolean };
   inventory: { view: boolean; adjust: boolean };
+  profitAnalytics?: { view: boolean };
+  balanceSheet?: { view: boolean };
   payments: { view: boolean; manage: boolean };
   wallets?: { view: boolean; manage: boolean };
   users: { view: boolean; create: boolean; edit: boolean; delete: boolean };

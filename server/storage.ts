@@ -342,6 +342,40 @@ export interface IStorage {
   getLowStockProducts(): Promise<Product[]>;
   getInventorySummary(): Promise<{ totalProducts: number; totalStock: number; lowStockCount: number; outOfStockCount: number; totalValue: number; totalCostValue: number }>;
   getProfitAnalytics(startDate?: Date, endDate?: Date): Promise<{ totalRevenue: number; totalCost: number; profit: number; margin: number; orderCount: number; topProfitProducts: { product: Product; profit: number; quantity: number }[] }>;
+  getBalanceSheet(startDate?: Date, endDate?: Date): Promise<{
+    assets: {
+      cashFromOrders: number;
+      inventoryValue: number;
+      pendingPayments: number;
+      totalAssets: number;
+    };
+    liabilities: {
+      customerWalletBalances: number;
+      pendingRefunds: number;
+      pendingTopups: number;
+      totalLiabilities: number;
+    };
+    equity: {
+      retainedEarnings: number;
+      netProfit: number;
+      totalEquity: number;
+    };
+    summary: {
+      totalRevenue: number;
+      totalCost: number;
+      grossProfit: number;
+      profitMargin: number;
+      orderCount: number;
+      completedOrderCount: number;
+      pendingOrderCount: number;
+      cancelledOrderCount: number;
+    };
+    periodComparison?: {
+      previousPeriodProfit: number;
+      profitChange: number;
+      profitChangePercent: number;
+    };
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2742,6 +2776,227 @@ export class DatabaseStorage implements IStorage {
       margin,
       orderCount: filteredOrders.length,
       topProfitProducts,
+    };
+  }
+
+  async getBalanceSheet(startDate?: Date, endDate?: Date): Promise<{
+    assets: {
+      cashFromOrders: number;
+      inventoryValue: number;
+      pendingPayments: number;
+      totalAssets: number;
+    };
+    liabilities: {
+      customerWalletBalances: number;
+      pendingRefunds: number;
+      pendingTopups: number;
+      totalLiabilities: number;
+    };
+    equity: {
+      retainedEarnings: number;
+      netProfit: number;
+      totalEquity: number;
+    };
+    summary: {
+      totalRevenue: number;
+      totalCost: number;
+      grossProfit: number;
+      profitMargin: number;
+      orderCount: number;
+      completedOrderCount: number;
+      pendingOrderCount: number;
+      cancelledOrderCount: number;
+    };
+    periodComparison?: {
+      previousPeriodProfit: number;
+      profitChange: number;
+      profitChangePercent: number;
+    };
+  }> {
+    // Calculate date range for previous period comparison
+    let prevStartDate: Date | undefined;
+    let prevEndDate: Date | undefined;
+    if (startDate && endDate) {
+      const periodDuration = endDate.getTime() - startDate.getTime();
+      prevStartDate = new Date(startDate.getTime() - periodDuration);
+      prevEndDate = new Date(startDate.getTime());
+    }
+
+    // Build date conditions for SQL query - fetch both current and previous period orders at once
+    const dateConditions: any[] = [];
+    if (startDate && endDate && prevStartDate) {
+      // Fetch orders from both current period and previous period
+      dateConditions.push(
+        sql`${orders.createdAt} >= ${prevStartDate} AND ${orders.createdAt} <= ${endDate}`
+      );
+    } else if (startDate) {
+      dateConditions.push(sql`${orders.createdAt} >= ${startDate}`);
+    } else if (endDate) {
+      dateConditions.push(sql`${orders.createdAt} <= ${endDate}`);
+    }
+
+    // Fetch orders with SQL date filtering (single query)
+    let allOrders;
+    if (dateConditions.length > 0) {
+      allOrders = await db.select().from(orders).where(and(...dateConditions));
+    } else {
+      allOrders = await db.select().from(orders);
+    }
+
+    // Separate current period and previous period orders
+    const filteredOrders = allOrders.filter(order => {
+      if (!startDate && !endDate) return true;
+      if (!order.createdAt) return true;
+      const orderDate = new Date(order.createdAt);
+      if (startDate && orderDate < startDate) return false;
+      if (endDate && orderDate > endDate) return false;
+      return true;
+    });
+
+    const prevPeriodOrders = (startDate && endDate && prevStartDate && prevEndDate) 
+      ? allOrders.filter(order => {
+          if (!order.createdAt) return false;
+          const orderDate = new Date(order.createdAt);
+          return orderDate >= prevStartDate! && orderDate < prevEndDate! && order.paymentStatus === 'completed';
+        })
+      : [];
+
+    // BATCH FETCH: Get all products once (for inventory and cost calculations)
+    const allProducts = await db.select().from(products);
+    const productCostMap = new Map<string, number>();
+    allProducts.forEach(p => {
+      productCostMap.set(p.id, p.costPrice ? parseFloat(p.costPrice) : 0);
+    });
+
+    // Calculate inventory value at cost price (only active products)
+    const inventoryValue = allProducts
+      .filter(p => p.isActive)
+      .reduce((sum, p) => {
+        const costPrice = productCostMap.get(p.id) || 0;
+        return sum + (costPrice * p.stock);
+      }, 0);
+
+    // ASSETS
+    const completedOrders = filteredOrders.filter(o => o.paymentStatus === 'completed');
+    const cashFromOrders = completedOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+    
+    const pendingPaymentOrders = filteredOrders.filter(o => o.paymentStatus === 'pending' || o.paymentStatus === 'processing');
+    const pendingPayments = pendingPaymentOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+    
+    const totalAssets = cashFromOrders + inventoryValue + pendingPayments;
+
+    // LIABILITIES - batch fetch wallets and topup requests
+    const [allWallets, pendingTopupRequests] = await Promise.all([
+      db.select().from(wallets),
+      db.select().from(walletTopupRequests).where(eq(walletTopupRequests.status, 'pending'))
+    ]);
+    
+    const customerWalletBalances = allWallets.reduce((sum, w) => sum + parseFloat(w.balance), 0);
+    
+    const refundedOrders = filteredOrders.filter(o => o.status === 'refunded' && o.paymentStatus !== 'refunded');
+    const pendingRefunds = refundedOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+    
+    const pendingTopups = pendingTopupRequests.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+    
+    const totalLiabilities = customerWalletBalances + pendingRefunds + pendingTopups;
+
+    // BATCH FETCH: Get all order items for completed orders (both periods) in ONE query
+    const allCompletedOrderIds = [...completedOrders.map(o => o.id), ...prevPeriodOrders.map(o => o.id)];
+    
+    let allOrderItems: { orderId: string; productId: string; quantity: number }[] = [];
+    if (allCompletedOrderIds.length > 0) {
+      allOrderItems = await db
+        .select({
+          orderId: orderItems.orderId,
+          productId: orderItems.productId,
+          quantity: orderItems.quantity,
+        })
+        .from(orderItems)
+        .where(sql`${orderItems.orderId} IN (${sql.join(allCompletedOrderIds.map(id => sql`${id}`), sql`, `)})`);
+    }
+
+    // Group order items by orderId for quick lookup
+    const orderItemsMap = new Map<string, { productId: string; quantity: number }[]>();
+    allOrderItems.forEach(item => {
+      const existing = orderItemsMap.get(item.orderId) || [];
+      existing.push({ productId: item.productId, quantity: item.quantity });
+      orderItemsMap.set(item.orderId, existing);
+    });
+
+    // Calculate COGS for current period using the maps
+    let totalCost = 0;
+    for (const order of completedOrders) {
+      const items = orderItemsMap.get(order.id) || [];
+      for (const item of items) {
+        const costPrice = productCostMap.get(item.productId) || 0;
+        totalCost += costPrice * item.quantity;
+      }
+    }
+    
+    const netProfit = cashFromOrders - totalCost;
+    const retainedEarnings = totalAssets - totalLiabilities - netProfit;
+    const totalEquity = retainedEarnings + netProfit;
+
+    // SUMMARY
+    const totalRevenue = cashFromOrders;
+    const grossProfit = totalRevenue - totalCost;
+    const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    
+    const completedOrderCount = completedOrders.length;
+    const pendingOrderCount = filteredOrders.filter(o => o.status === 'pending' || o.status === 'processing').length;
+    const cancelledOrderCount = filteredOrders.filter(o => o.status === 'cancelled').length;
+
+    // PERIOD COMPARISON using already-fetched data
+    let periodComparison: { previousPeriodProfit: number; profitChange: number; profitChangePercent: number } | undefined;
+    
+    if (startDate && endDate && prevPeriodOrders.length >= 0) {
+      const prevRevenue = prevPeriodOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+      
+      let prevCost = 0;
+      for (const order of prevPeriodOrders) {
+        const items = orderItemsMap.get(order.id) || [];
+        for (const item of items) {
+          const costPrice = productCostMap.get(item.productId) || 0;
+          prevCost += costPrice * item.quantity;
+        }
+      }
+      
+      const previousPeriodProfit = prevRevenue - prevCost;
+      const profitChange = netProfit - previousPeriodProfit;
+      const profitChangePercent = previousPeriodProfit > 0 ? (profitChange / previousPeriodProfit) * 100 : 0;
+      
+      periodComparison = { previousPeriodProfit, profitChange, profitChangePercent };
+    }
+
+    return {
+      assets: {
+        cashFromOrders,
+        inventoryValue,
+        pendingPayments,
+        totalAssets,
+      },
+      liabilities: {
+        customerWalletBalances,
+        pendingRefunds,
+        pendingTopups,
+        totalLiabilities,
+      },
+      equity: {
+        retainedEarnings,
+        netProfit,
+        totalEquity,
+      },
+      summary: {
+        totalRevenue,
+        totalCost,
+        grossProfit,
+        profitMargin,
+        orderCount: filteredOrders.length,
+        completedOrderCount,
+        pendingOrderCount,
+        cancelledOrderCount,
+      },
+      periodComparison,
     };
   }
 }

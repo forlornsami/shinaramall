@@ -2032,6 +2032,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get balance sheet data
+  app.get('/api/admin/balance-sheet', adminAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const balanceSheet = await storage.getBalanceSheet(start, end);
+      res.json(balanceSheet);
+    } catch (error) {
+      console.error("Error fetching balance sheet:", error);
+      res.status(500).json({ message: "Failed to fetch balance sheet" });
+    }
+  });
+
   // Admin dashboard stats
   app.get('/api/admin/stats', adminAuth, async (req, res) => {
     try {
