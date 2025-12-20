@@ -3105,6 +3105,48 @@ export class DatabaseStorage implements IStorage {
     for (const type of defaultTypes) {
       await db.insert(notificationTypes).values(type);
     }
+    
+    // Also seed default templates
+    await this.seedNotificationTemplates();
+  }
+
+  async seedNotificationTemplates(): Promise<void> {
+    const existing = await db.select().from(notificationTemplates);
+    if (existing.length > 0) return;
+
+    const defaultTemplates: InsertNotificationTemplate[] = [
+      // Order notifications - In-App
+      { typeKey: 'order_placed', channel: 'in_app', title: 'New Order Received', body: 'New order #{{orderNumber}} from {{customerName}} for Rs. {{total}}', variables: ['orderNumber', 'customerName', 'total'], isActive: true, version: 1 },
+      { typeKey: 'order_status_update', channel: 'in_app', title: 'Order #{{orderNumber}} Updated', body: '{{statusMessage}}', variables: ['orderNumber', 'status', 'statusMessage'], isActive: true, version: 1 },
+      
+      // Order notifications - Email
+      { typeKey: 'order_placed', channel: 'email', subject: 'Order Confirmation - #{{orderNumber}}', title: 'Thank you for your order!', body: 'Dear {{customerName}},\n\nYour order #{{orderNumber}} has been placed successfully.\n\nTotal: Rs. {{total}}\nPayment Method: {{paymentMethod}}\n\nThank you for shopping with us!', variables: ['orderNumber', 'customerName', 'total', 'paymentMethod'], isActive: true, version: 1 },
+      { typeKey: 'order_status_update', channel: 'email', subject: 'Order Update - #{{orderNumber}}', title: 'Your order status has changed', body: 'Dear {{customerName}},\n\nYour order #{{orderNumber}} is now {{status}}.\n\n{{statusMessage}}\n\nThank you for shopping with us!', variables: ['orderNumber', 'customerName', 'status', 'statusMessage'], isActive: true, version: 1 },
+      
+      // Payment notifications - In-App
+      { typeKey: 'payment_received', channel: 'in_app', title: 'Payment Verified', body: 'Payment of Rs. {{amount}} for order #{{orderNumber}} has been verified.', variables: ['amount', 'orderNumber'], isActive: true, version: 1 },
+      { typeKey: 'payment_failed', channel: 'in_app', title: 'Payment Failed', body: 'Payment failed for order #{{orderNumber}}. Please try again.', variables: ['orderNumber'], isActive: true, version: 1 },
+      
+      // Payment notifications - Email
+      { typeKey: 'payment_received', channel: 'email', subject: 'Payment Confirmed - Order #{{orderNumber}}', title: 'Payment Verified Successfully', body: 'Dear {{customerName}},\n\nYour payment of Rs. {{amount}} for order #{{orderNumber}} has been verified successfully.\n\nYour order will be processed shortly.\n\nThank you!', variables: ['customerName', 'amount', 'orderNumber'], isActive: true, version: 1 },
+      
+      // Inventory notifications - In-App
+      { typeKey: 'low_stock', channel: 'in_app', title: 'Low Stock Alert', body: 'Product "{{productName}}" is running low. Only {{stock}} units left.', variables: ['productName', 'stock'], isActive: true, version: 1 },
+      
+      // Customer notifications - In-App
+      { typeKey: 'customer_registration', channel: 'in_app', title: 'New Customer Registered', body: 'New customer {{customerName}} ({{email}}) has registered.', variables: ['customerName', 'email'], isActive: true, version: 1 },
+      { typeKey: 'review_submitted', channel: 'in_app', title: 'New Review Submitted', body: '{{customerName}} left a {{rating}}-star review for "{{productName}}".', variables: ['customerName', 'rating', 'productName'], isActive: true, version: 1 },
+      
+      // Communication notifications - In-App
+      { typeKey: 'chat_message', channel: 'in_app', title: 'New Chat Message', body: 'You have a new message from {{senderName}}.', variables: ['senderName'], isActive: true, version: 1 },
+      
+      // General notifications - In-App
+      { typeKey: 'general', channel: 'in_app', title: '{{title}}', body: '{{message}}', variables: ['title', 'message'], isActive: true, version: 1 },
+    ];
+
+    for (const template of defaultTemplates) {
+      await db.insert(notificationTemplates).values(template);
+    }
   }
 }
 

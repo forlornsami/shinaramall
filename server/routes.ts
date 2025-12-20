@@ -6,7 +6,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
-import { shouldSendAdminNotification, invalidateNotificationSettingsCache, type NotificationType } from "./notificationHelper";
+import { shouldSendAdminNotification, shouldSendEmailNotification, invalidateNotificationSettingsCache, type NotificationType } from "./notificationHelper";
+import { sendAdminNotification, sendCustomerNotification, defaultNotificationMessages } from "./notificationSender";
 import { sendVerificationEmail, sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendPaymentVerifiedEmail, sendPasswordResetEmail } from "./emailService";
 
 // Generate a secure JWT secret - use environment variable or generate a secure random secret
@@ -1230,18 +1231,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.increaseProductStock(item.productId, item.quantity);
       }
       
-      // Create admin notification (respecting preferences)
-      if (await shouldSendAdminNotification('order_status_update')) {
-        const user = await storage.getUser(userId);
-        const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
-        await storage.createNotification({
-          recipientType: 'admin',
-          type: 'order_status_update',
-          title: 'Order Cancelled by Customer',
-          message: `Order #${order.id.slice(-8).toUpperCase()} was cancelled by ${customerName}`,
-          data: { orderId, userId, reason: 'customer_requested' },
-        });
-      }
+      // Create admin notification for order cancellation (using templates)
+      const user = await storage.getUser(userId);
+      const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
+      const orderNumber = order.id.slice(-8).toUpperCase();
+      
+      await sendAdminNotification(
+        'order_status_update',
+        { orderNumber, customerName, status: 'cancelled', statusMessage: `Order was cancelled by ${customerName}` },
+        { title: 'Order Cancelled by Customer', message: `Order #{{orderNumber}} was cancelled by {{customerName}}` },
+        { orderId, userId, reason: 'customer_requested' }
+      );
       
       res.json({ success: true, message: "Order cancelled successfully" });
     } catch (error) {
@@ -1381,34 +1381,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return order with items
       const orderWithItems = await storage.getOrderWithItems(order.id);
       
-      // Create admin notification for new order (respecting preferences)
+      // Create admin notification for new order (using templates)
       try {
         const user = await storage.getUser(userId);
         const customerName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.email || 'Customer');
+        const orderNumber = order.id.slice(-8).toUpperCase();
         
-        if (await shouldSendAdminNotification('order_placed')) {
-          await storage.createNotification({
-            recipientType: 'admin',
-            type: 'order_placed',
-            title: 'New Order Received',
-            message: `New order #${order.id.slice(-8).toUpperCase()} from ${customerName} for Rs. ${parseFloat(order.total).toLocaleString()}`,
-            data: { orderId: order.id, userId, total: order.total },
-          });
-        }
+        await sendAdminNotification(
+          'order_placed',
+          { orderNumber, customerName, total: parseFloat(order.total).toLocaleString() },
+          defaultNotificationMessages.order_placed,
+          { orderId: order.id, userId, total: order.total }
+        );
         
-        // Check for low stock and create notifications (respecting preferences)
-        if (await shouldSendAdminNotification('low_stock')) {
-          for (const cartItem of cartItems) {
-            const updatedProduct = await storage.getProduct(cartItem.productId);
-            if (updatedProduct && updatedProduct.stock <= 10) {
-              await storage.createNotification({
-                recipientType: 'admin',
-                type: 'low_stock',
-                title: 'Low Stock Alert',
-                message: `Product "${updatedProduct.name}" is running low. Only ${updatedProduct.stock} units left.`,
-                data: { productId: updatedProduct.id, currentStock: updatedProduct.stock },
-              });
-            }
+        // Check for low stock and create notifications (using templates)
+        for (const cartItem of cartItems) {
+          const updatedProduct = await storage.getProduct(cartItem.productId);
+          if (updatedProduct && updatedProduct.stock <= 10) {
+            await sendAdminNotification(
+              'low_stock',
+              { productName: updatedProduct.name, stock: updatedProduct.stock },
+              defaultNotificationMessages.low_stock,
+              { productId: updatedProduct.id, currentStock: updatedProduct.stock }
+            );
           }
         }
       } catch (notificationError) {
@@ -1554,7 +1549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Order not found" });
       }
       
-      // Create customer notification for order status update
+      // Create customer notification for order status update (using templates)
       if (originalOrder && order.userId && status && originalOrder.status !== status) {
         try {
           const statusMessages: Record<string, string> = {
@@ -1564,25 +1559,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'delivered': 'Your order has been delivered. Enjoy!',
             'cancelled': 'Your order has been cancelled.',
           };
+          const orderNumber = order.id.slice(-8).toUpperCase();
+          const statusMessage = statusMessages[status] || `Your order status changed to ${status}.`;
           
-          await storage.createNotification({
-            recipientType: 'customer',
-            recipientId: order.userId,
-            type: 'order_status_update',
-            title: `Order #${order.id.slice(-8).toUpperCase()} Updated`,
-            message: statusMessages[status] || `Your order status changed to ${status}.`,
-            data: { orderId: order.id, status, previousStatus: originalOrder.status },
-          });
+          await sendCustomerNotification(
+            order.userId,
+            'order_status_update',
+            { orderNumber, status, statusMessage },
+            defaultNotificationMessages.order_status_update,
+            { orderId: order.id, status, previousStatus: originalOrder.status }
+          );
           
-          // Send order status update email
-          const user = await storage.getUser(order.userId);
-          if (user?.email) {
-            sendOrderStatusUpdateEmail(
-              user.email,
-              user.firstName || '',
-              order.id,
-              status
-            ).catch(err => console.error('Order status email error:', err));
+          // Send order status update email (respecting email preferences)
+          if (await shouldSendEmailNotification('order_status_update')) {
+            const user = await storage.getUser(order.userId);
+            if (user?.email) {
+              sendOrderStatusUpdateEmail(
+                user.email,
+                user.firstName || '',
+                order.id,
+                status
+              ).catch(err => console.error('Order status email error:', err));
+            }
           }
         } catch (notificationError) {
           console.error("Error creating order update notification:", notificationError);
@@ -1610,7 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Create customer notification for payment status update
+      // Create customer notification for payment status update (using templates)
       if (originalOrder && order.userId && paymentStatus && originalOrder.paymentStatus !== paymentStatus) {
         try {
           const paymentMessages: Record<string, string> = {
@@ -1619,17 +1617,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'failed': 'Payment failed. Please try again or contact support.',
             'refunded': 'Your order payment has been refunded.',
           };
+          const orderNumber = order.id.slice(-8).toUpperCase();
           
-          const paymentType = paymentStatus === 'paid' ? 'payment_received' : (paymentStatus === 'failed' ? 'payment_failed' : 'general');
+          const paymentType: NotificationType = paymentStatus === 'completed' ? 'payment_received' : (paymentStatus === 'failed' ? 'payment_failed' : 'general');
           
-          await storage.createNotification({
-            recipientType: 'customer',
-            recipientId: order.userId,
-            type: paymentType,
-            title: `Payment Update for Order #${order.id.slice(-8).toUpperCase()}`,
-            message: paymentMessages[paymentStatus] || `Payment status changed to ${paymentStatus}.`,
-            data: { orderId: order.id, paymentStatus, previousPaymentStatus: originalOrder.paymentStatus },
-          });
+          await sendCustomerNotification(
+            order.userId,
+            paymentType,
+            { orderNumber, amount: order.total },
+            { title: `Payment Update for Order #{{orderNumber}}`, message: paymentMessages[paymentStatus] || `Payment status changed to ${paymentStatus}.` },
+            { orderId: order.id, paymentStatus, previousPaymentStatus: originalOrder.paymentStatus }
+          );
         } catch (notificationError) {
           console.error("Error creating payment update notification:", notificationError);
         }
