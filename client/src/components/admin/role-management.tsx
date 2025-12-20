@@ -75,6 +75,7 @@ const defaultPermissions: Record<string, boolean | Permission> = {
   purchases: { view: false, create: false, edit: false },
   // Finance
   profitAnalytics: { view: false },
+  balanceSheet: { view: false },
   payments: { view: false, manage: false },
   wallets: { view: false, manage: false },
   coupons: { view: false, create: false, edit: false, delete: false },
@@ -86,6 +87,7 @@ const defaultPermissions: Record<string, boolean | Permission> = {
   roles: { view: false, create: false, edit: false, delete: false },
   // Settings
   settings: { view: false, edit: false },
+  notificationCenter: { view: false, manage: false },
 };
 
 interface PermissionCategory {
@@ -136,6 +138,7 @@ const permissionCategories: PermissionCategory[] = [
     title: "Finance",
     permissions: [
       { key: "profitAnalytics", label: "Profit & Analytics" },
+      { key: "balanceSheet", label: "Balance Sheet" },
       { key: "payments", label: "Payments" },
       { key: "wallets", label: "Wallets" },
       { key: "coupons", label: "Coupons" },
@@ -159,6 +162,7 @@ const permissionCategories: PermissionCategory[] = [
     title: "Settings",
     permissions: [
       { key: "settings", label: "Settings" },
+      { key: "notificationCenter", label: "Notification Center" },
     ],
   },
 ];
