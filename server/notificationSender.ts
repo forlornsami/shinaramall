@@ -24,9 +24,8 @@ async function getNotificationContent(
   defaults: NotificationResult
 ): Promise<NotificationResult> {
   try {
-    // Map to schema key for template lookup
-    const schemaKey = mapToSchemaType(type);
-    const templates = await storage.getNotificationTemplatesByType(schemaKey);
+    // Use original type key for template lookup (templates are stored with original keys)
+    const templates = await storage.getNotificationTemplatesByType(type);
     const template = templates.find(t => t.channel === channel && t.isActive);
     
     if (template) {
@@ -58,6 +57,9 @@ function mapToSchemaType(type: NotificationType): SchemaNotificationType {
     'customer_registration': 'customer_registration',
     'review_submitted': 'review_submitted',
     'chat_message': 'chat_message',
+    'wallet_topup_request': 'general',
+    'wallet_topup_approved': 'general',
+    'wallet_topup_rejected': 'general',
     'general': 'general',
   };
   return mapping[type] || 'general';
@@ -81,7 +83,7 @@ export async function sendAdminNotification(
       type: mapToSchemaType(type),
       title: content.title,
       message: content.message,
-      data: data || {},
+      data: { ...data, notificationType: type },
     });
     
     return true;
@@ -107,7 +109,7 @@ export async function sendCustomerNotification(
       type: mapToSchemaType(type),
       title: content.title,
       message: content.message,
-      data: data || {},
+      data: { ...data, notificationType: type },
     });
     
     return true;
@@ -128,9 +130,8 @@ export async function getEmailContent(
       return null; // Return null to indicate email should not be sent
     }
     
-    // Map to schema key for template lookup
-    const schemaKey = mapToSchemaType(type);
-    const templates = await storage.getNotificationTemplatesByType(schemaKey);
+    // Use original type key for template lookup (templates are stored with original keys)
+    const templates = await storage.getNotificationTemplatesByType(type);
     const template = templates.find(t => t.channel === 'email' && t.isActive);
     
     if (template) {

@@ -30,6 +30,9 @@ export type NotificationType =
   | 'customer_registration'
   | 'review_submitted'
   | 'chat_message'
+  | 'wallet_topup_request'
+  | 'wallet_topup_approved'
+  | 'wallet_topup_rejected'
   | 'general';
 
 const notificationTypeToPreference: Record<NotificationType, keyof StoreNotificationSettings | null> = {
@@ -42,6 +45,9 @@ const notificationTypeToPreference: Record<NotificationType, keyof StoreNotifica
   'customer_registration': 'customerRegistrations',
   'review_submitted': null,
   'chat_message': null,
+  'wallet_topup_request': 'paymentUpdates',
+  'wallet_topup_approved': 'paymentUpdates',
+  'wallet_topup_rejected': 'paymentUpdates',
   'general': null,
 };
 

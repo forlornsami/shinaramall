@@ -3595,15 +3595,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactionId: transactionId || null,
       });
       
-      // Create notification for admins
-      await storage.createNotification({
-        recipientType: 'admin',
-        recipientId: null,
-        type: 'payment_received',
-        title: 'New Wallet Top-up Request',
-        message: `${req.user.firstName || req.user.email} requested Rs. ${parseFloat(amount).toLocaleString()} wallet top-up via ${paymentMethod}`,
-        data: { topupRequestId: request.id, userId: req.user.id, amount },
-      });
+      // Create notification for admins (using templates)
+      await sendAdminNotification(
+        'wallet_topup_request',
+        { 
+          customerName: req.user.firstName || req.user.email, 
+          amount: parseFloat(amount).toLocaleString(),
+          paymentMethod 
+        },
+        defaultNotificationMessages.wallet_topup_request,
+        { topupRequestId: request.id, userId: req.user.id, amount }
+      );
       
       res.status(201).json(request);
     } catch (error) {
@@ -3715,26 +3717,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdBy: req.admin.id,
           });
           
-          // Notify customer
-          await storage.createNotification({
-            recipientType: 'customer',
-            recipientId: request.userId,
-            type: 'payment_received',
-            title: 'Wallet Top-up Approved',
-            message: `Rs. ${topupAmount.toLocaleString()} has been added to your wallet.`,
-            data: { topupRequestId: request.id, amount: request.amount },
-          });
+          // Notify customer (using templates)
+          await sendCustomerNotification(
+            request.userId,
+            'wallet_topup_approved',
+            { amount: topupAmount.toLocaleString() },
+            defaultNotificationMessages.wallet_topup_approved,
+            { topupRequestId: request.id, amount: request.amount }
+          );
         }
       } else {
-        // Notify customer of rejection
-        await storage.createNotification({
-          recipientType: 'customer',
-          recipientId: request.userId,
-          type: 'payment_failed',
-          title: 'Wallet Top-up Rejected',
-          message: note || 'Your wallet top-up request was rejected. Please contact support for more information.',
-          data: { topupRequestId: request.id, amount: request.amount },
-        });
+        // Notify customer of rejection (using templates)
+        await sendCustomerNotification(
+          request.userId,
+          'wallet_topup_rejected',
+          { amount: parseFloat(request.amount).toLocaleString(), reason: note || 'Please contact support for more information.' },
+          defaultNotificationMessages.wallet_topup_rejected,
+          { topupRequestId: request.id, amount: request.amount }
+        );
       }
       
       res.json(updatedRequest);
@@ -3777,15 +3777,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.admin.id,
       });
       
-      // Notify customer
-      await storage.createNotification({
-        recipientType: 'customer',
-        recipientId: req.params.userId,
-        type: 'payment_received',
-        title: 'Funds Added to Wallet',
-        message: `Rs. ${addAmount.toLocaleString()} has been added to your wallet.`,
-        data: { amount },
-      });
+      // Notify customer (using templates)
+      await sendCustomerNotification(
+        req.params.userId,
+        'wallet_topup_approved',
+        { amount: addAmount.toLocaleString() },
+        { title: 'Funds Added to Wallet', message: 'Rs. {{amount}} has been added to your wallet.' },
+        { amount, source: 'admin_credit' }
+      );
       
       res.json({ success: true, newBalance });
     } catch (error) {
