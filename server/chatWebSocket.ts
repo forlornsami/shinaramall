@@ -15,8 +15,18 @@ const clients = new Map<string, ChatClient>();
 
 export function setupChatWebSocket(server: Server) {
   const wss = new WebSocketServer({ 
-    server, 
-    path: '/ws/chat'
+    noServer: true
+  });
+
+  // Handle upgrade requests manually for better proxy compatibility
+  server.on('upgrade', (request, socket, head) => {
+    const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+    
+    if (pathname === '/ws/chat') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
   });
 
   wss.on('connection', async (ws, req) => {
