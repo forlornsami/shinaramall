@@ -79,7 +79,8 @@ export function setupChatWebSocket(server: Server) {
       }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      console.log('[Chat WebSocket] Connection closed, code:', code, 'reason:', reason?.toString());
       if (client) {
         clients.delete(client.userId);
         if (client.conversationId) {
@@ -93,7 +94,7 @@ export function setupChatWebSocket(server: Server) {
     });
 
     ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[Chat WebSocket] Error:', error);
     });
   });
 

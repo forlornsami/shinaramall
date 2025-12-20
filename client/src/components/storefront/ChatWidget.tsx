@@ -70,24 +70,38 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log('[ChatWidget] WebSocket opened, sending auth');
       const token = getToken();
-      ws.send(JSON.stringify({
-        type: 'auth',
-        userType: 'customer',
-        token: token,
-      }));
+      console.log('[ChatWidget] Token present:', !!token);
+      try {
+        ws.send(JSON.stringify({
+          type: 'auth',
+          userType: 'customer',
+          token: token,
+        }));
+        console.log('[ChatWidget] Auth message sent');
+      } catch (err) {
+        console.error('[ChatWidget] Failed to send auth:', err);
+      }
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('[ChatWidget] Received message:', data.type);
 
       switch (data.type) {
         case 'auth_success':
+          console.log('[ChatWidget] Auth success, joining conversation');
           setWsConnected(true);
           ws.send(JSON.stringify({
             type: 'join_conversation',
             conversationId: conversation.id,
           }));
+          break;
+          
+        case 'auth_error':
+          console.error('[ChatWidget] Auth error:', data.error);
+          setWsConnected(false);
           break;
 
         case 'new_message':
@@ -112,11 +126,13 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
       }
     };
 
-    ws.onerror = () => {
+    ws.onerror = (event) => {
+      console.error('[ChatWidget] WebSocket error:', event);
       setWsConnected(false);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log('[ChatWidget] WebSocket closed, code:', event.code, 'reason:', event.reason);
       setWsConnected(false);
     };
 
