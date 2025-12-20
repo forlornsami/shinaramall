@@ -20,19 +20,24 @@ export function setupChatWebSocket(server: Server) {
   });
 
   wss.on('connection', async (ws, req) => {
+    console.log('[Chat WebSocket] New connection established');
     let client: ChatClient | null = null;
 
     ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString());
+        console.log('[Chat WebSocket] Received message:', message.type);
 
         switch (message.type) {
           case 'auth':
+            console.log('[Chat WebSocket] Auth attempt for userType:', message.userType);
             client = await handleAuth(ws, message);
             if (client) {
               clients.set(client.userId, client);
+              console.log('[Chat WebSocket] Auth success for userId:', client.userId);
               ws.send(JSON.stringify({ type: 'auth_success', userId: client.userId }));
             } else {
+              console.log('[Chat WebSocket] Auth failed');
               ws.send(JSON.stringify({ type: 'auth_error', error: 'Authentication failed' }));
               ws.close();
             }
