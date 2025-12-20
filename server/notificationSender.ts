@@ -18,13 +18,15 @@ function applyVariables(template: string, variables: NotificationVariables): str
 }
 
 async function getNotificationContent(
-  typeKey: string,
+  type: NotificationType,
   channel: 'in_app' | 'email',
   variables: NotificationVariables,
   defaults: NotificationResult
 ): Promise<NotificationResult> {
   try {
-    const templates = await storage.getNotificationTemplatesByType(typeKey);
+    // Map to schema key for template lookup
+    const schemaKey = mapToSchemaType(type);
+    const templates = await storage.getNotificationTemplatesByType(schemaKey);
     const template = templates.find(t => t.channel === channel && t.isActive);
     
     if (template) {
@@ -34,7 +36,7 @@ async function getNotificationContent(
       };
     }
   } catch (error) {
-    console.error(`Error fetching template for ${typeKey}:`, error);
+    console.error(`Error fetching template for ${type}:`, error);
   }
   
   return {
@@ -116,16 +118,19 @@ export async function sendCustomerNotification(
 }
 
 export async function getEmailContent(
-  typeKey: string,
+  type: NotificationType,
   variables: NotificationVariables,
   defaults: { subject: string; title: string; body: string }
-): Promise<{ subject: string; title: string; body: string }> {
+): Promise<{ subject: string; title: string; body: string } | null> {
   try {
-    if (!(await shouldSendEmailNotification(typeKey as NotificationType))) {
-      return { subject: '', title: '', body: '' };
+    // Check email preferences using the original type
+    if (!(await shouldSendEmailNotification(type))) {
+      return null; // Return null to indicate email should not be sent
     }
     
-    const templates = await storage.getNotificationTemplatesByType(typeKey);
+    // Map to schema key for template lookup
+    const schemaKey = mapToSchemaType(type);
+    const templates = await storage.getNotificationTemplatesByType(schemaKey);
     const template = templates.find(t => t.channel === 'email' && t.isActive);
     
     if (template) {
@@ -136,7 +141,7 @@ export async function getEmailContent(
       };
     }
   } catch (error) {
-    console.error(`Error fetching email template for ${typeKey}:`, error);
+    console.error(`Error fetching email template for ${type}:`, error);
   }
   
   return {
