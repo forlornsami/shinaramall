@@ -2048,6 +2048,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== NOTIFICATION MANAGEMENT ROUTES =====
+  
+  // Get all notification types
+  app.get('/api/admin/notification-types', adminAuth, async (req, res) => {
+    try {
+      // Seed default types if empty
+      await storage.seedNotificationTypes();
+      const types = await storage.getNotificationTypes();
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching notification types:", error);
+      res.status(500).json({ message: "Failed to fetch notification types" });
+    }
+  });
+
+  // Update notification type
+  app.patch('/api/admin/notification-types/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateNotificationType(id, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Notification type not found" });
+      }
+      invalidateNotificationSettingsCache();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating notification type:", error);
+      res.status(500).json({ message: "Failed to update notification type" });
+    }
+  });
+
+  // Toggle notification type enabled status
+  app.patch('/api/admin/notification-types/:id/toggle', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { field, value } = req.body;
+      
+      if (!['isEnabled', 'isEmailEnabled', 'isInAppEnabled'].includes(field)) {
+        return res.status(400).json({ message: "Invalid field" });
+      }
+      
+      const updated = await storage.toggleNotificationType(id, field, value);
+      if (!updated) {
+        return res.status(404).json({ message: "Notification type not found" });
+      }
+      invalidateNotificationSettingsCache();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error toggling notification type:", error);
+      res.status(500).json({ message: "Failed to toggle notification type" });
+    }
+  });
+
+  // Get all notification templates
+  app.get('/api/admin/notification-templates', adminAuth, async (req, res) => {
+    try {
+      const templates = await storage.getNotificationTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching notification templates:", error);
+      res.status(500).json({ message: "Failed to fetch notification templates" });
+    }
+  });
+
+  // Get templates by type
+  app.get('/api/admin/notification-templates/by-type/:typeKey', adminAuth, async (req, res) => {
+    try {
+      const { typeKey } = req.params;
+      const templates = await storage.getNotificationTemplatesByType(typeKey);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching templates by type:", error);
+      res.status(500).json({ message: "Failed to fetch templates" });
+    }
+  });
+
+  // Create notification template
+  app.post('/api/admin/notification-templates', adminAuth, async (req, res) => {
+    try {
+      const template = await storage.createNotificationTemplate(req.body);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating notification template:", error);
+      res.status(500).json({ message: "Failed to create notification template" });
+    }
+  });
+
+  // Update notification template
+  app.patch('/api/admin/notification-templates/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateNotificationTemplate(id, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating notification template:", error);
+      res.status(500).json({ message: "Failed to update notification template" });
+    }
+  });
+
+  // Toggle notification template active status
+  app.patch('/api/admin/notification-templates/:id/toggle', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      
+      const updated = await storage.toggleNotificationTemplate(id, isActive);
+      if (!updated) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error toggling notification template:", error);
+      res.status(500).json({ message: "Failed to toggle notification template" });
+    }
+  });
+
+  // Delete notification template
+  app.delete('/api/admin/notification-templates/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteNotificationTemplate(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting notification template:", error);
+      res.status(500).json({ message: "Failed to delete notification template" });
+    }
+  });
+
   // Admin dashboard stats
   app.get('/api/admin/stats', adminAuth, async (req, res) => {
     try {

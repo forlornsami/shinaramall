@@ -18,6 +18,8 @@ import {
   paymentAccounts,
   storeSettings,
   notifications,
+  notificationTypes,
+  notificationTemplates,
   chatConversations,
   chatMessages,
   teamChatConversations,
@@ -63,6 +65,10 @@ import {
   type InsertStoreSettings,
   type Notification,
   type InsertNotification,
+  type NotificationType as NotificationTypeRecord,
+  type InsertNotificationType,
+  type NotificationTemplate,
+  type InsertNotificationTemplate,
   type ChatConversation,
   type InsertChatConversation,
   type ChatMessage,
@@ -2998,6 +3004,107 @@ export class DatabaseStorage implements IStorage {
       },
       periodComparison,
     };
+  }
+
+  // Notification Types Management
+  async getNotificationTypes(): Promise<NotificationTypeRecord[]> {
+    return db.select().from(notificationTypes).orderBy(notificationTypes.category, notificationTypes.label);
+  }
+
+  async getNotificationTypeByKey(key: string): Promise<NotificationTypeRecord | undefined> {
+    const [type] = await db.select().from(notificationTypes).where(eq(notificationTypes.key, key));
+    return type;
+  }
+
+  async createNotificationType(data: InsertNotificationType): Promise<NotificationTypeRecord> {
+    const [created] = await db.insert(notificationTypes).values(data).returning();
+    return created;
+  }
+
+  async updateNotificationType(id: string, data: Partial<InsertNotificationType>): Promise<NotificationTypeRecord | undefined> {
+    const [updated] = await db.update(notificationTypes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(notificationTypes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async toggleNotificationType(id: string, field: 'isEnabled' | 'isEmailEnabled' | 'isInAppEnabled', value: boolean): Promise<NotificationTypeRecord | undefined> {
+    const [updated] = await db.update(notificationTypes)
+      .set({ [field]: value, updatedAt: new Date() })
+      .where(eq(notificationTypes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNotificationType(id: string): Promise<boolean> {
+    const result = await db.delete(notificationTypes).where(eq(notificationTypes.id, id));
+    return true;
+  }
+
+  // Notification Templates Management
+  async getNotificationTemplates(): Promise<NotificationTemplate[]> {
+    return db.select().from(notificationTemplates).orderBy(notificationTemplates.typeKey);
+  }
+
+  async getNotificationTemplatesByType(typeKey: string): Promise<NotificationTemplate[]> {
+    return db.select().from(notificationTemplates).where(eq(notificationTemplates.typeKey, typeKey));
+  }
+
+  async getNotificationTemplate(id: string): Promise<NotificationTemplate | undefined> {
+    const [template] = await db.select().from(notificationTemplates).where(eq(notificationTemplates.id, id));
+    return template;
+  }
+
+  async createNotificationTemplate(data: InsertNotificationTemplate): Promise<NotificationTemplate> {
+    const [created] = await db.insert(notificationTemplates).values(data).returning();
+    return created;
+  }
+
+  async updateNotificationTemplate(id: string, data: Partial<InsertNotificationTemplate>): Promise<NotificationTemplate | undefined> {
+    const [existing] = await db.select().from(notificationTemplates).where(eq(notificationTemplates.id, id));
+    const newVersion = existing ? (existing.version || 1) + 1 : 1;
+    
+    const [updated] = await db.update(notificationTemplates)
+      .set({ ...data, version: newVersion, updatedAt: new Date() })
+      .where(eq(notificationTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async toggleNotificationTemplate(id: string, isActive: boolean): Promise<NotificationTemplate | undefined> {
+    const [updated] = await db.update(notificationTemplates)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(notificationTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNotificationTemplate(id: string): Promise<boolean> {
+    await db.delete(notificationTemplates).where(eq(notificationTemplates.id, id));
+    return true;
+  }
+
+  // Seed default notification types if empty
+  async seedNotificationTypes(): Promise<void> {
+    const existing = await db.select().from(notificationTypes);
+    if (existing.length > 0) return;
+
+    const defaultTypes: InsertNotificationType[] = [
+      { key: 'order_placed', label: 'Order Placed', description: 'When a new order is placed', category: 'orders', icon: 'ShoppingBag', isEnabled: true, isEmailEnabled: true, isInAppEnabled: true },
+      { key: 'order_status_update', label: 'Order Status Update', description: 'When order status changes (processing, shipped, delivered)', category: 'orders', icon: 'Truck', isEnabled: true, isEmailEnabled: true, isInAppEnabled: true },
+      { key: 'payment_received', label: 'Payment Received', description: 'When payment is verified', category: 'payments', icon: 'CreditCard', isEnabled: true, isEmailEnabled: true, isInAppEnabled: true },
+      { key: 'payment_failed', label: 'Payment Failed', description: 'When payment verification fails', category: 'payments', icon: 'AlertCircle', isEnabled: true, isEmailEnabled: true, isInAppEnabled: true },
+      { key: 'low_stock', label: 'Low Stock Alert', description: 'When product stock falls below threshold', category: 'inventory', icon: 'Package', isEnabled: true, isEmailEnabled: false, isInAppEnabled: true },
+      { key: 'customer_registration', label: 'Customer Registration', description: 'When a new customer registers', category: 'customers', icon: 'UserPlus', isEnabled: true, isEmailEnabled: false, isInAppEnabled: true },
+      { key: 'review_submitted', label: 'Review Submitted', description: 'When a customer submits a product review', category: 'customers', icon: 'Star', isEnabled: true, isEmailEnabled: false, isInAppEnabled: true },
+      { key: 'chat_message', label: 'Chat Message', description: 'When a new chat message is received', category: 'communication', icon: 'MessageCircle', isEnabled: true, isEmailEnabled: false, isInAppEnabled: true },
+      { key: 'general', label: 'General Notification', description: 'General system notifications', category: 'system', icon: 'Bell', isEnabled: true, isEmailEnabled: false, isInAppEnabled: true },
+    ];
+
+    for (const type of defaultTypes) {
+      await db.insert(notificationTypes).values(type);
+    }
   }
 }
 

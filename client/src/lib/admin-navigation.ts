@@ -18,7 +18,8 @@ import {
   Truck,
   PieChart,
   Building2,
-  FileText
+  FileText,
+  Bell
 } from "lucide-react";
 
 export interface NavItem {
@@ -58,6 +59,7 @@ export interface Permissions {
   payments?: Permission;
   wallets?: Permission;
   coupons?: Permission;
+  notificationCenter?: Permission;
   users?: Permission;
   roles?: Permission;
   settings?: Permission;
@@ -80,6 +82,7 @@ export const sectionToPermissionKey: Record<string, string> = {
   payments: 'payments',
   wallets: 'wallets',
   coupons: 'coupons',
+  'notification-center': 'notificationCenter',
   users: 'users',
   roles: 'roles',
   settings: 'settings',
@@ -148,6 +151,7 @@ export const accessControlSection: NavSection = {
 export const settingsSection: NavSection = {
   title: "Settings",
   items: [
+    { id: "notification-center", label: "Notifications", icon: Bell, color: "from-orange-500 to-orange-600" },
     { id: "settings", label: "Settings", icon: Settings, color: "from-slate-500 to-slate-600" },
     { id: "help", label: "Help Center", icon: HelpCircle, color: "from-teal-500 to-teal-600" },
   ],

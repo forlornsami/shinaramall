@@ -47,6 +47,11 @@ Preferred communication style: Simple, everyday language.
     - **Live Chat Support**: Customer-to-agent chat with WebSocket, agent assignment, and notification integration.
     - **Team Chat System**: Internal admin communication (direct and group chats) with WebSocket, presence indicators, and unread counts.
 - **Notification System**: In-app notifications for both admin and customer users based on events (e.g., new orders, low stock, chat messages) with polling for updates. Admin notification preferences are configurable in settings.
+- **Notification Center**: Comprehensive notification management with:
+    - **Type Management**: Enable/disable notification types globally, control email and in-app channels separately per type.
+    - **Template Editor**: Create and customize notification templates with variable support ({{variableName}} syntax), version tracking.
+    - **Categories**: Organized by orders, payments, inventory, customers, communication, and system.
+    - **Integration**: Settings affect both in-app and email notifications throughout the system.
 - **Email Service**: Resend-powered transactional emails for:
     - **Email Verification**: Sent on registration with 24-hour expiry tokens.
     - **Order Confirmation**: Sent when customer places an order.

@@ -752,6 +752,76 @@ export const insertNotificationSchema = createInsertSchema(notifications, {
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
+// Notification channel enum
+export const notificationChannelEnum = pgEnum("notification_channel", [
+  "in_app",
+  "email"
+]);
+
+// Notification category enum
+export const notificationCategoryEnum = pgEnum("notification_category", [
+  "orders",
+  "payments",
+  "inventory",
+  "customers",
+  "communication",
+  "system"
+]);
+
+// Notification types management table
+export const notificationTypes = pgTable("notification_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key").notNull().unique(), // e.g., 'order_placed', 'low_stock'
+  label: varchar("label").notNull(), // Human-readable name
+  description: text("description"), // What this notification does
+  category: notificationCategoryEnum("category").notNull(),
+  channels: jsonb("channels").$type<string[]>().default(["in_app", "email"]), // Available channels
+  isEnabled: boolean("is_enabled").default(true), // Global enable/disable
+  isEmailEnabled: boolean("is_email_enabled").default(true), // Email channel toggle
+  isInAppEnabled: boolean("is_in_app_enabled").default(true), // In-app channel toggle
+  icon: varchar("icon"), // Icon name from lucide-react
+  priority: varchar("priority").default("normal"), // low, normal, high
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNotificationTypeSchema = createInsertSchema(notificationTypes, {
+  channels: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NotificationType = typeof notificationTypes.$inferSelect;
+export type InsertNotificationType = z.infer<typeof insertNotificationTypeSchema>;
+
+// Notification templates for customizable email content
+export const notificationTemplates = pgTable("notification_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  typeKey: varchar("type_key").notNull(), // References notificationTypes.key
+  channel: notificationChannelEnum("channel").notNull().default("email"),
+  subject: varchar("subject"), // Email subject template
+  title: varchar("title").notNull(), // Notification title template
+  body: text("body").notNull(), // Notification body template (supports variables like {{orderNumber}})
+  variables: jsonb("variables").$type<string[]>(), // Available variable names
+  isActive: boolean("is_active").default(true),
+  version: integer("version").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNotificationTemplateSchema = createInsertSchema(notificationTemplates, {
+  variables: z.array(z.string()).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
+export type InsertNotificationTemplate = z.infer<typeof insertNotificationTemplateSchema>;
+
 // Chat conversation status enum
 export const chatConversationStatusEnum = pgEnum("chat_conversation_status", [
   "open",

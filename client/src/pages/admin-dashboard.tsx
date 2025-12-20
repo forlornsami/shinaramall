@@ -20,6 +20,7 @@ import SuppliersManagement from "@/components/admin/suppliers-management";
 import PurchaseManagement from "@/components/admin/purchase-management";
 import ProfitAnalytics from "@/components/admin/profit-analytics";
 import BalanceSheet from "@/components/admin/balance-sheet";
+import NotificationCenter from "@/components/admin/notification-center";
 import { AdminNotificationBell } from "@/components/admin/notification-bell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,7 @@ import {
   type Permissions,
 } from "@/lib/admin-navigation";
 
-type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "suppliers" | "purchases" | "profit-analytics" | "balance-sheet" | "payments" | "wallets" | "coupons" | "reviews" | "users" | "roles" | "settings" | "help" | "chat" | "team-chat";
+type AdminSection = "overview" | "products" | "categories" | "orders" | "customers" | "inventory" | "suppliers" | "purchases" | "profit-analytics" | "balance-sheet" | "payments" | "wallets" | "coupons" | "reviews" | "users" | "roles" | "settings" | "notification-center" | "help" | "chat" | "team-chat";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -359,6 +360,8 @@ export default function AdminDashboard() {
         return <UserManagement />;
       case "roles":
         return <RoleManagement />;
+      case "notification-center":
+        return <NotificationCenter />;
       case "settings":
         return <SettingsSection />;
       case "help":

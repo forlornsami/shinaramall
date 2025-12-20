@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { storeSettings } from "@shared/schema";
+import { storeSettings, notificationTypes } from "@shared/schema";
 
 interface StoreNotificationSettings {
   orderNotifications: boolean;
@@ -9,7 +9,14 @@ interface StoreNotificationSettings {
   marketingEmails: boolean;
 }
 
+interface NotificationTypeSettings {
+  isEnabled: boolean;
+  isEmailEnabled: boolean;
+  isInAppEnabled: boolean;
+}
+
 let cachedSettings: StoreNotificationSettings | null = null;
+let cachedNotificationTypes: Map<string, NotificationTypeSettings> | null = null;
 let cacheExpiresAt: number = 0;
 const CACHE_TTL_MS = 60000;
 
@@ -20,6 +27,8 @@ export type NotificationType =
   | 'payment_received'
   | 'payment_failed'
   | 'new_customer'
+  | 'customer_registration'
+  | 'review_submitted'
   | 'chat_message'
   | 'general';
 
@@ -30,6 +39,8 @@ const notificationTypeToPreference: Record<NotificationType, keyof StoreNotifica
   'payment_received': 'paymentUpdates',
   'payment_failed': 'paymentUpdates',
   'new_customer': 'customerRegistrations',
+  'customer_registration': 'customerRegistrations',
+  'review_submitted': null,
   'chat_message': null,
   'general': null,
 };
@@ -55,7 +66,44 @@ async function getNotificationSettings(): Promise<StoreNotificationSettings> {
   return cachedSettings;
 }
 
+async function getNotificationTypeSettings(): Promise<Map<string, NotificationTypeSettings>> {
+  const now = Date.now();
+  
+  if (cachedNotificationTypes && cacheExpiresAt > now) {
+    return cachedNotificationTypes;
+  }
+  
+  const types = await db.select().from(notificationTypes);
+  cachedNotificationTypes = new Map();
+  
+  for (const type of types) {
+    cachedNotificationTypes.set(type.key, {
+      isEnabled: type.isEnabled ?? true,
+      isEmailEnabled: type.isEmailEnabled ?? true,
+      isInAppEnabled: type.isInAppEnabled ?? true,
+    });
+  }
+  
+  return cachedNotificationTypes;
+}
+
 export async function shouldSendAdminNotification(type: NotificationType): Promise<boolean> {
+  // First check the notification_types table (managed via Notification Center)
+  const typeSettings = await getNotificationTypeSettings();
+  const typeSetting = typeSettings.get(type);
+  
+  if (typeSetting) {
+    // If master switch is off, don't send any notification
+    if (!typeSetting.isEnabled) {
+      return false;
+    }
+    // If in-app notifications are disabled, don't send admin notification
+    if (!typeSetting.isInAppEnabled) {
+      return false;
+    }
+  }
+  
+  // Also check store settings for backward compatibility
   const preferenceKey = notificationTypeToPreference[type];
   
   if (preferenceKey === null) {
@@ -66,7 +114,27 @@ export async function shouldSendAdminNotification(type: NotificationType): Promi
   return settings[preferenceKey];
 }
 
+export async function shouldSendEmailNotification(type: NotificationType): Promise<boolean> {
+  // Check the notification_types table for email settings
+  const typeSettings = await getNotificationTypeSettings();
+  const typeSetting = typeSettings.get(type);
+  
+  if (typeSetting) {
+    // If master switch is off, don't send email
+    if (!typeSetting.isEnabled) {
+      return false;
+    }
+    // If email notifications are disabled, don't send email
+    if (!typeSetting.isEmailEnabled) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
 export function invalidateNotificationSettingsCache(): void {
   cachedSettings = null;
+  cachedNotificationTypes = null;
   cacheExpiresAt = 0;
 }
