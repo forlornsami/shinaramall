@@ -12,13 +12,16 @@ import { sendVerificationEmail, sendOrderConfirmationEmail, sendOrderStatusUpdat
 
 // Generate a secure JWT secret - use environment variable or generate a secure random secret
 const getJwtSecret = (): string => {
+  if (process.env.SESSION_SECRET) {
+    return process.env.SESSION_SECRET;
+  }
   if (process.env.JWT_SECRET) {
     return process.env.JWT_SECRET;
   }
   // Generate a secure random secret for this server instance
   // Note: This will change on server restart, logging out all admin users
   const generatedSecret = crypto.randomBytes(64).toString('hex');
-  console.warn('WARNING: JWT_SECRET not set in environment. Using generated secret. Admin sessions will not persist across server restarts.');
+  console.warn('WARNING: SESSION_SECRET not set in environment. Using generated secret. Admin sessions will not persist across server restarts.');
   return generatedSecret;
 };
 
