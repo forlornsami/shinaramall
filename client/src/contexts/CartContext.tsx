@@ -150,6 +150,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, removeFromCartMutation]);
 
   const updateQuantity = useCallback((productId: string, quantity: number) => {
+    // Cap at available stock (product is present in enrichedItems)
+    const item = enrichedItems.find(i => i.productId === productId);
+    const stock = item?.product?.stock;
+    if (stock !== undefined && stock !== null && quantity > stock) return;
     if (quantity <= 0) {
       removeFromCart(productId);
       return;

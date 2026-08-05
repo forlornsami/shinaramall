@@ -189,6 +189,8 @@ export default function CartView() {
                           size="icon"
                           className="h-8 w-8 rounded-lg"
                           onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          disabled={item.quantity >= (item.product?.stock ?? Infinity)}
+                          title={item.quantity >= (item.product?.stock ?? Infinity) ? `Only ${item.product?.stock} in stock` : undefined}
                           data-testid={`button-increase-${item.productId}`}
                         >
                           <Plus className="w-4 h-4" />
