@@ -298,11 +298,41 @@ export const stockAdjustments = pgTable("stock_adjustments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// User saved shipping addresses (multiple per user)
+export const userAddresses = pgTable("user_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  label: varchar("label").default("Home"),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name"),
+  address: text("address").notNull(),
+  city: varchar("city").notNull(),
+  postalCode: varchar("postal_code"),
+  phone: varchar("phone").notNull(),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserAddressSchema = createInsertSchema(userAddresses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type UserAddress = typeof userAddresses.$inferSelect;
+export type InsertUserAddress = z.infer<typeof insertUserAddressSchema>;
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
   cartItems: many(cartItems),
   wishlistItems: many(wishlistItems),
+  addresses: many(userAddresses),
+}));
+
+export const userAddressesRelations = relations(userAddresses, ({ one }) => ({
+  user: one(users, { fields: [userAddresses.userId], references: [users.id] }),
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({

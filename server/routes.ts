@@ -318,6 +318,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Shipping address book ──────────────────────────────────────────────────
+  app.get('/api/addresses', isAuthenticated, async (req: any, res) => {
+    try {
+      const addresses = await storage.getUserAddresses(req.user.id);
+      res.json(addresses);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch addresses" });
+    }
+  });
+
+  app.post('/api/addresses', isAuthenticated, async (req: any, res) => {
+    try {
+      const { label, firstName, lastName, address, city, postalCode, phone, isDefault } = req.body;
+      if (!firstName || !address || !city || !phone) {
+        return res.status(400).json({ message: "firstName, address, city and phone are required" });
+      }
+      const addr = await storage.createUserAddress({
+        userId: req.user.id,
+        label: label || "Home",
+        firstName,
+        lastName,
+        address,
+        city,
+        postalCode,
+        phone,
+        isDefault: !!isDefault,
+      });
+      res.status(201).json(addr);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create address" });
+    }
+  });
+
+  app.patch('/api/addresses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { label, firstName, lastName, address, city, postalCode, phone, isDefault } = req.body;
+      const addr = await storage.updateUserAddress(req.params.id, req.user.id, {
+        label, firstName, lastName, address, city, postalCode, phone, isDefault,
+      });
+      res.json(addr);
+    } catch (error: any) {
+      if (error.message === "Address not found") return res.status(404).json({ message: error.message });
+      res.status(500).json({ message: "Failed to update address" });
+    }
+  });
+
+  app.delete('/api/addresses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteUserAddress(req.params.id, req.user.id);
+      if (!deleted) return res.status(404).json({ message: "Address not found" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete address" });
+    }
+  });
+
+  app.post('/api/addresses/:id/default', isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.setDefaultAddress(req.params.id, req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to set default address" });
+    }
+  });
+
+  // Admin: view a registered customer's addresses
+  app.get('/api/admin/customers/:userId/addresses', adminAuth, async (req: any, res) => {
+    try {
+      const addresses = await storage.getAdminUserAddresses(req.params.userId);
+      res.json(addresses);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch customer addresses" });
+    }
+  });
+
   // Admin auth routes
   app.post('/api/admin/login', async (req, res) => {
     try {

@@ -28,6 +28,7 @@ import {
   wallets,
   walletTransactions,
   walletTopupRequests,
+  userAddresses,
   coupons,
   couponCategories,
   couponProducts,
@@ -110,6 +111,8 @@ import {
   type InsertPurchaseItem,
   type StockAdjustment,
   type InsertStockAdjustment,
+  type UserAddress,
+  type InsertUserAddress,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
@@ -122,6 +125,14 @@ export interface IStorage {
   createUser(user: { email: string; passwordHash: string; firstName?: string; lastName?: string; mobile?: string; emailVerificationToken?: string; emailVerificationExpires?: Date }): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
   getAllCustomers(): Promise<SafeUser[]>;
+
+  // User address operations
+  getUserAddresses(userId: string): Promise<UserAddress[]>;
+  createUserAddress(data: InsertUserAddress): Promise<UserAddress>;
+  updateUserAddress(id: string, userId: string, data: Partial<InsertUserAddress>): Promise<UserAddress>;
+  deleteUserAddress(id: string, userId: string): Promise<boolean>;
+  setDefaultAddress(id: string, userId: string): Promise<void>;
+  getAdminUserAddresses(userId: string): Promise<UserAddress[]>;
   
   // Admin user operations
   getAdminUser(id: string): Promise<AdminUser | undefined>;
@@ -462,6 +473,56 @@ export class DatabaseStorage implements IStorage {
       emailVerificationExpires: users.emailVerificationExpires,
     }).from(users).orderBy(desc(users.createdAt));
     return result;
+  }
+
+  // User address operations
+  async getUserAddresses(userId: string): Promise<UserAddress[]> {
+    return db.select().from(userAddresses)
+      .where(eq(userAddresses.userId, userId))
+      .orderBy(desc(userAddresses.isDefault), desc(userAddresses.createdAt));
+  }
+
+  async createUserAddress(data: InsertUserAddress): Promise<UserAddress> {
+    // If this is marked default, clear any existing default first
+    if (data.isDefault) {
+      await db.update(userAddresses)
+        .set({ isDefault: false })
+        .where(eq(userAddresses.userId, data.userId));
+    }
+    const [addr] = await db.insert(userAddresses).values(data).returning();
+    return addr;
+  }
+
+  async updateUserAddress(id: string, userId: string, data: Partial<InsertUserAddress>): Promise<UserAddress> {
+    if (data.isDefault) {
+      await db.update(userAddresses)
+        .set({ isDefault: false })
+        .where(eq(userAddresses.userId, userId));
+    }
+    const [addr] = await db.update(userAddresses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(userAddresses.id, id), eq(userAddresses.userId, userId)))
+      .returning();
+    if (!addr) throw new Error("Address not found");
+    return addr;
+  }
+
+  async deleteUserAddress(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(userAddresses)
+      .where(and(eq(userAddresses.id, id), eq(userAddresses.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async setDefaultAddress(id: string, userId: string): Promise<void> {
+    await db.update(userAddresses).set({ isDefault: false }).where(eq(userAddresses.userId, userId));
+    await db.update(userAddresses).set({ isDefault: true, updatedAt: new Date() })
+      .where(and(eq(userAddresses.id, id), eq(userAddresses.userId, userId)));
+  }
+
+  async getAdminUserAddresses(userId: string): Promise<UserAddress[]> {
+    return db.select().from(userAddresses)
+      .where(eq(userAddresses.userId, userId))
+      .orderBy(desc(userAddresses.isDefault), desc(userAddresses.createdAt));
   }
 
   // Admin user operations

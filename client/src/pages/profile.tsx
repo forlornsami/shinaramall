@@ -17,13 +17,13 @@ import {
   Package, 
   Settings, 
   Save,
-  ArrowLeft,
   Calendar,
   ShoppingBag,
   Clock,
   Home as HomeIcon
 } from "lucide-react";
 import type { Order, User as UserType } from "@shared/schema";
+import AddressBook from "@/components/storefront/AddressBook";
 
 export default function ProfilePage() {
   const [, setLocation] = useLocation();
@@ -295,47 +295,8 @@ export default function ProfilePage() {
                 </Card>
 
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5" />
-                      Shipping Address
-                    </CardTitle>
-                    <CardDescription>Your default shipping address</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Street Address</Label>
-                      <Input
-                        id="address"
-                        placeholder="Enter your street address"
-                        value={profileData.address}
-                        onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                        disabled={!isEditing}
-                        data-testid="input-address"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        placeholder="Enter your city"
-                        value={profileData.city}
-                        onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
-                        disabled={!isEditing}
-                        data-testid="input-city"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        placeholder="+92 300 1234567"
-                        value={profileData.phone}
-                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                        disabled={!isEditing}
-                        data-testid="input-phone"
-                      />
-                    </div>
+                  <CardContent className="p-6">
+                    <AddressBook />
                   </CardContent>
                 </Card>
               </TabsContent>

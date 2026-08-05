@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Mail, Calendar, ShoppingBag } from "lucide-react";
-import type { User, Order } from "@shared/schema";
+import { Search, Mail, Calendar, ShoppingBag, MapPin } from "lucide-react";
+import type { User, Order, UserAddress } from "@shared/schema";
 
 export default function CustomerManagement() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,6 +35,23 @@ export default function CustomerManagement() {
     },
   });
 
+  const [addressUserId, setAddressUserId] = useState<string | null>(null);
+  const [addressCustomerName, setAddressCustomerName] = useState("");
+
+  const { data: customerAddresses = [], isLoading: addressesLoading } = useQuery<UserAddress[]>({
+    queryKey: ['/api/admin/customers', addressUserId, 'addresses'],
+    queryFn: async () => {
+      if (!addressUserId) return [];
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`/api/admin/customers/${addressUserId}/addresses`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    enabled: !!addressUserId,
+  });
+
   // Group orders by user — registered users by userId, guests by email/phone/name
   const customerStats = orders?.reduce((acc: any, order: any) => {
     const isGuest = !order.userId;
@@ -57,6 +75,7 @@ export default function CustomerManagement() {
         totalSpent: 0,
         lastOrderDate: order.createdAt,
         isGuest,
+        userId: isGuest ? null : order.userId,
       };
     }
     acc[customerKey].totalOrders += 1;
@@ -81,6 +100,11 @@ export default function CustomerManagement() {
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
+
+  const openAddresses = (customer: any) => {
+    setAddressCustomerName(customer.name);
+    setAddressUserId(customer.userId);
   };
 
   return (
@@ -211,6 +235,7 @@ export default function CustomerManagement() {
                   <TableHead data-testid="header-total-spent">Total Spent</TableHead>
                   <TableHead data-testid="header-last-order">Last Order</TableHead>
                   <TableHead data-testid="header-status">Status</TableHead>
+                  <TableHead>Addresses</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -263,6 +288,21 @@ export default function CustomerManagement() {
                         {customer.isGuest ? 'Guest' : 'Registered'}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {!customer.isGuest && customer.userId ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => openAddresses(customer)}
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                          View
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -270,6 +310,56 @@ export default function CustomerManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Customer Addresses Dialog */}
+      <Dialog open={!!addressUserId} onOpenChange={v => !v && setAddressUserId(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary" />
+              Saved Addresses — {addressCustomerName}
+            </DialogTitle>
+            <DialogDescription>
+              Shipping addresses saved by this customer
+            </DialogDescription>
+          </DialogHeader>
+          {addressesLoading ? (
+            <div className="space-y-3 py-2">
+              {[1, 2].map(i => <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />)}
+            </div>
+          ) : customerAddresses.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No saved addresses</p>
+            </div>
+          ) : (
+            <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto pr-1">
+              {customerAddresses.map((addr: UserAddress) => (
+                <div
+                  key={addr.id}
+                  className={`p-4 rounded-xl border ${addr.isDefault ? 'border-primary/50 bg-primary/5' : 'border-border'}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {addr.label}
+                    </span>
+                    {addr.isDefault && (
+                      <Badge className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary border-0">
+                        Default
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium">{addr.firstName} {addr.lastName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {addr.address}, {addr.city}{addr.postalCode ? ` ${addr.postalCode}` : ''}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{addr.phone}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
