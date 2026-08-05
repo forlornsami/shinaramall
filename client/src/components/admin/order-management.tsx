@@ -535,7 +535,14 @@ export default function OrderManagement() {
                         {order.orderNumber}
                       </TableCell>
                       <TableCell data-testid={`text-order-customer-${order.id}`}>
-                        {order.shippingAddress?.firstName} {order.shippingAddress?.lastName}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{order.shippingAddress?.firstName} {order.shippingAddress?.lastName}</span>
+                          {!(order as any).userId && (
+                            <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 border-orange-200" data-testid={`badge-guest-${order.id}`}>
+                              Guest
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell data-testid={`text-order-amount-${order.id}`}>
                         Rs. {parseFloat(order.total).toLocaleString()}
@@ -646,9 +653,28 @@ export default function OrderManagement() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Shipping Address</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      Shipping Address
+                      {!(orderDetails as any).userId && (
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 border-orange-200" data-testid="badge-detail-guest">
+                          Guest Order
+                        </Badge>
+                      )}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent data-testid="shipping-address-content">
+                    {!(orderDetails as any).userId && ((orderDetails as any).guestName) && (
+                      <div className="mb-3 pb-3 border-b space-y-1">
+                        <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Guest Info</div>
+                        <div className="font-medium" data-testid="text-detail-guest-name">{(orderDetails as any).guestName}</div>
+                        {(orderDetails as any).guestPhone && (
+                          <div className="text-sm text-muted-foreground" data-testid="text-detail-guest-phone">📞 {(orderDetails as any).guestPhone}</div>
+                        )}
+                        {(orderDetails as any).guestEmail && (
+                          <div className="text-sm text-muted-foreground" data-testid="text-detail-guest-email">✉ {(orderDetails as any).guestEmail}</div>
+                        )}
+                      </div>
+                    )}
                     {orderDetails.shippingAddress && (
                       <div className="space-y-1">
                         <div className="font-medium" data-testid="text-shipping-name">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/contexts/CartContext";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +33,13 @@ export default function CartView() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
+  const { data: storeSettings } = useQuery<any>({
+    queryKey: ['/api/store-settings'],
+  });
+  const guestCheckoutEnabled = storeSettings?.guestCheckoutEnabled ?? false;
+
   const handleCheckout = () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !guestCheckoutEnabled) {
       setShowLoginModal(true);
       return;
     }

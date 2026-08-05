@@ -6,14 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal, Ticket } from "lucide-react";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal, Ticket, UserCircle, LogIn } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProductThumbnail } from "@/lib/utils";
-import type { CartItem, Product, PaymentAccount, Wallet as WalletType } from "@shared/schema";
+import type { CartItem, Product, PaymentAccount, Wallet as WalletType, StoreSettings } from "@shared/schema";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -76,6 +76,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   };
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  // "choosing" = the auth/guest choice screen; "guest" = proceeding as guest; "auth" = normal authenticated flow
+  const [checkoutMode, setCheckoutMode] = useState<"choosing" | "guest" | "auth">("choosing");
   const [step, setStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("easypaisa");
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -102,6 +104,21 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     postalCode: "",
     phone: "",
   });
+  const [guestInfo, setGuestInfo] = useState({
+    name: "",
+    phone: "",
+    email: "",
+  });
+  const [guestToken, setGuestToken] = useState<string | null>(null);
+
+  // Fetch store settings to check guest checkout
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
+  const guestCheckoutEnabled = storeSettings?.guestCheckoutEnabled ?? false;
+  // If authenticated, always go to auth flow; skip choice screen
+  const effectiveMode = isAuthenticated ? "auth" : checkoutMode;
 
   // Fetch wallet balance
   const { data: wallet, refetch: refetchWallet } = useQuery<WalletType>({
@@ -206,6 +223,53 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setCouponError(null);
   };
 
+  // Guest order mutation
+  const createGuestOrderMutation = useMutation({
+    mutationFn: async () => {
+      const guestOrderData = {
+        guestName: guestInfo.name,
+        guestEmail: guestInfo.email || undefined,
+        guestPhone: guestInfo.phone,
+        shippingAddress: shippingInfo,
+        paymentMethod,
+        items: cartItems?.map((item: CartItemWithProduct) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })) || [],
+        // subtotal, shippingCost, and total are computed server-side for security
+      };
+      const response = await apiRequest('POST', '/api/orders/guest', guestOrderData);
+      return await response.json();
+    },
+    onSuccess: async (order) => {
+      setOrderId(order.id);
+      setOrderNumber(order.orderNumber);
+      // Store the capability token returned by the server for proof upload
+      if (order.guestToken) setGuestToken(order.guestToken);
+      const isRequiresProof = selectedPaymentConfig?.requiresProof || false;
+      if (isRequiresProof) {
+        setStep(3);
+      } else {
+        toast({
+          title: "Order Placed Successfully!",
+          description: `Your order #${order.orderNumber} has been placed. Pay on delivery.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/products/storefront'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+        clearCart();
+        onClose();
+        resetCheckoutState();
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Order Failed",
+        description: "Failed to create order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       const orderData = {
@@ -278,10 +342,17 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       if (!orderId || !paymentScreenshot) {
         throw new Error("Order ID and screenshot are required");
       }
-      const response = await apiRequest('POST', `/api/orders/${orderId}/payment-proof`, {
+      const endpoint = effectiveMode === "guest"
+        ? `/api/orders/guest/${orderId}/payment-proof`
+        : `/api/orders/${orderId}/payment-proof`;
+      const body: any = {
         screenshot: paymentScreenshot,
         transactionId: transactionId || null,
-      });
+      };
+      if (effectiveMode === "guest" && guestToken) {
+        body.guestToken = guestToken;
+      }
+      const response = await apiRequest('POST', endpoint, body);
       return await response.json();
     },
     onSuccess: () => {
@@ -294,11 +365,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       clearCart();
       onClose();
-      setStep(1);
-      setPaymentScreenshot(null);
-      setTransactionId("");
-      setOrderId(null);
-      setOrderNumber(null);
+      resetCheckoutState();
     },
     onError: () => {
       toast({
@@ -361,11 +428,26 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       return;
     }
     
-    createOrderMutation.mutate();
+    if (effectiveMode === "guest") {
+      createGuestOrderMutation.mutate();
+    } else {
+      createOrderMutation.mutate();
+    }
   };
 
   const handleNextStep = () => {
     if (step === 1) {
+      // Validate guest info if in guest mode
+      if (effectiveMode === "guest") {
+        if (!guestInfo.name || !guestInfo.phone) {
+          toast({
+            title: "Missing Information",
+            description: "Please fill in your name and phone number.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       if (!shippingInfo.firstName || !shippingInfo.lastName || !shippingInfo.address || 
           !shippingInfo.city || !shippingInfo.phone) {
         toast({
@@ -376,7 +458,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         return;
       }
     }
-    setStep(step + 1);
+    setStep(step +  1);
   };
 
   const handlePaymentMethodChange = (value: string) => {
@@ -385,6 +467,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
   const resetCheckoutState = () => {
     setStep(1);
+    setCheckoutMode("choosing");
     setPaymentScreenshot(null);
     setTransactionId("");
     setOrderId(null);
@@ -394,6 +477,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponError(null);
+    setGuestInfo({ name: "", phone: "", email: "" });
+    setGuestToken(null);
+    setShippingInfo({ firstName: "", lastName: "", address: "", city: "", postalCode: "", phone: "" });
   };
   
   const handleApplyWallet = () => {
@@ -413,6 +499,57 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
   const selectedPaymentMethod = paymentMethods.find(m => m.id === paymentMethod);
 
+  // Show choice screen for unauthenticated users when guest checkout is enabled
+  if (!isAuthenticated && guestCheckoutEnabled && effectiveMode === "choosing") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <Card className="relative w-full max-w-md rounded-3xl shadow-2xl border-0 animate-slide-up">
+          <div className="sticky top-0 z-10 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+                <Lock className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground" data-testid="text-checkout-title">Checkout</h2>
+            </div>
+            <Button type="button" variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl hover:bg-destructive/10 hover:text-destructive" onClick={onClose} data-testid="button-close-checkout">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <CardContent className="p-6 space-y-4">
+            <p className="text-center text-muted-foreground mb-2">How would you like to continue?</p>
+            <button
+              onClick={() => setCheckoutMode("auth")}
+              className="w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-primary/30 hover:border-primary hover:bg-primary/5 transition-all text-left"
+              data-testid="button-signin-checkout"
+            >
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <LogIn className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <div className="font-semibold text-foreground">Sign In / Register</div>
+                <div className="text-sm text-muted-foreground">Access wallet, order history & more</div>
+              </div>
+            </button>
+            <button
+              onClick={() => setCheckoutMode("guest")}
+              className="w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-muted hover:border-primary/30 hover:bg-muted/30 transition-all text-left"
+              data-testid="button-guest-checkout"
+            >
+              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                <UserCircle className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-semibold text-foreground">Continue as Guest</div>
+                <div className="text-sm text-muted-foreground">No account needed, quick checkout</div>
+              </div>
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -429,7 +566,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-foreground" data-testid="text-checkout-title">
-                  Secure Checkout
+                  {effectiveMode === "guest" ? "Guest Checkout" : "Secure Checkout"}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {step === 3 ? 'Complete Payment' : `Step ${step} of 2`}
@@ -462,6 +599,51 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           <CardContent className="p-6">
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
+                {/* Guest info fields - only show in guest mode */}
+                {effectiveMode === "guest" && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <UserCircle className="w-5 h-5 text-primary" />
+                      Your Information
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="guestName" className="text-sm font-medium">Full Name *</Label>
+                        <Input
+                          id="guestName"
+                          value={guestInfo.name}
+                          onChange={(e) => setGuestInfo({ ...guestInfo, name: e.target.value })}
+                          className="mt-2 h-12 rounded-xl border-2"
+                          placeholder="Ahmad Khan"
+                          data-testid="input-guest-name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="guestPhone" className="text-sm font-medium">Phone Number *</Label>
+                        <Input
+                          id="guestPhone"
+                          value={guestInfo.phone}
+                          onChange={(e) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                          className="mt-2 h-12 rounded-xl border-2"
+                          placeholder="03XX-XXXXXXX"
+                          data-testid="input-guest-phone"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="guestEmail" className="text-sm font-medium">Email (Optional)</Label>
+                        <Input
+                          id="guestEmail"
+                          type="email"
+                          value={guestInfo.email}
+                          onChange={(e) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                          className="mt-2 h-12 rounded-xl border-2"
+                          placeholder="your@email.com (for order confirmation)"
+                          data-testid="input-guest-email"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                     <Truck className="w-5 h-5 text-primary" />
@@ -547,8 +729,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
-                {/* Coupon Section */}
-                <div className="mb-6">
+                {/* Coupon Section - hidden for guests */}
+                {effectiveMode !== "guest" && <div className="mb-6">
                   <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-primary" />
                     Apply Coupon Code
@@ -616,7 +798,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   {couponError && (
                     <p className="text-sm text-red-500 mt-2" data-testid="text-coupon-error">{couponError}</p>
                   )}
-                </div>
+                </div>}
 
                 {/* Wallet Section */}
                 {isAuthenticated && walletBalance > 0 && (
@@ -970,11 +1152,11 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     <Button 
                       type="button"
                       onClick={handlePlaceOrder}
-                      disabled={createOrderMutation.isPending}
+                      disabled={createOrderMutation.isPending || createGuestOrderMutation.isPending}
                       className="flex-1 btn-modern rounded-xl py-6"
                       data-testid="button-place-order"
                     >
-                      {createOrderMutation.isPending ? (
+                      {(createOrderMutation.isPending || createGuestOrderMutation.isPending) ? (
                         <>
                           <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                           Processing...
@@ -982,7 +1164,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                       ) : (
                         <>
                           <ShieldCheck className="w-5 h-5 mr-2" />
-                          {`Pay Rs. ${total.toLocaleString()} with ${selectedPaymentMethod?.name}`}
+                          {effectiveMode === "guest"
+                            ? `Place Order - Rs. ${total.toLocaleString()}`
+                            : `Pay Rs. ${total.toLocaleString()} with ${selectedPaymentMethod?.name}`}
                         </>
                       )}
                     </Button>

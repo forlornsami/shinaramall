@@ -181,7 +181,11 @@ export const paymentAccounts = pgTable("payment_accounts", {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: varchar("order_number").notNull().unique(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  guestName: varchar("guest_name"),
+  guestEmail: varchar("guest_email"),
+  guestPhone: varchar("guest_phone"),
+  guestToken: varchar("guest_token"), // unguessable capability token for guest proof upload
   status: orderStatusEnum("status").notNull().default("pending"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
   paymentMethod: varchar("payment_method"), // Changed to varchar to avoid enum conflicts
@@ -705,6 +709,7 @@ export const storeSettings = pgTable("store_settings", {
   customerRegistrations: boolean("customer_registrations").default(true),
   paymentUpdates: boolean("payment_updates").default(true),
   marketingEmails: boolean("marketing_emails").default(false),
+  guestCheckoutEnabled: boolean("guest_checkout_enabled").default(false),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

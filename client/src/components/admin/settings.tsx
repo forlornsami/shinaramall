@@ -60,6 +60,7 @@ export default function SettingsSection() {
     currency: "PKR",
     defaultProductImage: "",
     defaultCategoryImage: "",
+    guestCheckoutEnabled: false,
   });
 
   const [notifications, setNotifications] = useState({
@@ -102,6 +103,7 @@ export default function SettingsSection() {
         currency: settings.currency || "PKR",
         defaultProductImage: settings.defaultProductImage || "",
         defaultCategoryImage: settings.defaultCategoryImage || "",
+        guestCheckoutEnabled: settings.guestCheckoutEnabled ?? false,
       });
       setNotifications({
         orderNotifications: settings.orderNotifications ?? true,
@@ -753,6 +755,31 @@ export default function SettingsSection() {
                   value={storeSettings.storeAddress}
                   onChange={(e) => setStoreSettings({ ...storeSettings, storeAddress: e.target.value })}
                   data-testid="input-store-address"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="w-5 h-5" />
+                Order Settings
+              </CardTitle>
+              <CardDescription>
+                Control checkout and ordering options for customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Guest Checkout</p>
+                  <p className="text-sm text-muted-foreground">Allow customers to place orders without creating an account</p>
+                </div>
+                <Switch
+                  checked={storeSettings.guestCheckoutEnabled}
+                  onCheckedChange={(checked) => setStoreSettings({ ...storeSettings, guestCheckoutEnabled: checked })}
+                  data-testid="switch-guest-checkout"
                 />
               </div>
             </CardContent>

@@ -5,7 +5,9 @@ import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateT
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema, orders as ordersTable, orderItems as orderItemsTable } from "@shared/schema";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 import { shouldSendAdminNotification, shouldSendEmailNotification, invalidateNotificationSettingsCache, type NotificationType } from "./notificationHelper";
 import { sendAdminNotification, sendCustomerNotification, defaultNotificationMessages } from "./notificationSender";
 import { sendVerificationEmail, sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendPaymentVerifiedEmail, sendPasswordResetEmail } from "./emailService";
@@ -1250,6 +1252,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error cancelling order:", error);
       res.status(500).json({ message: "Failed to cancel order" });
+    }
+  });
+
+  // Guest order endpoint - no auth required
+  app.post('/api/orders/guest', async (req: any, res) => {
+    try {
+      // Check if guest checkout is enabled
+      const settings = await storage.getStoreSettings();
+      if (!settings.guestCheckoutEnabled) {
+        return res.status(403).json({ message: "Guest checkout is not enabled" });
+      }
+
+      const { guestName, guestEmail, guestPhone, shippingAddress, paymentMethod, items } = req.body;
+
+      // Validate guest info
+      if (!guestName || !guestPhone || !shippingAddress) {
+        return res.status(400).json({ message: "Guest name, phone, and shipping address are required" });
+      }
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      // Validate payment method
+      const validPaymentMethods = ['cod', 'easypaisa', 'jazzcash', 'hbl', 'bank_transfer'];
+      if (!paymentMethod || !validPaymentMethods.includes(paymentMethod)) {
+        return res.status(400).json({ message: "Invalid payment method" });
+      }
+
+      // Aggregate duplicate productIds so each product appears only once
+      const aggregated = new Map<string, number>();
+      for (const item of items) {
+        if (!item.productId || !Number.isInteger(item.quantity) || item.quantity < 1) {
+          return res.status(400).json({ message: "Invalid item: productId and positive integer quantity are required" });
+        }
+        aggregated.set(item.productId, (aggregated.get(item.productId) ?? 0) + item.quantity);
+      }
+
+      // Validate each product (stock check against aggregated quantity) and build validated list
+      const validatedItems: Array<{ product: any; quantity: number }> = [];
+      for (const entry of Array.from(aggregated.entries())) {
+        const productId = entry[0];
+        const quantity = entry[1];
+        const product = await storage.getProduct(productId);
+        if (!product || !product.isActive) {
+          return res.status(400).json({ message: `Product not found: ${productId}` });
+        }
+        if (product.stock < quantity) {
+          return res.status(400).json({
+            message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`
+          });
+        }
+        validatedItems.push({ product, quantity });
+      }
+
+      // Compute totals from trusted product prices
+      const computedSubtotal = validatedItems.reduce(
+        (sum, { product, quantity }) => sum + parseFloat(product.price) * quantity, 0
+      );
+      const computedShippingCost = computedSubtotal > 5000 ? 0 : 300;
+      const computedTotal = computedSubtotal + computedShippingCost;
+
+      // Generate a cryptographically random capability token for guest proof upload
+      const { randomBytes } = await import('crypto');
+      const guestToken = randomBytes(32).toString('hex');
+
+      // Create order, line items, and decrement stock atomically in a transaction
+      const orderNumber = `PKM-${Date.now()}`;
+      const order = await db.transaction(async (tx) => {
+        const [created] = await tx.insert(ordersTable).values({
+          orderNumber,
+          userId: null,
+          guestName,
+          guestEmail: guestEmail || null,
+          guestPhone,
+          guestToken,
+          paymentMethod,
+          subtotal: computedSubtotal.toString(),
+          shippingCost: computedShippingCost.toString(),
+          total: computedTotal.toString(),
+          shippingAddress,
+          status: 'pending',
+          paymentStatus: 'pending',
+          verificationStatus: paymentMethod === 'cod' ? 'approved' : 'pending',
+        }).returning();
+
+        for (const { product, quantity } of validatedItems) {
+          // Atomic stock decrement — the WHERE clause enforces the reservation.
+          // Throwing here causes the whole transaction (including the order insert) to roll back.
+          const decrementResult = await tx.execute(
+            sql`UPDATE products SET stock = stock - ${quantity} WHERE id = ${product.id} AND stock >= ${quantity} RETURNING id`
+          );
+          if (!decrementResult.rows || decrementResult.rows.length === 0) {
+            throw new Error(`Insufficient stock for ${product.name} — the item may have sold out while you were checking out.`);
+          }
+
+          await tx.insert(orderItemsTable).values({
+            orderId: created.id,
+            productId: product.id,
+            quantity,
+            price: product.price,
+            total: (parseFloat(product.price) * quantity).toString(),
+          });
+        }
+
+        return created;
+      });
+
+      // Create admin notification
+      try {
+        await sendAdminNotification(
+          'order_placed',
+          { orderNumber: order.orderNumber, customerName: guestName + ' (Guest)', total: parseFloat(order.total).toLocaleString() },
+          defaultNotificationMessages.order_placed,
+          { orderId: order.id, total: order.total }
+        );
+      } catch (notificationError) {
+        console.error("Error creating order notification:", notificationError);
+      }
+
+      // Send confirmation email to guest if email provided
+      if (guestEmail) {
+        try {
+          sendOrderConfirmationEmail(
+            guestEmail,
+            guestName,
+            order.id,
+            order.total,
+            paymentMethod || 'Unknown'
+          ).catch(err => console.error('Guest order confirmation email error:', err));
+        } catch (emailError) {
+          console.error("Error sending guest order confirmation email:", emailError);
+        }
+      }
+
+      res.json(order);
+    } catch (error) {
+      console.error("Error creating guest order:", error);
+      res.status(500).json({ message: "Failed to create guest order" });
     }
   });
 
@@ -2712,6 +2853,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // Upload payment screenshot for an order
+  // Guest payment proof (no auth - for guest orders, capability-token protected)
+  app.post('/api/orders/guest/:orderId/payment-proof', async (req: any, res) => {
+    try {
+      const { orderId } = req.params;
+      const { screenshot, transactionId, guestToken } = req.body;
+      
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Only allow for guest orders (no userId)
+      if (order.userId) {
+        return res.status(403).json({ message: "Use the authenticated endpoint for account orders" });
+      }
+
+      // Verify capability token — must match what was issued at order creation
+      const orderWithToken = order as any;
+      if (!guestToken || !orderWithToken.guestToken || guestToken !== orderWithToken.guestToken) {
+        return res.status(403).json({ message: "Invalid or missing guest token" });
+      }
+
+      if (!screenshot || !screenshot.startsWith('data:image/')) {
+        return res.status(400).json({ message: "Valid payment screenshot is required" });
+      }
+
+      const base64Data = screenshot.split(',')[1];
+      if (base64Data && Buffer.from(base64Data, 'base64').length > 2 * 1024 * 1024) {
+        return res.status(400).json({ message: "Screenshot file size must be less than 2MB" });
+      }
+
+      const updated = await storage.updateOrder(orderId, {
+        paymentScreenshotUrl: screenshot,
+        transactionId: transactionId || null,
+        verificationStatus: 'pending',
+      });
+
+      res.json({ 
+        message: "Payment proof uploaded successfully. Awaiting verification.",
+        order: updated 
+      });
+    } catch (error) {
+      console.error("Error uploading guest payment proof:", error);
+      res.status(500).json({ message: "Failed to upload payment proof" });
+    }
+  });
+
   app.post('/api/orders/:orderId/payment-proof', isAuthenticated, async (req: any, res) => {
     try {
       const { orderId } = req.params;
@@ -2852,7 +3040,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'storeName', 'storeLogo', 'storeEmail', 'storePhone', 'storeAddress',
         'currency', 'timezone', 'language',
         'orderNotifications', 'stockAlerts', 'customerRegistrations',
-        'paymentUpdates', 'marketingEmails', 'defaultProductImage', 'defaultCategoryImage'
+        'paymentUpdates', 'marketingEmails', 'defaultProductImage', 'defaultCategoryImage',
+        'guestCheckoutEnabled'
       ];
       
       for (const field of allowedFields) {
