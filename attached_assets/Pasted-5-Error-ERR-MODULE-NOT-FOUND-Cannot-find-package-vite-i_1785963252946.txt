@@ -1,0 +1,48 @@
+5
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b0-4c58-7122-ba11-091d4b3f510e/nodejs/dist/index.js
+at packageResolve (node:internal/modules/esm/resolve:873:9)
+at moduleResolve (node:internal/modules/esm/resolve:946:18)
+at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+at #cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:413:53)
+at new ModuleJobSync (node:internal/modules/esm/module_job:375:34)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:386:11)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+AUG 06,01:50:32.924
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b0-4c58-7122-ba11-091d4b3f510e/nodejs/dist/index.js
+at packageResolve (node:internal/modules/esm/resolve:873:9)
+at moduleResolve (node:internal/modules/esm/resolve:946:18)
+at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+at #cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:413:53)
+at new ModuleJobSync (node:internal/modules/esm/module_job:375:34)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:386:11)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+AUG 06,01:50:40.073
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b0-4c58-7122-ba11-091d4b3f510e/nodejs/dist/index.js
+at packageResolve (node:internal/modules/esm/resolve:873:9)
+at moduleResolve (node:internal/modules/esm/resolve:946:18)
+at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+at #cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:413:53)
+at new ModuleJobSync (node:internal/modules/esm/module_job:375:34)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:386:11)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+AUG 06,01:50:40.294
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b0-4c58-7122-ba11-091d4b3f510e/nodejs/dist/index.js
+at packageResolve (node:internal/modules/esm/resolve:873:9)
+at moduleResolve (node:internal/modules/esm/resolve:946:18)
+at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+at #cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:413:53)
+at new ModuleJobSync (node:internal/modules/esm/module_job:375:34)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:386:11)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
