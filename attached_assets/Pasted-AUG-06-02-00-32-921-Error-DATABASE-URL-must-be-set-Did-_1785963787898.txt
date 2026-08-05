@@ -1,0 +1,36 @@
+AUG 06,02:00:32.921
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+at server/db.ts (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:1240:13)
+at __init (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:4:56)
+at server/storage.ts (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:1256:5)
+at __init (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:4:56)
+at file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:3624:1
+at ModuleJobSync.runSync (node:internal/modules/esm/module_job:437:37)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:389:47)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+AUG 06,02:00:41.689
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+at server/db.ts (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:1240:13)
+at __init (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:4:56)
+at server/storage.ts (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:1256:5)
+at __init (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:4:56)
+at file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:3624:1
+at ModuleJobSync.runSync (node:internal/modules/esm/module_job:437:37)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:389:47)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+AUG 06,02:00:52.506
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+at server/db.ts (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:1240:13)
+at __init (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:4:56)
+at server/storage.ts (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:1256:5)
+at __init (file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:4:56)
+at file:///home/u983047254/domains/shinaramall.com/hbuilds/versions/019fd3b9-aedc-72c5-96d7-22ed03794797/nodejs/dist/index.js:3624:1
+at ModuleJobSync.runSync (node:internal/modules/esm/module_job:437:37)
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:389:47)
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
