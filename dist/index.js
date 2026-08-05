@@ -7939,9 +7939,11 @@ import path from "path";
 function serveStatic(app2) {
   const distPath = path.resolve(import.meta.dirname, "public");
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
-    );
+    console.warn(`[static] dist/public not found at ${distPath} \u2014 skipping static file serving`);
+    app2.use("*", (_req, res) => {
+      res.status(404).json({ message: "Not found" });
+    });
+    return;
   }
   app2.use(express.static(distPath));
   app2.use("*", (_req, res) => {

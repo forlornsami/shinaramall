@@ -6,9 +6,13 @@ export function serveStatic(app: Express) {
   const distPath = path.resolve(import.meta.dirname, "public");
 
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+    // Frontend is served separately (e.g. Hostinger shared hosting).
+    // Just return 404 for non-API routes instead of crashing the server.
+    console.warn(`[static] dist/public not found at ${distPath} — skipping static file serving`);
+    app.use("*", (_req, res) => {
+      res.status(404).json({ message: "Not found" });
+    });
+    return;
   }
 
   app.use(express.static(distPath));
