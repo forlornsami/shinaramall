@@ -59,7 +59,13 @@ export default function Landing() {
     {
       icon: Truck,
       title: "Fast Delivery",
-      description: "Free shipping on orders over Rs. 5,000 across Pakistan",
+      description: (() => {
+        const threshold = parseFloat((storeSettings as any)?.freeShippingThreshold ?? "5000");
+        const fee = parseFloat((storeSettings as any)?.shippingFee ?? "300") || 300;
+        return threshold > 0
+          ? `Free shipping on orders over Rs. ${threshold.toLocaleString()} across Pakistan`
+          : `Flat shipping fee of Rs. ${fee.toLocaleString()} across Pakistan`;
+      })(),
       color: "from-green-500 to-emerald-600",
     },
     {
@@ -209,7 +215,15 @@ export default function Landing() {
               </div>
               <div className="flex items-center gap-2">
                 <Truck className="w-5 h-5" />
-                <span>Free Delivery over Rs. 5000</span>
+                <span>
+                  {(() => {
+                    const threshold = parseFloat((storeSettings as any)?.freeShippingThreshold ?? "5000");
+                    const fee = parseFloat((storeSettings as any)?.shippingFee ?? "300") || 300;
+                    return threshold > 0
+                      ? `Free Delivery over Rs. ${threshold.toLocaleString()}`
+                      : `Flat Shipping: Rs. ${fee.toLocaleString()}`;
+                  })()}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />

@@ -263,7 +263,15 @@ export default function CartView() {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Truck className="w-4 h-4 text-blue-600" />
-                  <span>Free delivery on orders over Rs. 5,000</span>
+                  <span>
+                    {(() => {
+                      const threshold = parseFloat(storeSettings?.freeShippingThreshold ?? "5000");
+                      const fee = parseFloat(storeSettings?.shippingFee ?? "300") || 300;
+                      return threshold > 0
+                        ? `Free delivery on orders over Rs. ${threshold.toLocaleString()}`
+                        : `Flat shipping fee: Rs. ${fee.toLocaleString()}`;
+                    })()}
+                  </span>
                 </div>
               </div>
 

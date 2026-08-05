@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-const faqs = [
+const buildFaqs = (shippingFee: string, freeThreshold: string) => [
   {
     category: "Orders & Shipping",
     icon: Truck,
@@ -39,7 +39,9 @@ const faqs = [
       },
       {
         q: "Do you offer free shipping?",
-        a: "Yes! We offer free shipping on all orders above Rs. 5,000. For orders below this amount, a flat shipping fee of Rs. 200 applies."
+        a: freeThreshold === "0"
+          ? `A flat shipping fee of Rs. ${parseFloat(shippingFee).toLocaleString()} applies to all orders.`
+          : `Yes! We offer free shipping on all orders above Rs. ${parseFloat(freeThreshold).toLocaleString()}. For orders below this amount, a flat shipping fee of Rs. ${parseFloat(shippingFee).toLocaleString()} applies.`
       },
       {
         q: "Can I track my order?",
@@ -142,6 +144,11 @@ export default function HelpView() {
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
   });
+
+  const faqs = buildFaqs(
+    storeSettings?.shippingFee ?? "300",
+    storeSettings?.freeShippingThreshold ?? "5000"
+  );
 
   const filteredFaqs = faqs.map(category => ({
     ...category,
