@@ -3041,7 +3041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'currency', 'timezone', 'language',
         'orderNotifications', 'stockAlerts', 'customerRegistrations',
         'paymentUpdates', 'marketingEmails', 'defaultProductImage', 'defaultCategoryImage',
-        'guestCheckoutEnabled'
+        'guestCheckoutEnabled', 'shippingFee', 'freeShippingThreshold'
       ];
       
       for (const field of allowedFields) {
