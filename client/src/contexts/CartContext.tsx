@@ -117,25 +117,41 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = useCallback((productId: string, quantity = 1) => {
     if (isAuthenticated) {
-      addToCartMutation.mutate({ productId, quantity });
+      // Check how many are already in the server cart and cap at stock
+      const existing = enrichedItems.find(i => i.productId === productId);
+      const stock = existing?.product?.stock;
+      const inCart = existing?.quantity ?? 0;
+      if (stock !== undefined && stock !== null && inCart >= stock) return; // already at max
+      const allowed = stock !== undefined && stock !== null
+        ? Math.min(quantity, stock - inCart)
+        : quantity;
+      if (allowed <= 0) return;
+      addToCartMutation.mutate({ productId, quantity: allowed });
     } else {
       setLocalCart(prev => {
         const existing = prev.find(item => item.productId === productId);
+        const stock = products?.find(p => p.id === productId)?.stock;
+        const inCart = existing?.quantity ?? 0;
+        if (stock !== undefined && stock !== null && inCart >= stock) return prev; // already at max
+        const allowed = stock !== undefined && stock !== null
+          ? Math.min(quantity, stock - inCart)
+          : quantity;
+        if (allowed <= 0) return prev;
         let updated: LocalCartItem[];
         if (existing) {
           updated = prev.map(item =>
             item.productId === productId
-              ? { ...item, quantity: item.quantity + quantity }
+              ? { ...item, quantity: item.quantity + allowed }
               : item
           );
         } else {
-          updated = [...prev, { productId, quantity }];
+          updated = [...prev, { productId, quantity: allowed }];
         }
         setStoredCart(updated);
         return updated;
       });
     }
-  }, [isAuthenticated, addToCartMutation]);
+  }, [isAuthenticated, addToCartMutation, enrichedItems, products]);
 
   const removeFromCart = useCallback((productId: string) => {
     if (isAuthenticated) {
