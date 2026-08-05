@@ -115,6 +115,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  const enrichedItems = useMemo(() => {
+    if (isAuthenticated && serverCart) {
+      return serverCart.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        product: item.product,
+      }));
+    }
+    return localCart.map(item => ({
+      ...item,
+      product: products?.find(p => p.id === item.productId),
+    }));
+  }, [isAuthenticated, serverCart, localCart, products]);
+
+  const itemCount = useMemo(() => {
+    return enrichedItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [enrichedItems]);
+
+  const total = useMemo(() => {
+    return enrichedItems.reduce((sum, item) => {
+      const price = parseFloat(item.product?.price || "0");
+      return sum + price * item.quantity;
+    }, 0);
+  }, [enrichedItems]);
+
   const addToCart = useCallback((productId: string, quantity = 1) => {
     if (isAuthenticated) {
       // Check how many are already in the server cart and cap at stock
@@ -197,31 +222,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       clearStoredCart();
     }
   }, [isAuthenticated, serverCart, removeFromCartMutation]);
-
-  const enrichedItems = useMemo(() => {
-    if (isAuthenticated && serverCart) {
-      return serverCart.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        product: item.product,
-      }));
-    }
-    return localCart.map(item => ({
-      ...item,
-      product: products?.find(p => p.id === item.productId),
-    }));
-  }, [isAuthenticated, serverCart, localCart, products]);
-
-  const itemCount = useMemo(() => {
-    return enrichedItems.reduce((sum, item) => sum + item.quantity, 0);
-  }, [enrichedItems]);
-
-  const total = useMemo(() => {
-    return enrichedItems.reduce((sum, item) => {
-      const price = parseFloat(item.product?.price || "0");
-      return sum + price * item.quantity;
-    }, 0);
-  }, [enrichedItems]);
 
   const isLoading = serverCartLoading && isAuthenticated;
   const isAddingToCart = addToCartMutation.isPending;
