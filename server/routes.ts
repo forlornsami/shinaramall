@@ -3171,6 +3171,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============== CUSTOMER CHAT ENDPOINTS ==============
 
+  // ---- Chat file upload ----
+  app.post('/api/chat/upload', isAuthenticated, async (req: any, res) => {
+    try {
+      const { data, name, type } = req.body;
+      if (!data || !name) return res.status(400).json({ message: "Missing file data" });
+      const fs = await import('fs');
+      const path = await import('path');
+      const uploadDir = path.join(process.cwd(), 'uploads', 'chat');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      const ext = name.split('.').pop() || 'bin';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const filePath = path.join(uploadDir, fileName);
+      const base64Data = data.replace(/^data:[^;]+;base64,/, '');
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+      res.json({ url: `/uploads/chat/${fileName}`, name, type: type || 'application/octet-stream' });
+    } catch (error) {
+      console.error("Chat upload error:", error);
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+
+  // ---- Chat reaction (REST fallback) ----
+  app.post('/api/chat/conversation/:id/messages/:msgId/reactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { emoji } = req.body;
+      const conversation = await storage.getChatConversation(req.params.id);
+      if (!conversation || conversation.customerId !== userId) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      const msg = await storage.getChatMessage(req.params.msgId);
+      if (!msg) return res.status(404).json({ message: "Message not found" });
+      const reactions: Record<string, string[]> = (msg.reactions as any) || {};
+      const users = reactions[req.body.emoji] || [];
+      const idx = users.indexOf(userId);
+      if (idx === -1) reactions[emoji] = [...users, userId];
+      else {
+        reactions[emoji] = users.filter((u: string) => u !== userId);
+        if (reactions[emoji].length === 0) delete reactions[emoji];
+      }
+      const updated = await storage.updateChatMessageReactions(req.params.msgId, reactions);
+      res.json(updated);
+    } catch (error) {
+      console.error("Chat reaction error:", error);
+      res.status(500).json({ message: "Failed to update reaction" });
+    }
+  });
+
   // Get or create customer's active conversation
   app.get('/api/chat/conversation', isAuthenticated, async (req: any, res) => {
     try {

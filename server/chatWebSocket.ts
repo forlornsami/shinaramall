@@ -76,6 +76,12 @@ export function setupChatWebSocket(server: Server) {
             }
             break;
 
+          case 'add_reaction':
+            if (client && message.messageId && message.emoji) {
+              await handleAddReaction(client, message.messageId, message.emoji);
+            }
+            break;
+
           case 'mark_read':
             if (client && message.conversationId) {
               const senderType = client.userType === 'agent' ? 'customer' : 'agent';
@@ -170,14 +176,36 @@ async function handleJoinConversation(client: ChatClient, conversationId: string
   }, client.userId);
 }
 
+async function handleAddReaction(client: ChatClient, messageId: string, emoji: string) {
+  const msg = await storage.getChatMessage(messageId);
+  if (!msg || msg.conversationId !== client.conversationId) return;
+
+  const reactions: Record<string, string[]> = (msg.reactions as any) || {};
+  const users = reactions[emoji] || [];
+  const idx = users.indexOf(client.userId);
+  if (idx === -1) {
+    reactions[emoji] = [...users, client.userId];
+  } else {
+    reactions[emoji] = users.filter((u) => u !== client.userId);
+    if (reactions[emoji].length === 0) delete reactions[emoji];
+  }
+
+  const updated = await storage.updateChatMessageReactions(messageId, reactions);
+  broadcastToConversation(msg.conversationId, {
+    type: 'reaction_updated',
+    message: updated,
+  });
+}
+
 async function handleSendMessage(client: ChatClient, content: string, attachments?: any) {
-  if (!client.conversationId || !content.trim()) return;
+  if (!client.conversationId || (!content.trim() && (!attachments || attachments.length === 0))) return;
 
   const message = await storage.createChatMessage({
     conversationId: client.conversationId,
     senderId: client.userId,
     senderType: client.userType,
-    message: content.trim(),
+    message: content.trim() || ' ',
+    attachments: attachments || [],
   });
 
   broadcastToConversation(client.conversationId, {

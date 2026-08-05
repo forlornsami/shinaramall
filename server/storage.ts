@@ -1547,6 +1547,20 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getChatMessage(messageId: string): Promise<ChatMessage | undefined> {
+    const [msg] = await db.select().from(chatMessages).where(eq(chatMessages.id, messageId));
+    return msg;
+  }
+
+  async updateChatMessageReactions(messageId: string, reactions: Record<string, string[]>): Promise<ChatMessage> {
+    const [updated] = await db
+      .update(chatMessages)
+      .set({ reactions })
+      .where(eq(chatMessages.id, messageId))
+      .returning();
+    return updated;
+  }
+
   async markMessagesAsRead(conversationId: string, senderType: string): Promise<void> {
     // Mark all messages from the specified sender type as read
     await db

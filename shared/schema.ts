@@ -866,6 +866,8 @@ export const chatMessages = pgTable("chat_messages", {
   senderId: varchar("sender_id"), // customer user id or admin user id
   message: text("message").notNull(),
   isRead: boolean("is_read").default(false),
+  attachments: jsonb("attachments").$type<{ name: string; url: string; type: string; size: number }[]>(),
+  reactions: jsonb("reactions").$type<Record<string, string[]>>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
