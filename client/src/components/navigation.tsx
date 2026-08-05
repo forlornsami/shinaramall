@@ -38,7 +38,7 @@ export default function Navigation({ onCartToggle }: NavigationProps) {
     queryKey: ['/api/store-settings'],
   });
 
-  const storeName = storeSettings?.storeName || 'Eshaal Store';
+  const storeName = storeSettings?.storeName || 'Shinara Mall';
   const storeLogo = storeSettings?.storeLogo;
 
   const categories = categoriesData?.slice(0, 6).map(cat => ({

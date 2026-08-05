@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const TOKEN_KEY = "eshaal_store_token";
+const TOKEN_KEY = "shinara_mall_token";
 const ADMIN_TOKEN_KEY = "adminToken";
 
 export function getToken(): string | null {

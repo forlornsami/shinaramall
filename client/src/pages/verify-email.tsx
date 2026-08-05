@@ -69,7 +69,7 @@ export default function VerifyEmailPage() {
           {status === 'success' && (
             <div className="space-y-3">
               <p className="text-center text-muted-foreground">
-                Your email has been verified. You can now enjoy all features of Eshaal Store.
+                Your email has been verified. You can now enjoy all features of Shinara Mall.
               </p>
               <Button 
                 className="w-full" 

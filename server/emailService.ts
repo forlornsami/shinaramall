@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = 'Eshaal Store <onboarding@resend.dev>';
+const FROM_EMAIL = 'Shinara Mall <onboarding@resend.dev>';
 
 interface EmailResult {
   success: boolean;
@@ -21,7 +21,7 @@ export async function sendVerificationEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
-      subject: 'Verify Your Email - Eshaal Store',
+      subject: 'Verify Your Email - Shinara Mall',
       html: `
         <!DOCTYPE html>
         <html>
@@ -31,11 +31,11 @@ export async function sendVerificationEmail(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Eshaal Store</h1>
+            <h1 style="color: white; margin: 0;">Shinara Mall</h1>
           </div>
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: #333;">Welcome, ${firstName || 'Valued Customer'}!</h2>
-            <p>Thank you for creating an account with Eshaal Store. Please verify your email address to complete your registration.</p>
+            <p>Thank you for creating an account with Shinara Mall. Please verify your email address to complete your registration.</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${verificationUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                 Verify Email Address
@@ -45,7 +45,7 @@ export async function sendVerificationEmail(
             <p style="color: #666; font-size: 14px;">If you didn't create an account, you can safely ignore this email.</p>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
-              © ${new Date().getFullYear()} Eshaal Store. All rights reserved.
+              © ${new Date().getFullYear()} Shinara Mall. All rights reserved.
             </p>
           </div>
         </body>
@@ -78,7 +78,7 @@ export async function sendOrderConfirmationEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
-      subject: `Order Confirmation #${orderId.slice(-8).toUpperCase()} - Eshaal Store`,
+      subject: `Order Confirmation #${orderId.slice(-8).toUpperCase()} - Shinara Mall`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -88,7 +88,7 @@ export async function sendOrderConfirmationEmail(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Eshaal Store</h1>
+            <h1 style="color: white; margin: 0;">Shinara Mall</h1>
           </div>
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: #333;">Order Confirmed!</h2>
@@ -111,7 +111,7 @@ export async function sendOrderConfirmationEmail(
             </div>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
-              © ${new Date().getFullYear()} Eshaal Store. All rights reserved.
+              © ${new Date().getFullYear()} Shinara Mall. All rights reserved.
             </p>
           </div>
         </body>
@@ -162,7 +162,7 @@ export async function sendOrderStatusUpdateEmail(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Eshaal Store</h1>
+            <h1 style="color: white; margin: 0;">Shinara Mall</h1>
           </div>
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: ${statusInfo.color};">${statusInfo.title}</h2>
@@ -179,7 +179,7 @@ export async function sendOrderStatusUpdateEmail(
             </div>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
-              © ${new Date().getFullYear()} Eshaal Store. All rights reserved.
+              © ${new Date().getFullYear()} Shinara Mall. All rights reserved.
             </p>
           </div>
         </body>
@@ -221,7 +221,7 @@ export async function sendPaymentVerifiedEmail(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Eshaal Store</h1>
+            <h1 style="color: white; margin: 0;">Shinara Mall</h1>
           </div>
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <div style="text-align: center; margin-bottom: 20px;">
@@ -243,7 +243,7 @@ export async function sendPaymentVerifiedEmail(
             </div>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
-              © ${new Date().getFullYear()} Eshaal Store. All rights reserved.
+              © ${new Date().getFullYear()} Shinara Mall. All rights reserved.
             </p>
           </div>
         </body>
@@ -274,7 +274,7 @@ export async function sendPasswordResetEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
-      subject: 'Reset Your Password - Eshaal Store',
+      subject: 'Reset Your Password - Shinara Mall',
       html: `
         <!DOCTYPE html>
         <html>
@@ -284,7 +284,7 @@ export async function sendPasswordResetEmail(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Eshaal Store</h1>
+            <h1 style="color: white; margin: 0;">Shinara Mall</h1>
           </div>
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: #333;">Reset Your Password</h2>
@@ -299,7 +299,7 @@ export async function sendPasswordResetEmail(
             <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email. Your password will remain unchanged.</p>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
-              © ${new Date().getFullYear()} Eshaal Store. All rights reserved.
+              © ${new Date().getFullYear()} Shinara Mall. All rights reserved.
             </p>
           </div>
         </body>

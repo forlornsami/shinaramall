@@ -422,7 +422,7 @@ export default function AdminDashboard() {
                         </div>
                       )}
                       <div>
-                        <h2 className="text-xl font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</h2>
+                        <h2 className="text-xl font-bold gradient-text">{storeSettings?.storeName || "Shinara Mall"}</h2>
                         <p className="text-xs text-muted-foreground">Admin Panel</p>
                       </div>
                     </div>

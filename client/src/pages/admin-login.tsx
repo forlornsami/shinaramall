@@ -77,7 +77,7 @@ export default function AdminLogin() {
                 <Sparkles className="w-7 h-7 text-white" />
               </div>
             )}
-            <span className="text-2xl font-bold">{storeSettings?.storeName || "Eshaal Store"}</span>
+            <span className="text-2xl font-bold">{storeSettings?.storeName || "Shinara Mall"}</span>
           </div>
           
           <h1 className="text-4xl font-bold mb-4">
@@ -122,7 +122,7 @@ export default function AdminLogin() {
                   <Sparkles className="w-6 h-6 text-white" />
                 </div>
               )}
-              <span className="text-2xl font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</span>
+              <span className="text-2xl font-bold gradient-text">{storeSettings?.storeName || "Shinara Mall"}</span>
             </div>
           </div>
           

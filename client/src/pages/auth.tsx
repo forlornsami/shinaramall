@@ -106,7 +106,7 @@ export default function AuthPage() {
       });
       toast({
         title: "Account created!",
-        description: `Welcome to ${storeSettings?.storeName || "Eshaal Store"}!`,
+        description: `Welcome to ${storeSettings?.storeName || "Shinara Mall"}!`,
       });
       setLocation("/");
     } catch (error: any) {
@@ -144,7 +144,7 @@ export default function AuthPage() {
               <ShoppingBag className="h-8 w-8 text-white" />
             </div>
           )}
-          <h1 className="text-2xl font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</h1>
+          <h1 className="text-2xl font-bold gradient-text">{storeSettings?.storeName || "Shinara Mall"}</h1>
           <p className="text-muted-foreground mt-1">Shop Authentic Products</p>
         </div>
 

@@ -24,7 +24,7 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const CART_STORAGE_KEY = "eshaal_guest_cart";
+const CART_STORAGE_KEY = "shinara_guest_cart";
 
 function getStoredCart(): LocalCartItem[] {
   try {

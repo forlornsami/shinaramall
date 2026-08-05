@@ -419,7 +419,7 @@ function ProductCard({ product, onAddToCart, onProductClick, isAddingToCart, siz
       <div className="relative overflow-hidden">
         <img
           src={getProductThumbnail(product, defaultProductImage)}
-          alt={`${product.name} - Buy online at Eshaal Store`}
+          alt={`${product.name} - Buy online at Shinara Mall`}
           loading="lazy"
           className={cn(
             "w-full object-cover transition-transform duration-500 group-hover:scale-110",

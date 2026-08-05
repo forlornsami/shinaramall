@@ -18,7 +18,7 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-const WISHLIST_STORAGE_KEY = "eshaal_guest_wishlist";
+const WISHLIST_STORAGE_KEY = "shinara_guest_wishlist";
 
 function getStoredWishlist(): string[] {
   try {

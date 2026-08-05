@@ -28,8 +28,8 @@ export function SEO({
   type = 'website',
   product,
 }: SEOProps) {
-  const siteName = 'Eshaal Store';
-  const defaultDescription = 'Shop the best products at Eshaal Store. Wide selection of quality items with secure Pakistani payment methods including EasyPaisa, JazzCash, and HBL Bank.';
+  const siteName = 'Shinara Mall';
+  const defaultDescription = 'Shop the best products at Shinara Mall. Wide selection of quality items with secure Pakistani payment methods including EasyPaisa, JazzCash, and HBL Bank.';
   const defaultKeywords = 'online shopping, Pakistan, ecommerce, EasyPaisa, JazzCash, HBL, cash on delivery';
 
   const pageTitle = title ? `${title} | ${siteName}` : `${siteName} - Pakistani Online Shopping`;

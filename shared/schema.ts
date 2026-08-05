@@ -690,9 +690,9 @@ export type InsertPaymentTransaction = z.infer<typeof insertPaymentTransactionSc
 // Store settings table (singleton - only one row)
 export const storeSettings = pgTable("store_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  storeName: varchar("store_name").notNull().default("Eshaal Store"),
+  storeName: varchar("store_name").notNull().default("Shinara Mall"),
   storeLogo: varchar("store_logo"),
-  storeEmail: varchar("store_email").notNull().default("contact@eshaalstore.pk"),
+  storeEmail: varchar("store_email").notNull().default("contact@shinaramall.pk"),
   storePhone: varchar("store_phone").notNull().default("+92 300 1234567"),
   storeAddress: varchar("store_address").default("Lahore, Pakistan"),
   currency: varchar("currency").default("PKR"),

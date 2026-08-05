@@ -55,7 +55,7 @@ export default function AdminSidebar({ activeSection, onSectionChange, adminUser
   const visibleAccessControlItems = accessControlSection.items.filter(item => canAccessSection(permissions, role, item.id));
   const visibleSettingsItems = settingsSection.items.filter(item => canAccessSection(permissions, role, item.id));
 
-  const storeName = storeSettings?.storeName || 'Eshaal Store';
+  const storeName = storeSettings?.storeName || 'Shinara Mall';
   const storeLogo = storeSettings?.storeLogo;
 
   return (

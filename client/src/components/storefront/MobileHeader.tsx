@@ -176,7 +176,7 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
                   )}
                   <div>
                     <h2 className="text-xl font-bold gradient-text">
-                      {storeSettings?.storeName || "Eshaal Store"}
+                      {storeSettings?.storeName || "Shinara Mall"}
                     </h2>
                     <p className="text-xs text-muted-foreground">Shop Authentic Products</p>
                   </div>
@@ -265,7 +265,7 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
             </div>
           )}
           <span className="font-bold gradient-text">
-            {storeSettings?.storeName || "Eshaal Store"}
+            {storeSettings?.storeName || "Shinara Mall"}
           </span>
         </div>
 

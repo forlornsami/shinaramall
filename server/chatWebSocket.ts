@@ -118,7 +118,7 @@ async function handleAuth(ws: WebSocket, message: any): Promise<ChatClient | nul
       if (!token) return null;
       
       // Verify customer JWT token
-      const JWT_SECRET = process.env.SESSION_SECRET || "eshaal-store-secret-key-change-in-production";
+      const JWT_SECRET = process.env.SESSION_SECRET || "shinara-mall-secret-key-change-in-production";
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       
       const user = await storage.getUser(decoded.userId);

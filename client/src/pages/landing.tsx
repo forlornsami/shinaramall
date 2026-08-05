@@ -128,7 +128,7 @@ export default function Landing() {
                   <span className="text-white font-bold text-lg">{(storeSettings?.storeName || "E").charAt(0).toUpperCase()}</span>
                 </div>
               )}
-              <h1 className="text-2xl font-bold gradient-text" data-testid="logo-text">{storeSettings?.storeName || "Eshaal Store"}</h1>
+              <h1 className="text-2xl font-bold gradient-text" data-testid="logo-text">{storeSettings?.storeName || "Shinara Mall"}</h1>
             </div>
             <div className="flex items-center gap-4">
               <Button 
@@ -429,7 +429,7 @@ export default function Landing() {
                 <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-xl">{storeSettings?.storeName?.charAt(0) || "E"}</span>
                 </div>
-                <h3 className="text-2xl font-bold gradient-text" data-testid="text-store-name">{storeSettings?.storeName || "Eshaal Store"}</h3>
+                <h3 className="text-2xl font-bold gradient-text" data-testid="text-store-name">{storeSettings?.storeName || "Shinara Mall"}</h3>
               </div>
               <p className="text-muted-foreground mb-6 max-w-sm" data-testid="text-footer-description">
                 Pakistan's premier e-commerce platform offering authentic products with secure local payment methods.
@@ -461,7 +461,7 @@ export default function Landing() {
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-center gap-2" data-testid="text-contact-email">
                   <Mail className="w-4 h-4" />
-                  {storeSettings?.storeEmail || "support@eshaalstore.pk"}
+                  {storeSettings?.storeEmail || "support@shinaramall.pk"}
                 </li>
                 <li className="flex items-center gap-2" data-testid="text-contact-phone">
                   <Phone className="w-4 h-4" />
@@ -477,7 +477,7 @@ export default function Landing() {
           
           <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 {storeSettings?.storeName || "Eshaal Store"}. All rights reserved.
+              © 2024 {storeSettings?.storeName || "Shinara Mall"}. All rights reserved.
             </p>
             <Button 
               variant="ghost" 

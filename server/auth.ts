@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import type { User, SafeUser } from "@shared/schema";
 
-const JWT_SECRET = process.env.SESSION_SECRET || "eshaal-store-secret-key-change-in-production";
+const JWT_SECRET = process.env.SESSION_SECRET || "shinara-mall-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "7d";
 
 export interface JWTPayload {

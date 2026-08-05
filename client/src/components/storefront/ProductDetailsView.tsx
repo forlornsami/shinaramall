@@ -126,7 +126,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
     
     const shareData = {
       title: product.name,
-      text: `Check out ${product.name} at Eshaal Store - Rs. ${parseFloat(product.price).toLocaleString()}`,
+      text: `Check out ${product.name} at Shinara Mall - Rs. ${parseFloat(product.price).toLocaleString()}`,
       url: window.location.href,
     };
 
@@ -200,7 +200,7 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
     <>
       <SEO 
         title={product.name}
-        description={product.description || `Buy ${product.name} at Eshaal Store. Quality products with secure Pakistani payment options.`}
+        description={product.description || `Buy ${product.name} at Shinara Mall. Quality products with secure Pakistani payment options.`}
         type="product"
         image={images[0]}
         url={typeof window !== 'undefined' ? window.location.href : undefined}

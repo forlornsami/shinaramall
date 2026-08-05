@@ -532,10 +532,10 @@ export default function Home() {
                   <span className="text-white font-bold text-sm">{(storeSettings?.storeName || "E").charAt(0).toUpperCase()}</span>
                 </div>
               )}
-              <span className="font-bold gradient-text">{storeSettings?.storeName || "Eshaal Store"}</span>
+              <span className="font-bold gradient-text">{storeSettings?.storeName || "Shinara Mall"}</span>
             </div>
             <p className="text-sm text-muted-foreground text-center">
-              © 2024 {storeSettings?.storeName || "Eshaal Store"}. Pakistan's trusted online marketplace.
+              © 2024 {storeSettings?.storeName || "Shinara Mall"}. Pakistan's trusted online marketplace.
             </p>
             <div className="flex gap-2">
               {paymentMethods.map((method) => (

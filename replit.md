@@ -1,6 +1,6 @@
 # Overview
 
-Eshaal Store is a Pakistani e-commerce platform offering customers product browsing and purchasing with local payment methods (EasyPaisa, JazzCash, HBL, COD). It features an internal email/password authentication system for customers and administrators, comprehensive product catalog management, and order processing capabilities. The platform aims to provide a unified shopping experience and efficient administration, supporting various payment verification methods, real-time communication, and secure user management.
+Shinara Mall is a Pakistani e-commerce platform offering customers product browsing and purchasing with local payment methods (EasyPaisa, JazzCash, HBL, COD). It features an internal email/password authentication system for customers and administrators, comprehensive product catalog management, and order processing capabilities. The platform aims to provide a unified shopping experience and efficient administration, supporting various payment verification methods, real-time communication, and secure user management.
 
 # User Preferences
 

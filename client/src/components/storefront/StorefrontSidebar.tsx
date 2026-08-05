@@ -229,7 +229,7 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
     );
   };
 
-  const storeName = storeSettings?.storeName || "Eshaal Store";
+  const storeName = storeSettings?.storeName || "Shinara Mall";
   const storeLogo = storeSettings?.storeLogo;
 
   return (
