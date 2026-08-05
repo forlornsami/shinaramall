@@ -70,8 +70,9 @@ const paymentMethods = [
 ];
 
 export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
-  const { items: cartItems, clearCart } = useCart() as {
+  const { items: cartItems, total: cartContextTotal, clearCart } = useCart() as {
     items: CartItemWithProduct[] | undefined;
+    total: number;
     clearCart: () => void;
   };
   const { toast } = useToast();
@@ -140,9 +141,11 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     enabled: paymentMethod !== 'cod',
   });
 
-  const subtotal = cartItems?.reduce((sum: number, item: CartItemWithProduct) => 
-    sum + (parseFloat(item.product.price) * item.quantity), 0
-  ) || 0;
+  const subtotal = cartItems && cartItems.length > 0
+    ? cartItems.reduce((sum: number, item: CartItemWithProduct) => 
+        sum + (parseFloat((item.product as any)?.price || "0") * item.quantity), 0
+      ) || cartContextTotal
+    : cartContextTotal;
   
   const shippingCost = subtotal > 5000 ? 0 : 300;
   
@@ -903,18 +906,18 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   
                   <div className="space-y-3 mb-4">
                     {cartItems?.map((item: CartItemWithProduct) => (
-                      <div key={item.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                      <div key={(item as any).productId || item.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
                         <img 
-                          src={getProductThumbnail(item.product)} 
-                          alt={item.product.name}
+                          src={getProductThumbnail((item as any).product)} 
+                          alt={(item as any).product?.name || "Product"}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{item.product.name}</p>
+                          <p className="text-sm font-medium text-foreground truncate">{(item as any).product?.name || "Product"}</p>
                           <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                         </div>
                         <p className="text-sm font-semibold text-foreground">
-                          Rs. {(parseFloat(item.product.price) * item.quantity).toLocaleString()}
+                          Rs. {(parseFloat((item as any).product?.price || "0") * item.quantity).toLocaleString()}
                         </p>
                       </div>
                     ))}
