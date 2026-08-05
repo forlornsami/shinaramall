@@ -15,7 +15,7 @@ interface CartContextType {
   itemCount: number;
   total: number;
   isLoading: boolean;
-  addToCart: (productId: string, quantity?: number) => void;
+  addToCart: (productId: string, quantity?: number) => boolean;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -140,30 +140,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, 0);
   }, [enrichedItems]);
 
-  const addToCart = useCallback((productId: string, quantity = 1) => {
+  const addToCart = useCallback((productId: string, quantity = 1): boolean => {
     if (isAuthenticated) {
-      // Check how many are already in the server cart and cap at stock
       const existing = enrichedItems.find(i => i.productId === productId);
       const stock = existing?.product?.stock;
       const inCart = existing?.quantity ?? 0;
-      if (stock !== undefined && stock !== null && inCart >= stock) return; // already at max
+      if (stock !== undefined && stock !== null && inCart >= stock) return false;
       const allowed = stock !== undefined && stock !== null
         ? Math.min(quantity, stock - inCart)
         : quantity;
-      if (allowed <= 0) return;
+      if (allowed <= 0) return false;
       addToCartMutation.mutate({ productId, quantity: allowed });
+      return true;
     } else {
+      const existing = localCart.find(item => item.productId === productId);
+      const stock = products?.find(p => p.id === productId)?.stock;
+      const inCart = existing?.quantity ?? 0;
+      if (stock !== undefined && stock !== null && inCart >= stock) return false;
+      const allowed = stock !== undefined && stock !== null
+        ? Math.min(quantity, stock - inCart)
+        : quantity;
+      if (allowed <= 0) return false;
       setLocalCart(prev => {
-        const existing = prev.find(item => item.productId === productId);
-        const stock = products?.find(p => p.id === productId)?.stock;
-        const inCart = existing?.quantity ?? 0;
-        if (stock !== undefined && stock !== null && inCart >= stock) return prev; // already at max
-        const allowed = stock !== undefined && stock !== null
-          ? Math.min(quantity, stock - inCart)
-          : quantity;
-        if (allowed <= 0) return prev;
+        const ex = prev.find(item => item.productId === productId);
         let updated: LocalCartItem[];
-        if (existing) {
+        if (ex) {
           updated = prev.map(item =>
             item.productId === productId
               ? { ...item, quantity: item.quantity + allowed }
@@ -175,8 +176,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setStoredCart(updated);
         return updated;
       });
+      return true;
     }
-  }, [isAuthenticated, addToCartMutation, enrichedItems, products]);
+  }, [isAuthenticated, addToCartMutation, enrichedItems, localCart, products]);
 
   const removeFromCart = useCallback((productId: string) => {
     if (isAuthenticated) {

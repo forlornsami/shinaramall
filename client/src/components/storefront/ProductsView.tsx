@@ -126,12 +126,20 @@ export default function ProductsView({ categoryId, featuredOnly, title, onProduc
     setSortBy("featured");
   };
 
-  const handleAddToCart = (productId: string, productName: string) => {
-    addToCart(productId, 1);
-    toast({
-      title: "Added to Cart",
-      description: `${productName} added to your cart`,
-    });
+  const handleAddToCart = (productId: string, productName: string, stock: number) => {
+    const added = addToCart(productId, 1);
+    if (added) {
+      toast({
+        title: "Added to Cart",
+        description: `${productName} added to your cart`,
+      });
+    } else {
+      toast({
+        title: "Maximum stock reached",
+        description: `Only ${stock} unit${stock === 1 ? "" : "s"} available`,
+        variant: "destructive",
+      });
+    }
   };
 
   const hasActiveFilters = searchQuery || (selectedCategory && !categoryId) || priceRange[0] > 0 || priceRange[1] < maxPrice;
@@ -367,7 +375,7 @@ export default function ProductsView({ categoryId, featuredOnly, title, onProduc
             <ProductCard
               key={product.id}
               product={product}
-              onAddToCart={() => handleAddToCart(product.id, product.name)}
+              onAddToCart={() => handleAddToCart(product.id, product.name, product.stock)}
               onProductClick={() => onProductSelect?.(`product-${product.id}`)}
               isAddingToCart={isAddingToCart}
               size={gridView === "large" ? "large" : "small"}

@@ -81,11 +81,19 @@ export default function ProductDetailsView({ productId, onBack }: ProductDetails
     
     setIsAddingToCart(true);
     try {
-      await addToCart(product.id, quantity);
-      toast({
-        title: "Added to cart",
-        description: `${quantity} x ${product.name} added to your cart`,
-      });
+      const added = addToCart(product.id, quantity);
+      if (added) {
+        toast({
+          title: "Added to cart",
+          description: `${quantity} x ${product.name} added to your cart`,
+        });
+      } else {
+        toast({
+          title: "Maximum stock reached",
+          description: `Only ${product.stock} unit${product.stock === 1 ? "" : "s"} available`,
+          variant: "destructive",
+        });
+      }
     } catch {
       toast({
         title: "Error",
