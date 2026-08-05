@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "d6HSnS4R3CBka_eOa62nP"
+uri = "file://shinara-mall-hostinger.zip"
+type = "unspecified"
+title = "shinara-mall-hostinger.zip"
+description = "Hostinger-ready frontend build for shinaramall.com (295 KB). Upload contents to public_html."

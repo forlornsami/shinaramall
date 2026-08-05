@@ -1,4 +1,9 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { API_BASE } from "./api-base";
+
+function toAbsolute(url: string): string {
+  return API_BASE && url.startsWith("/") ? API_BASE + url : url;
+}
 
 const TOKEN_KEY = "shinara_mall_token";
 const ADMIN_TOKEN_KEY = "adminToken";
@@ -65,7 +70,7 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(url, {
+  const res = await fetch(toAbsolute(url), {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
@@ -83,7 +88,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = queryKey[0] as string;
-    const res = await fetch(url, {
+    const res = await fetch(toAbsolute(url), {
       credentials: "include",
       headers: getAuthHeaders(url),
     });

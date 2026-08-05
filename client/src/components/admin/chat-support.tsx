@@ -20,6 +20,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { getWsUrl } from '@/lib/api-base';
 import { format } from 'date-fns';
 import type { ChatMessage, ChatConversationWithDetails } from '@shared/schema';
 
@@ -145,8 +146,7 @@ export default function ChatSupport({ adminToken, adminId }: ChatSupportProps) {
   useEffect(() => {
     if (!selectedConversation || !adminToken) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat`);
+    const ws = new WebSocket(getWsUrl('/ws/chat'));
     wsRef.current = ws;
 
     ws.onopen = () => {

@@ -9,6 +9,7 @@ import {
   ImageIcon, FileText, CheckCheck, Wifi, WifiOff,
 } from 'lucide-react';
 import { queryClient, getToken } from '@/lib/queryClient';
+import { getWsUrl } from '@/lib/api-base';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { ChatMessage, ChatConversationWithDetails } from '@shared/schema';
 
@@ -272,8 +273,7 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
   useEffect(() => {
     if (!isOpen || !conversation?.id || !userId) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat`);
+    const ws = new WebSocket(getWsUrl('/ws/chat'));
     wsRef.current = ws;
 
     ws.onopen = () => {
