@@ -70,8 +70,8 @@ const paymentMethods = [
 ];
 
 export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
-  const { cartItems, clearCart } = useCart() as {
-    cartItems: CartItemWithProduct[] | undefined;
+  const { items: cartItems, clearCart } = useCart() as {
+    items: CartItemWithProduct[] | undefined;
     clearCart: () => void;
   };
   const { toast } = useToast();
