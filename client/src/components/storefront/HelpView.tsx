@@ -264,7 +264,7 @@ export default function HelpView() {
                 <div>
                   <p className="text-sm font-medium">Email</p>
                   <p className="text-sm text-muted-foreground" data-testid="text-help-email">
-                    {storeSettings?.storeEmail || "support@shinaramall.pk"}
+                    {storeSettings?.storeEmail || "support@shinaramall.com"}
                   </p>
                 </div>
               </div>

@@ -15,7 +15,7 @@ export async function sendVerificationEmail(
   firstName: string,
   verificationToken: string
 ): Promise<EmailResult> {
-  const verificationUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/verify-email?token=${verificationToken}`;
   
   try {
     const { data, error } = await resend.emails.send({
@@ -72,7 +72,7 @@ export async function sendOrderConfirmationEmail(
   orderTotal: string,
   paymentMethod: string
 ): Promise<EmailResult> {
-  const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/orders/${orderId}`;
+  const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/orders/${orderId}`;
   
   try {
     const { data, error } = await resend.emails.send({
@@ -137,7 +137,7 @@ export async function sendOrderStatusUpdateEmail(
   orderId: string,
   newStatus: string
 ): Promise<EmailResult> {
-  const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/orders/${orderId}`;
+  const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/orders/${orderId}`;
   
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     processing: { title: 'Order Processing', message: 'Your order is being processed and will be shipped soon.', color: '#17a2b8' },
@@ -205,7 +205,7 @@ export async function sendPaymentVerifiedEmail(
   orderId: string,
   orderTotal: string
 ): Promise<EmailResult> {
-  const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/orders/${orderId}`;
+  const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/orders/${orderId}`;
   
   try {
     const { data, error } = await resend.emails.send({
@@ -268,7 +268,7 @@ export async function sendPasswordResetEmail(
   firstName: string,
   resetToken: string
 ): Promise<EmailResult> {
-  const resetUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000'}/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/reset-password?token=${resetToken}`;
   
   try {
     const { data, error } = await resend.emails.send({

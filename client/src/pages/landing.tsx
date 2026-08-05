@@ -461,7 +461,7 @@ export default function Landing() {
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-center gap-2" data-testid="text-contact-email">
                   <Mail className="w-4 h-4" />
-                  {storeSettings?.storeEmail || "support@shinaramall.pk"}
+                  {storeSettings?.storeEmail || "support@shinaramall.com"}
                 </li>
                 <li className="flex items-center gap-2" data-testid="text-contact-phone">
                   <Phone className="w-4 h-4" />

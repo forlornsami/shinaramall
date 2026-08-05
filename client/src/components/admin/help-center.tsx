@@ -219,7 +219,7 @@ export default function HelpCenterSection() {
                 <div>
                   <p className="font-medium text-sm">Email Support</p>
                   <p className="text-xs text-muted-foreground" data-testid="text-admin-help-email">
-                    {storeSettings?.storeEmail || "support@shinaramall.pk"}
+                    {storeSettings?.storeEmail || "support@shinaramall.com"}
                   </p>
                 </div>
               </div>
