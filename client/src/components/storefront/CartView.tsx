@@ -228,7 +228,16 @@ export default function CartView() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
-                <span className="font-medium text-green-600">Free</span>
+                {(() => {
+                  const fee = parseFloat(storeSettings?.shippingFee ?? "300") || 300;
+                  const threshold = parseFloat(storeSettings?.freeShippingThreshold ?? "5000");
+                  const shipping = threshold > 0 && total >= threshold ? 0 : fee;
+                  return (
+                    <span className={shipping === 0 ? "font-medium text-green-600" : "font-medium"}>
+                      {shipping === 0 ? "Free" : `Rs. ${shipping.toLocaleString()}`}
+                    </span>
+                  );
+                })()}
               </div>
               <Separator />
               <div className="flex justify-between">

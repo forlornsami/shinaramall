@@ -147,7 +147,9 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       ) || cartContextTotal
     : cartContextTotal;
   
-  const shippingCost = subtotal > 5000 ? 0 : 300;
+  const shippingFee = parseFloat(storeSettings?.shippingFee as string ?? "300") || 300;
+  const freeShippingThreshold = parseFloat(storeSettings?.freeShippingThreshold as string ?? "5000");
+  const shippingCost = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold ? 0 : shippingFee;
   
   // Calculate coupon discount
   const couponDiscount = appliedCoupon?.discountAmount || 0;

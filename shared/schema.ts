@@ -710,6 +710,8 @@ export const storeSettings = pgTable("store_settings", {
   paymentUpdates: boolean("payment_updates").default(true),
   marketingEmails: boolean("marketing_emails").default(false),
   guestCheckoutEnabled: boolean("guest_checkout_enabled").default(false),
+  shippingFee: decimal("shipping_fee", { precision: 10, scale: 2 }).default("300"),
+  freeShippingThreshold: decimal("free_shipping_threshold", { precision: 10, scale: 2 }).default("5000"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

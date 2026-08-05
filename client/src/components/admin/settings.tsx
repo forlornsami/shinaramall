@@ -61,6 +61,8 @@ export default function SettingsSection() {
     defaultProductImage: "",
     defaultCategoryImage: "",
     guestCheckoutEnabled: false,
+    shippingFee: "300",
+    freeShippingThreshold: "5000",
   });
 
   const [notifications, setNotifications] = useState({
@@ -104,6 +106,8 @@ export default function SettingsSection() {
         defaultProductImage: settings.defaultProductImage || "",
         defaultCategoryImage: settings.defaultCategoryImage || "",
         guestCheckoutEnabled: settings.guestCheckoutEnabled ?? false,
+        shippingFee: settings.shippingFee ?? "300",
+        freeShippingThreshold: settings.freeShippingThreshold ?? "5000",
       });
       setNotifications({
         orderNotifications: settings.orderNotifications ?? true,
@@ -781,6 +785,31 @@ export default function SettingsSection() {
                   onCheckedChange={(checked) => setStoreSettings({ ...storeSettings, guestCheckoutEnabled: checked })}
                   data-testid="switch-guest-checkout"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium mb-1">Shipping Fee (Rs.)</p>
+                  <p className="text-xs text-muted-foreground mb-2">Charged when order is below the free shipping threshold</p>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={storeSettings.shippingFee}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, shippingFee: e.target.value })}
+                    placeholder="300"
+                  />
+                </div>
+                <div>
+                  <p className="font-medium mb-1">Free Shipping Above (Rs.)</p>
+                  <p className="text-xs text-muted-foreground mb-2">Orders at or above this amount get free shipping (0 = always charge)</p>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={storeSettings.freeShippingThreshold}
+                    onChange={(e) => setStoreSettings({ ...storeSettings, freeShippingThreshold: e.target.value })}
+                    placeholder="5000"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
