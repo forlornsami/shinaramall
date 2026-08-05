@@ -1632,7 +1632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/admin/orders/:id', adminAuth, async (req, res) => {
     try {
-      const { status, paymentStatus, refundFullToWallet } = req.body;
+      const { status, paymentStatus, refundFullToWallet, trackingNumber } = req.body;
       
       // Get original order to check for status change
       const originalOrder = await storage.getOrder(req.params.id);
@@ -1684,8 +1684,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         order = await storage.updateOrder(req.params.id, {
-          status,
-          paymentStatus,
+          ...(status !== undefined && { status }),
+          ...(paymentStatus !== undefined && { paymentStatus }),
+          ...(trackingNumber !== undefined && { trackingNumber }),
         });
       }
       

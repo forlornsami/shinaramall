@@ -12,7 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getProductThumbnail } from "@/lib/utils";
-import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X, AlertTriangle } from "lucide-react";
+import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X, AlertTriangle, Pencil, Copy, Check } from "lucide-react";
 import type { Order, OrderItem, Product, StoreSettings } from "@shared/schema";
 
 type SortField = 'orderNumber' | 'customer' | 'amount' | 'status' | 'paymentStatus' | 'date';
@@ -39,6 +39,16 @@ export default function OrderManagement() {
   // Sort states
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Update dialog states
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [orderToUpdate, setOrderToUpdate] = useState<Order | null>(null);
+  const [updateForm, setUpdateForm] = useState({
+    status: "",
+    paymentStatus: "",
+    trackingNumber: "",
+  });
+  const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
 
   // Fetch store settings
   const { data: storeSettings } = useQuery<StoreSettings>({
@@ -74,11 +84,12 @@ export default function OrderManagement() {
 
   // Update order status
   const updateOrderMutation = useMutation({
-    mutationFn: async ({ orderId, status, paymentStatus, refundFullToWallet }: { 
+    mutationFn: async ({ orderId, status, paymentStatus, refundFullToWallet, trackingNumber }: { 
       orderId: string; 
       status?: string; 
       paymentStatus?: string;
       refundFullToWallet?: boolean;
+      trackingNumber?: string;
     }) => {
       const token = localStorage.getItem('adminToken');
       const response = await fetch(`/api/admin/orders/${orderId}`, {
@@ -87,7 +98,7 @@ export default function OrderManagement() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ status, paymentStatus, refundFullToWallet }),
+        body: JSON.stringify({ status, paymentStatus, refundFullToWallet, trackingNumber }),
       });
       if (!response.ok) throw new Error('Failed to update order');
       return response.json();
@@ -106,6 +117,8 @@ export default function OrderManagement() {
       setIsCancelDialogOpen(false);
       setOrderToCancel(null);
       setRefundFullToWallet(false);
+      setIsUpdateDialogOpen(false);
+      setOrderToUpdate(null);
     },
     onError: (error) => {
       toast({
@@ -116,15 +129,34 @@ export default function OrderManagement() {
     },
   });
   
-  // Handle status change - intercept cancellation
-  const handleStatusChange = (order: Order, newStatus: string) => {
-    if (newStatus === 'cancelled') {
-      setOrderToCancel(order);
+  // Open the per-row update form
+  const handleOpenUpdateDialog = (order: Order) => {
+    setOrderToUpdate(order);
+    setUpdateForm({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      trackingNumber: (order as any).trackingNumber || "",
+    });
+    setIsUpdateDialogOpen(true);
+  };
+
+  // Submit the update form
+  const handleSubmitUpdate = () => {
+    if (!orderToUpdate) return;
+    if (updateForm.status === 'cancelled') {
+      // Route through cancel confirmation
+      setOrderToCancel(orderToUpdate);
       setRefundFullToWallet(false);
+      setIsUpdateDialogOpen(false);
       setIsCancelDialogOpen(true);
-    } else {
-      updateOrderMutation.mutate({ orderId: order.id, status: newStatus });
+      return;
     }
+    updateOrderMutation.mutate({
+      orderId: orderToUpdate.id,
+      status: updateForm.status || undefined,
+      paymentStatus: updateForm.paymentStatus || undefined,
+      trackingNumber: updateForm.trackingNumber,
+    });
   };
   
   // Confirm cancellation
@@ -548,25 +580,15 @@ export default function OrderManagement() {
                         Rs. {parseFloat(order.total).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-col gap-1">
                           <Badge className={getStatusColor(order.status)} data-testid={`badge-order-status-${order.id}`}>
                             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                           </Badge>
-                          <Select
-                            value={order.status}
-                            onValueChange={(value) => handleStatusChange(order, value)}
-                          >
-                            <SelectTrigger className="w-32 h-8" data-testid={`select-order-status-${order.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending" data-testid="option-pending">Pending</SelectItem>
-                              <SelectItem value="processing" data-testid="option-processing">Processing</SelectItem>
-                              <SelectItem value="shipped" data-testid="option-shipped">Shipped</SelectItem>
-                              <SelectItem value="delivered" data-testid="option-delivered">Delivered</SelectItem>
-                              <SelectItem value="cancelled" data-testid="option-cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {(order as any).trackingNumber && (
+                            <span className="text-xs text-muted-foreground font-mono">
+                              # {(order as any).trackingNumber}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -583,14 +605,26 @@ export default function OrderManagement() {
                         {formatDate(order.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewOrder(order)}
-                          data-testid={`button-view-order-${order.id}`}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewOrder(order)}
+                            data-testid={`button-view-order-${order.id}`}
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenUpdateDialog(order)}
+                            data-testid={`button-update-order-${order.id}`}
+                            title="Update order"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -775,6 +809,95 @@ export default function OrderManagement() {
               </Card>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Order Dialog */}
+      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Update Order — {orderToUpdate?.orderNumber}
+            </DialogTitle>
+            <DialogDescription>
+              Change the order status, payment status, or assign a tracking number.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Order Status */}
+            <div className="space-y-2">
+              <Label htmlFor="update-status">Order Status</Label>
+              <Select
+                value={updateForm.status}
+                onValueChange={(v) => setUpdateForm({ ...updateForm, status: v })}
+              >
+                <SelectTrigger id="update-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancel Order…</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Status */}
+            <div className="space-y-2">
+              <Label htmlFor="update-payment">Payment Status</Label>
+              <Select
+                value={updateForm.paymentStatus}
+                onValueChange={(v) => setUpdateForm({ ...updateForm, paymentStatus: v })}
+              >
+                <SelectTrigger id="update-payment">
+                  <SelectValue placeholder="Select payment status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tracking Number */}
+            <div className="space-y-2">
+              <Label htmlFor="update-tracking">
+                Tracking Number
+                <span className="ml-1 text-xs text-muted-foreground">(visible to customer)</span>
+              </Label>
+              <Input
+                id="update-tracking"
+                placeholder="e.g. TCS-123456789"
+                value={updateForm.trackingNumber}
+                onChange={(e) => setUpdateForm({ ...updateForm, trackingNumber: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Registered customers can see this in their order portal. Set when shipping.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => { setIsUpdateDialogOpen(false); setOrderToUpdate(null); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitUpdate}
+              disabled={updateOrderMutation.isPending}
+            >
+              {updateOrderMutation.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

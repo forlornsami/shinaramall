@@ -20,6 +20,8 @@ import {
   ShoppingBag,
   Ban,
   Loader2,
+  Copy,
+  Check,
 } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -35,6 +37,14 @@ export default function OrdersView() {
   const { toast } = useToast();
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyTracking = (trackingNumber: string, orderId: string) => {
+    navigator.clipboard.writeText(trackingNumber).then(() => {
+      setCopiedId(orderId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
@@ -203,6 +213,24 @@ export default function OrdersView() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Tracking number — shown when assigned */}
+                  {(order as any).trackingNumber && (
+                    <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm">
+                      <Truck className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-blue-700 dark:text-blue-300 font-medium">Tracking: </span>
+                        <span className="font-mono text-blue-800 dark:text-blue-200">{(order as any).trackingNumber}</span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); copyTracking((order as any).trackingNumber, order.id); }}
+                        className="shrink-0 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-600 transition-colors"
+                        title="Copy tracking number"
+                      >
+                        {copiedId === order.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-4 text-muted-foreground">

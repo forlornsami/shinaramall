@@ -209,6 +209,7 @@ export const orders = pgTable("orders", {
   }>(),
   paymentScreenshotUrl: text("payment_screenshot_url"),
   transactionId: varchar("transaction_id"),
+  trackingNumber: varchar("tracking_number"),
   verificationStatus: varchar("verification_status").default("pending"),
   verificationNote: text("verification_note"),
   verifiedBy: varchar("verified_by").references(() => adminUsers.id),
@@ -548,6 +549,7 @@ export type UpdateOrder = Partial<InsertOrder> & {
   paymentDetails?: { transactionId?: string; gatewayResponse?: any; method?: string; note?: string };
   paymentScreenshotUrl?: string;
   transactionId?: string;
+  trackingNumber?: string;
   verificationStatus?: "pending" | "approved" | "rejected";
   verificationNote?: string;
   verifiedBy?: string;
