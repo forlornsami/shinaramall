@@ -1307,11 +1307,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedItems.push({ product, quantity });
       }
 
-      // Compute totals from trusted product prices
+      // Compute totals from trusted product prices + admin-configured shipping
       const computedSubtotal = validatedItems.reduce(
         (sum, { product, quantity }) => sum + parseFloat(product.price) * quantity, 0
       );
-      const computedShippingCost = computedSubtotal > 5000 ? 0 : 300;
+      const configuredShippingFee = parseFloat(settings?.shippingFee || "300");
+      const configuredFreeThreshold = parseFloat(settings?.freeShippingThreshold || "5000");
+      const computedShippingCost =
+        configuredFreeThreshold > 0 && computedSubtotal >= configuredFreeThreshold
+          ? 0
+          : configuredShippingFee;
       const computedTotal = computedSubtotal + computedShippingCost;
 
       // Generate a cryptographically random capability token for guest proof upload

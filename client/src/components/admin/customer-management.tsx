@@ -34,17 +34,29 @@ export default function CustomerManagement() {
     },
   });
 
-  // Group orders by customer to get customer stats
-  const customerStats = orders?.reduce((acc: any, order: Order) => {
-    const customerKey = `${order.shippingAddress?.firstName} ${order.shippingAddress?.lastName}`;
+  // Group orders by user — registered users by userId, guests by email/phone/name
+  const customerStats = orders?.reduce((acc: any, order: any) => {
+    const isGuest = !order.userId;
+    const customerKey = isGuest
+      ? `guest:${order.guestEmail || order.guestPhone || order.guestName || order.shippingAddress?.phone}`
+      : `user:${order.userId}`;
+
+    const displayName = isGuest
+      ? (order.guestName || `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim())
+      : `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim();
+
+    const displayEmail = isGuest
+      ? (order.guestEmail || order.guestPhone || '—')
+      : (order.userEmail || order.shippingAddress?.phone || '—');
+
     if (!acc[customerKey]) {
       acc[customerKey] = {
-        name: customerKey,
-        email: order.shippingAddress?.phone || 'N/A', // Using phone as placeholder
+        name: displayName || 'Unknown',
+        email: displayEmail,
         totalOrders: 0,
         totalSpent: 0,
         lastOrderDate: order.createdAt,
-        status: 'Active'
+        isGuest,
       };
     }
     acc[customerKey].totalOrders += 1;
@@ -245,10 +257,10 @@ export default function CustomerManagement() {
                     </TableCell>
                     <TableCell>
                       <Badge 
-                        variant={customer.status === 'Active' ? 'default' : 'secondary'}
+                        variant={customer.isGuest ? 'secondary' : 'default'}
                         data-testid={`badge-customer-status-${index}`}
                       >
-                        {customer.status}
+                        {customer.isGuest ? 'Guest' : 'Registered'}
                       </Badge>
                     </TableCell>
                   </TableRow>

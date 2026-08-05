@@ -1584,10 +1584,38 @@ export default function PaymentManagement() {
           {viewingOrder && (
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Amount</Label>
-                  <p className="text-lg font-semibold">Rs. {parseFloat(viewingOrder.total || '0').toLocaleString()}</p>
+                {/* Amount breakdown */}
+                <div className="col-span-2 rounded-lg border bg-muted/40 p-3 space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Product subtotal</span>
+                    <span>Rs. {parseFloat((viewingOrder as any).subtotal || viewingOrder.total || '0').toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Shipping charges</span>
+                    <span>
+                      {parseFloat((viewingOrder as any).shippingCost || '0') === 0
+                        ? <span className="text-green-600">Free</span>
+                        : `Rs. ${parseFloat((viewingOrder as any).shippingCost || '0').toLocaleString()}`}
+                    </span>
+                  </div>
+                  {parseFloat((viewingOrder as any).discountAmount || '0') > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Discount</span>
+                      <span className="text-green-600">- Rs. {parseFloat((viewingOrder as any).discountAmount).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {parseFloat((viewingOrder as any).walletAmountUsed || '0') > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Wallet used</span>
+                      <span className="text-blue-600">- Rs. {parseFloat((viewingOrder as any).walletAmountUsed).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold border-t pt-1.5 mt-1">
+                    <span>Total charged</span>
+                    <span>Rs. {parseFloat(viewingOrder.total || '0').toLocaleString()}</span>
+                  </div>
                 </div>
+
                 <div>
                   <Label className="text-muted-foreground">Payment Method</Label>
                   <Badge variant="outline" className={getIconColor(viewingOrder.paymentMethod || '')}>
@@ -1595,14 +1623,14 @@ export default function PaymentManagement() {
                   </Badge>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Transaction ID</Label>
-                  <p className="font-mono">{viewingOrder.transactionId || 'Not provided'}</p>
-                </div>
-                <div>
                   <Label className="text-muted-foreground">Verification Status</Label>
                   <Badge variant={viewingOrder.verificationStatus === 'pending' ? 'secondary' : viewingOrder.verificationStatus === 'approved' ? 'default' : 'destructive'}>
                     {viewingOrder.verificationStatus || 'pending'}
                   </Badge>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-muted-foreground">Transaction ID</Label>
+                  <p className="font-mono">{viewingOrder.transactionId || 'Not provided'}</p>
                 </div>
               </div>
 
