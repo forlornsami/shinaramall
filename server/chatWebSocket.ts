@@ -124,7 +124,7 @@ async function handleAuth(ws: WebSocket, message: any): Promise<ChatClient | nul
       if (!token) return null;
       
       // Verify customer JWT token
-      const JWT_SECRET = process.env.SESSION_SECRET || "shinara-mall-secret-key-change-in-production";
+      const JWT_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       
       const user = await storage.getUser(decoded.userId);
@@ -135,7 +135,7 @@ async function handleAuth(ws: WebSocket, message: any): Promise<ChatClient | nul
       const token = message.token;
       if (!token) return null;
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'admin-secret') as any;
+      const decoded = jwt.verify(token, process.env.SESSION_SECRET || process.env.JWT_SECRET || 'admin-secret') as any;
       const admin = await storage.getAdminUser(decoded.adminId);
       if (!admin) return null;
 

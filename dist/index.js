@@ -54266,7 +54266,7 @@ async function handleAuth(ws2, message) {
     if (message.userType === "customer") {
       const token = message.token;
       if (!token) return null;
-      const JWT_SECRET3 = process.env.SESSION_SECRET || "shinara-mall-secret-key-change-in-production";
+      const JWT_SECRET3 = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
       const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET3);
       const user = await storage.getUser(decoded.userId);
       if (!user || !user.isActive) return null;
@@ -54274,7 +54274,7 @@ async function handleAuth(ws2, message) {
     } else if (message.userType === "agent") {
       const token = message.token;
       if (!token) return null;
-      const decoded = import_jsonwebtoken2.default.verify(token, process.env.JWT_SECRET || "admin-secret");
+      const decoded = import_jsonwebtoken2.default.verify(token, process.env.SESSION_SECRET || process.env.JWT_SECRET || "admin-secret");
       const admin = await storage.getAdminUser(decoded.adminId);
       if (!admin) return null;
       return { ws: ws2, userId: admin.id, userType: "agent" };
@@ -54509,7 +54509,7 @@ async function handleAuth2(ws2, message) {
   try {
     const token = message.token;
     if (!token) return null;
-    const decoded = import_jsonwebtoken3.default.verify(token, process.env.JWT_SECRET || "admin-secret");
+    const decoded = import_jsonwebtoken3.default.verify(token, process.env.SESSION_SECRET || process.env.JWT_SECRET || "admin-secret");
     const admin = await storage.getAdminUser(decoded.adminId);
     if (!admin) return null;
     const conversations = await storage.getTeamChatConversations(admin.id);
