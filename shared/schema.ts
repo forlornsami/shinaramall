@@ -879,7 +879,9 @@ export const chatSenderTypeEnum = pgEnum("chat_sender_type", [
 // Chat conversations table
 export const chatConversations = pgTable("chat_conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }),
+  guestId: varchar("guest_id"),       // set when the visitor is not logged in
+  guestName: varchar("guest_name"),   // display name provided by guest
   assignedAgentId: varchar("assigned_agent_id").references(() => adminUsers.id, { onDelete: "set null" }),
   status: chatConversationStatusEnum("status").notNull().default("open"),
   subject: varchar("subject"),
@@ -941,7 +943,8 @@ export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // Extended chat types with relations
 export type ChatConversationWithDetails = ChatConversation & {
-  customer: User;
+  customer?: User | null;
+  guestDisplayName?: string | null; // resolved from guestName or guestId
   assignedAgent?: AdminUser | null;
   messages?: ChatMessage[];
   unreadCount?: number;

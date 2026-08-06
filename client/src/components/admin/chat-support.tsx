@@ -297,13 +297,15 @@ export default function ChatSupport({ adminToken, adminId }: ChatSupportProps) {
                     <div className="flex items-start gap-3">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback>
-                          {conv.customer?.firstName?.charAt(0) || 'C'}
+                          {conv.customer?.firstName?.charAt(0) || (conv as any).guestDisplayName?.charAt(0) || 'G'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="font-medium truncate">
-                            {conv.customer?.firstName || 'Customer'} {conv.customer?.lastName || ''}
+                            {conv.customer
+                              ? `${conv.customer.firstName || ''} ${conv.customer.lastName || ''}`.trim() || 'Customer'
+                              : ((conv as any).guestDisplayName || 'Guest')}
                           </p>
                           {(conv.unreadCount ?? 0) > 0 && (
                             <Badge variant="destructive" className="ml-2">
@@ -312,7 +314,7 @@ export default function ChatSupport({ adminToken, adminId }: ChatSupportProps) {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
-                          {conv.customer?.email}
+                          {conv.customer?.email || 'Guest visitor'}
                         </p>
                         <div className="flex items-center justify-between mt-1">
                           {getStatusBadge(conv.status)}
@@ -338,15 +340,17 @@ export default function ChatSupport({ adminToken, adminId }: ChatSupportProps) {
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback>
-                      {currentConversation.customer?.firstName?.charAt(0) || 'C'}
+                      {currentConversation.customer?.firstName?.charAt(0) || (currentConversation as any).guestDisplayName?.charAt(0) || 'G'}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <CardTitle className="text-lg">
-                      {currentConversation.customer?.firstName || 'Customer'} {currentConversation.customer?.lastName || ''}
+                      {currentConversation.customer
+                        ? `${currentConversation.customer.firstName || ''} ${currentConversation.customer.lastName || ''}`.trim() || 'Customer'
+                        : ((currentConversation as any).guestDisplayName || 'Guest')}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      {currentConversation.customer?.email}
+                      {currentConversation.customer?.email || 'Guest visitor'}
                     </p>
                   </div>
                 </div>

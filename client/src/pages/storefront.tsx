@@ -146,12 +146,7 @@ export default function Storefront() {
             </div>
           </main>
 
-          {isAuthenticated && user && (
-            <ChatWidget 
-              userId={user.id} 
-              userName={user.firstName || user.email || 'Customer'} 
-            />
-          )}
+          <ChatWidget />
         </div>
       </WishlistProvider>
     </CartProvider>

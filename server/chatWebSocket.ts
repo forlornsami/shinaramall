@@ -6,8 +6,10 @@ import type { ChatMessage } from '@shared/schema';
 
 interface ChatClient {
   ws: WebSocket;
-  userId: string;
+  userId: string;        // for registered users: real user id; for guests: guestId prefixed with "guest:"
   userType: 'customer' | 'agent';
+  isGuest?: boolean;
+  guestName?: string;
   conversationId?: string;
 }
 
@@ -119,23 +121,35 @@ export function setupChatWebSocket(server: Server) {
 
 async function handleAuth(ws: WebSocket, message: any): Promise<ChatClient | null> {
   try {
+    const JWT_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
+
     if (message.userType === 'customer') {
       const token = message.token;
       if (!token) return null;
-      
-      // Verify customer JWT token
-      const JWT_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
+
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      
+
+      // Guest token
+      if (decoded.type === 'guest') {
+        return {
+          ws,
+          userId: `guest:${decoded.guestId}`,
+          userType: 'customer',
+          isGuest: true,
+          guestName: decoded.guestName || 'Guest',
+        };
+      }
+
+      // Registered user
       const user = await storage.getUser(decoded.userId);
       if (!user || !user.isActive) return null;
+      return { ws, userId: user.id, userType: 'customer', isGuest: false };
 
-      return { ws, userId: user.id, userType: 'customer' };
     } else if (message.userType === 'agent') {
       const token = message.token;
       if (!token) return null;
 
-      const decoded = jwt.verify(token, process.env.SESSION_SECRET || process.env.JWT_SECRET || 'admin-secret') as any;
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
       const admin = await storage.getAdminUser(decoded.adminId);
       if (!admin) return null;
 
@@ -155,9 +169,14 @@ async function handleJoinConversation(client: ChatClient, conversationId: string
     return;
   }
 
-  if (client.userType === 'customer' && conversation.customerId !== client.userId) {
-    client.ws.send(JSON.stringify({ type: 'error', error: 'Unauthorized' }));
-    return;
+  if (client.userType === 'customer') {
+    const authorized = client.isGuest
+      ? conversation.guestId === client.userId.replace('guest:', '')
+      : conversation.customerId === client.userId;
+    if (!authorized) {
+      client.ws.send(JSON.stringify({ type: 'error', error: 'Unauthorized' }));
+      return;
+    }
   }
 
   const senderType = client.userType === 'agent' ? 'customer' : 'agent';
@@ -252,6 +271,9 @@ async function createAgentNotification(conversationId: string, message: ChatMess
 async function createCustomerNotification(conversationId: string, message: ChatMessage) {
   const conversation = await storage.getChatConversation(conversationId);
   if (!conversation) return;
+
+  // Guests don't have a userId to look up — skip notification for them
+  if (!conversation.customerId) return;
 
   const customerClient = clients.get(conversation.customerId);
   if (!customerClient || customerClient.conversationId !== conversationId) {

@@ -236,6 +236,7 @@ export interface IStorage {
   getChatConversations(filters?: { status?: string; assignedAgentId?: string; unassigned?: boolean }): Promise<ChatConversationWithDetails[]>;
   getChatConversation(id: string): Promise<ChatConversationWithDetails | undefined>;
   getCustomerConversation(customerId: string): Promise<ChatConversation | undefined>;
+  getGuestConversation(guestId: string): Promise<ChatConversation | undefined>;
   createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation>;
   updateChatConversation(id: string, data: Partial<InsertChatConversation>): Promise<ChatConversation>;
   assignChatAgent(conversationId: string, agentId: string): Promise<ChatConversation>;
@@ -1502,20 +1503,19 @@ export class DatabaseStorage implements IStorage {
     // Fetch customer and agent details for each conversation
     const conversationsWithDetails: ChatConversationWithDetails[] = [];
     for (const conv of conversations) {
-      const customer = await this.getUser(conv.customerId);
+      const customer = conv.customerId ? await this.getUser(conv.customerId) : null;
       const agent = conv.assignedAgentId ? await this.getAdminUser(conv.assignedAgentId) : null;
       
       // Get unread count for agent (messages from customer that are unread)
       const unreadCount = await this.getUnreadMessageCount(conv.id, 'customer');
       
-      if (customer) {
-        conversationsWithDetails.push({
-          ...conv,
-          customer,
-          assignedAgent: agent,
-          unreadCount,
-        });
-      }
+      conversationsWithDetails.push({
+        ...conv,
+        customer: customer ?? undefined,
+        guestDisplayName: conv.guestName || (conv.guestId ? `Guest (${conv.guestId.slice(0, 8)})` : null),
+        assignedAgent: agent,
+        unreadCount,
+      });
     }
     
     return conversationsWithDetails;
@@ -1529,15 +1529,14 @@ export class DatabaseStorage implements IStorage {
     
     if (!conversation) return undefined;
     
-    const customer = await this.getUser(conversation.customerId);
+    const customer = conversation.customerId ? await this.getUser(conversation.customerId) : null;
     const agent = conversation.assignedAgentId ? await this.getAdminUser(conversation.assignedAgentId) : null;
     const messages = await this.getChatMessages(id);
     
-    if (!customer) return undefined;
-    
     return {
       ...conversation,
-      customer,
+      customer: customer ?? undefined,
+      guestDisplayName: conversation.guestName || (conversation.guestId ? `Guest (${conversation.guestId.slice(0, 8)})` : null),
       assignedAgent: agent,
       messages,
     };
@@ -1557,6 +1556,21 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(chatConversations.createdAt))
       .limit(1);
     
+    return conversation;
+  }
+
+  async getGuestConversation(guestId: string): Promise<ChatConversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(chatConversations)
+      .where(
+        and(
+          eq(chatConversations.guestId, guestId),
+          sql`${chatConversations.status} IN ('open', 'in_progress')`
+        )
+      )
+      .orderBy(desc(chatConversations.createdAt))
+      .limit(1);
     return conversation;
   }
 

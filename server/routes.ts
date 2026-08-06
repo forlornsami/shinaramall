@@ -3257,8 +3257,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============== CUSTOMER CHAT ENDPOINTS ==============
 
+  // ---- Guest token ----
+  // Issues a short-lived JWT so unauthenticated visitors can use the chat.
+  // The token carries { guestId, guestName, type:'guest' }.
+  app.post('/api/chat/guest-token', async (req: any, res) => {
+    try {
+      const { guestId, guestName } = req.body;
+      if (!guestId || typeof guestId !== 'string' || guestId.length < 8) {
+        return res.status(400).json({ message: 'Invalid guestId' });
+      }
+      const JWT_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'shinara-mall-secret-key-change-in-production';
+      const jwtLib = await import('jsonwebtoken');
+      const token = jwtLib.default.sign(
+        { guestId, guestName: guestName || 'Guest', type: 'guest' },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      res.json({ token });
+    } catch (error) {
+      console.error('Guest token error:', error);
+      res.status(500).json({ message: 'Failed to create guest token' });
+    }
+  });
+
+  // Middleware: accept either a regular user JWT or a guest JWT
+  async function isAuthenticatedOrGuest(req: any, res: any, next: any) {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const token = auth.slice(7);
+    try {
+      const JWT_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'shinara-mall-secret-key-change-in-production';
+      const jwtLib = await import('jsonwebtoken');
+      const decoded = jwtLib.default.verify(token, JWT_SECRET) as any;
+      if (decoded.type === 'guest') {
+        req.guest = { guestId: decoded.guestId, guestName: decoded.guestName || 'Guest' };
+        return next();
+      }
+      // Regular user
+      const user = await storage.getUser(decoded.userId);
+      if (!user || !user.isActive) return res.status(401).json({ message: 'Unauthorized' });
+      req.user = user;
+      next();
+    } catch {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+  }
+
   // ---- Chat file upload ----
-  app.post('/api/chat/upload', isAuthenticated, async (req: any, res) => {
+  app.post('/api/chat/upload', isAuthenticatedOrGuest, async (req: any, res) => {
     try {
       const { data, name, type } = req.body;
       if (!data || !name) return res.status(400).json({ message: "Missing file data" });
@@ -3278,23 +3326,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: check conversation ownership for either user or guest
+  function ownsConversation(req: any, conversation: any): boolean {
+    if (req.user) return conversation.customerId === req.user.id;
+    if (req.guest) return conversation.guestId === req.guest.guestId;
+    return false;
+  }
+
   // ---- Chat reaction (REST fallback) ----
-  app.post('/api/chat/conversation/:id/messages/:msgId/reactions', isAuthenticated, async (req: any, res) => {
+  app.post('/api/chat/conversation/:id/messages/:msgId/reactions', isAuthenticatedOrGuest, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const reactorId = req.user?.id || req.guest?.guestId;
       const { emoji } = req.body;
       const conversation = await storage.getChatConversation(req.params.id);
-      if (!conversation || conversation.customerId !== userId) {
+      if (!conversation || !ownsConversation(req, conversation)) {
         return res.status(404).json({ message: "Conversation not found" });
       }
       const msg = await storage.getChatMessage(req.params.msgId);
       if (!msg) return res.status(404).json({ message: "Message not found" });
       const reactions: Record<string, string[]> = (msg.reactions as any) || {};
-      const users = reactions[req.body.emoji] || [];
-      const idx = users.indexOf(userId);
-      if (idx === -1) reactions[emoji] = [...users, userId];
+      const users = reactions[emoji] || [];
+      const idx = users.indexOf(reactorId);
+      if (idx === -1) reactions[emoji] = [...users, reactorId];
       else {
-        reactions[emoji] = users.filter((u: string) => u !== userId);
+        reactions[emoji] = users.filter((u: string) => u !== reactorId);
         if (reactions[emoji].length === 0) delete reactions[emoji];
       }
       const updated = await storage.updateChatMessageReactions(req.params.msgId, reactions);
@@ -3305,19 +3360,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get or create customer's active conversation
-  app.get('/api/chat/conversation', isAuthenticated, async (req: any, res) => {
+  // Get or create active conversation (works for both users and guests)
+  app.get('/api/chat/conversation', isAuthenticatedOrGuest, async (req: any, res) => {
     try {
-      const userId = req.user.id;
-      let conversation = await storage.getCustomerConversation(userId);
-      
-      if (!conversation) {
-        conversation = await storage.createChatConversation({
-          customerId: userId,
-          status: 'open',
-        });
+      let conversation: any;
+      if (req.user) {
+        conversation = await storage.getCustomerConversation(req.user.id);
+        if (!conversation) {
+          conversation = await storage.createChatConversation({
+            customerId: req.user.id,
+            status: 'open',
+          });
+        }
+      } else {
+        // Guest
+        conversation = await storage.getGuestConversation(req.guest.guestId);
+        if (!conversation) {
+          conversation = await storage.createChatConversation({
+            guestId: req.guest.guestId,
+            guestName: req.guest.guestName,
+            status: 'open',
+          } as any);
+        }
       }
-      
       const fullConversation = await storage.getChatConversation(conversation.id);
       res.json(fullConversation);
     } catch (error) {
@@ -3326,16 +3391,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get messages for a conversation (customer)
-  app.get('/api/chat/conversation/:id/messages', isAuthenticated, async (req: any, res) => {
+  // Get messages for a conversation (customer or guest)
+  app.get('/api/chat/conversation/:id/messages', isAuthenticatedOrGuest, async (req: any, res) => {
     try {
-      const userId = req.user.id;
       const conversation = await storage.getChatConversation(req.params.id);
-      
-      if (!conversation || conversation.customerId !== userId) {
+      if (!conversation || !ownsConversation(req, conversation)) {
         return res.status(404).json({ message: "Conversation not found" });
       }
-      
       const messages = await storage.getChatMessages(req.params.id);
       res.json(messages);
     } catch (error) {
@@ -3344,36 +3406,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send message (customer) - fallback for when WebSocket is not available
-  app.post('/api/chat/conversation/:id/messages', isAuthenticated, async (req: any, res) => {
+  // Send message (customer or guest) - fallback for when WebSocket is not available
+  app.post('/api/chat/conversation/:id/messages', isAuthenticatedOrGuest, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const senderId = req.user?.id || req.guest?.guestId;
       const { content } = req.body;
-      
+
       const conversation = await storage.getChatConversation(req.params.id);
-      if (!conversation || conversation.customerId !== userId) {
+      if (!conversation || !ownsConversation(req, conversation)) {
         return res.status(404).json({ message: "Conversation not found" });
       }
-      
+
       const message = await storage.createChatMessage({
         conversationId: req.params.id,
-        senderId: userId,
+        senderId,
         senderType: 'customer',
         message: content.trim(),
       });
-      
+
       // Create notification for agent if assigned
       if (conversation.assignedAgentId) {
+        const displayName = req.user
+          ? (conversation.customer?.firstName || 'Customer')
+          : (req.guest?.guestName || 'Guest');
         await storage.createNotification({
           recipientType: 'admin',
           recipientId: conversation.assignedAgentId,
           type: 'chat_message',
           title: 'New Chat Message',
-          message: `Customer ${conversation.customer?.firstName || 'Customer'} sent a message`,
+          message: `${displayName} sent a message`,
           data: { conversationId: req.params.id, messageId: message.id },
         });
       }
-      
+
       res.json(message);
     } catch (error) {
       console.error("Error sending message:", error);

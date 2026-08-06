@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -16,16 +17,42 @@ import type { ChatMessage, ChatConversationWithDetails } from '@shared/schema';
 // ── Emoji palette for reactions ──────────────────────────────────────────────
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
+// ── Guest session helpers ─────────────────────────────────────────────────────
+const GUEST_ID_KEY = 'shinara_guest_id';
+const GUEST_NAME_KEY = 'shinara_guest_name';
+const GUEST_TOKEN_KEY = 'shinara_guest_token';
+
+function getOrCreateGuestId(): string {
+  let id = localStorage.getItem(GUEST_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(GUEST_ID_KEY, id);
+  }
+  return id;
+}
+
+async function fetchGuestToken(guestId: string, guestName: string): Promise<string> {
+  const res = await fetch('/api/chat/guest-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ guestId, guestName }),
+  });
+  if (!res.ok) throw new Error('Failed to get guest token');
+  const { token } = await res.json();
+  localStorage.setItem(GUEST_TOKEN_KEY, token);
+  return token;
+}
+
+/** Returns the best available chat token — user JWT or guest JWT. */
+function getChatToken(): string | null {
+  return getToken() || localStorage.getItem(GUEST_TOKEN_KEY);
+}
+
 interface PendingAttachment {
   name: string;
   type: string;
   size: number;
-  dataUrl: string;  // base64 data URI for preview + upload
-}
-
-interface ChatWidgetProps {
-  userId: string;
-  userName: string;
+  dataUrl: string;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -78,43 +105,28 @@ function MessageBubble({
   conversationId: string;
 }) {
   const [showPicker, setShowPicker] = useState(false);
-  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const reactions = (msg.reactions as Record<string, string[]>) || {};
-  const hasReactions = Object.keys(reactions).length > 0;
-
-  const handleMouseEnter = () => {
-    hoverTimerRef.current = setTimeout(() => setShowPicker(true), 400);
-  };
-  const handleMouseLeave = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    setShowPicker(false);
-  };
-
-  const handleReact = useCallback((emoji: string) => {
+  const handleReact = (emoji: string) => {
     setShowPicker(false);
     if (wsConnected && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'add_reaction', messageId: msg.id, emoji }));
     } else {
-      // REST fallback
-      const token = getToken();
+      const token = getChatToken();
       fetch(`/api/chat/conversation/${conversationId}/messages/${msg.id}/reactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ emoji }),
-      }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/chat/conversation', conversationId, 'messages'] });
-      });
+      }).then(() =>
+        queryClient.invalidateQueries({ queryKey: ['/api/chat/conversation', conversationId, 'messages'] })
+      );
     }
-  }, [wsConnected, wsRef, conversationId, msg.id]);
+  };
 
-  const attachments = (msg.attachments as any[]) || [];
+  const reactions = (msg.reactions as Record<string, string[]> | null) || {};
+  const attachments = msg.attachments || [];
 
   return (
-    <div
-      className={`flex gap-2 group ${isOwn ? 'justify-end' : 'justify-start'}`}
-      data-testid={`chat-message-${msg.id}`}
-    >
+    <div className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
       {/* Agent avatar */}
       {!isOwn && (
         <Avatar className="h-7 w-7 mt-1 shrink-0">
@@ -124,83 +136,84 @@ function MessageBubble({
         </Avatar>
       )}
 
-      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[72%]`}>
-        {/* Bubble */}
-        <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-          {/* Reaction picker on hover */}
-          {showPicker && (
-            <div className={isOwn ? 'right-0 absolute -top-9' : 'left-0 absolute -top-9'}>
-              <ReactionPicker onPick={handleReact} />
-            </div>
-          )}
-
-          <div
-            className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${
-              isOwn
-                ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-tl-sm'
-            }`}
-          >
-            {/* Attachments */}
+      <div className={`max-w-[75%] flex flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
+        {/* Attachments */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
             {attachments.map((att, i) => {
               const isImage = att.type?.startsWith('image/');
               return isImage ? (
-                <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
+                <a key={i} href={att.url} target="_blank" rel="noopener noreferrer">
                   <img
                     src={att.url}
                     alt={att.name}
-                    className="max-w-full rounded-lg max-h-48 object-cover"
+                    className="h-32 w-32 rounded-xl object-cover border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:opacity-90 transition-opacity"
                   />
                 </a>
               ) : (
                 <a
                   key={i}
                   href={att.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex items-center gap-2 rounded-lg p-2 mb-1.5 text-xs ${
-                    isOwn ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-zinc-200 dark:bg-zinc-700'
-                  }`}
+                  download={att.name}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors text-sm"
                 >
-                  <FileText className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{att.name}</span>
-                  <span className="opacity-60 shrink-0">{formatFileSize(att.size)}</span>
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate max-w-[120px]">{att.name}</span>
+                  {att.size && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">{formatFileSize(att.size)}</span>
+                  )}
                 </a>
               );
             })}
-
-            {/* Text */}
-            {msg.message.trim() && msg.message.trim() !== ' ' && (
-              <p className="whitespace-pre-wrap break-words">{msg.message}</p>
-            )}
           </div>
+        )}
 
-          {/* Timestamp + read receipt */}
-          <div className={`flex items-center gap-1 mt-0.5 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-            <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.createdAt)}</span>
-            {isOwn && (
-              <CheckCheck className={`h-3 w-3 ${msg.isRead ? 'text-primary' : 'text-muted-foreground'}`} />
-            )}
+        {/* Text bubble */}
+        {msg.message && msg.message.trim() && (
+          <div
+            className={`group relative px-3.5 py-2 rounded-2xl text-sm shadow-sm max-w-full ${
+              isOwn
+                ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                : 'bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-tl-sm'
+            }`}
+            onClick={() => setShowPicker((v) => !v)}
+          >
+            <span className="whitespace-pre-wrap break-words">{msg.message}</span>
+
+            {/* Reaction picker trigger */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowPicker((v) => !v); }}
+              className="absolute -bottom-2 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[13px] leading-none"
+              title="React"
+            >
+              <Smile className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+            </button>
+            {showPicker && <ReactionPicker onPick={handleReact} />}
           </div>
-        </div>
+        )}
 
-        {/* Reactions row */}
-        {hasReactions && (
-          <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        {/* Reactions display */}
+        {Object.keys(reactions).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
             {Object.entries(reactions).map(([emoji, users]) =>
               users.length > 0 ? (
                 <button
                   key={emoji}
                   onClick={() => handleReact(emoji)}
-                  className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full px-1.5 py-0.5 text-xs hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-xs hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
                 >
-                  <span>{emoji}</span>
-                  <span className="text-muted-foreground">{users.length}</span>
+                  {emoji} {users.length > 1 ? users.length : ''}
                 </button>
               ) : null
             )}
           </div>
         )}
+
+        {/* Timestamp + read receipt */}
+        <span className="text-[10px] text-muted-foreground px-1 flex items-center gap-1">
+          {formatMessageTime(msg.createdAt)}
+          {isOwn && msg.isRead && <CheckCheck className="h-3 w-3 text-primary" />}
+        </span>
       </div>
 
       {/* Customer avatar */}
@@ -215,8 +228,44 @@ function MessageBubble({
   );
 }
 
+// ── Guest name prompt ─────────────────────────────────────────────────────────
+function GuestNamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
+  const [name, setName] = useState('');
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5">
+      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+        <MessageCircle className="h-8 w-8 text-primary" />
+      </div>
+      <div className="text-center">
+        <h4 className="font-semibold text-sm mb-1">Start a conversation</h4>
+        <p className="text-xs text-muted-foreground">
+          What's your name? We'll use it so our team can greet you properly.
+        </p>
+      </div>
+      <div className="w-full space-y-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your name"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && name.trim()) onSubmit(name.trim());
+          }}
+        />
+        <Button
+          className="w-full"
+          disabled={!name.trim()}
+          onClick={() => onSubmit(name.trim())}
+        >
+          Start chatting
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main widget ──────────────────────────────────────────────────────────────
-export function ChatWidget({ userId, userName }: ChatWidgetProps) {
+export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
 
   // Allow external triggers (e.g. mobile header chat button) to open the widget
@@ -225,11 +274,47 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     window.addEventListener('shinara:openChat', handler);
     return () => window.removeEventListener('shinara:openChat', handler);
   }, []);
+
   const [message, setMessage] = useState('');
   const [wsConnected, setWsConnected] = useState(false);
   const [isAgentTyping, setIsAgentTyping] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // ── Guest state ────────────────────────────────────────────────────────────
+  const [guestName, setGuestName] = useState<string | null>(
+    () => localStorage.getItem(GUEST_NAME_KEY)
+  );
+  const [guestToken, setGuestToken] = useState<string | null>(
+    () => localStorage.getItem(GUEST_TOKEN_KEY)
+  );
+  const [guestTokenLoading, setGuestTokenLoading] = useState(false);
+
+  const isLoggedIn = Boolean(getToken());
+  // For a guest, we need a name + token before we can start chatting
+  const needsGuestSetup = !isLoggedIn && (!guestName || !guestToken);
+  // The token to use for all chat API calls
+  const chatToken = isLoggedIn ? getToken() : guestToken;
+
+  const handleGuestNameSubmit = useCallback(async (name: string) => {
+    setGuestTokenLoading(true);
+    try {
+      const guestId = getOrCreateGuestId();
+      localStorage.setItem(GUEST_NAME_KEY, name);
+      const token = await fetchGuestToken(guestId, name);
+      setGuestName(name);
+      setGuestToken(token);
+    } catch (e) {
+      console.error('Failed to init guest session', e);
+    } finally {
+      setGuestTokenLoading(false);
+    }
+  }, []);
+
+  // Resolved display name for this user
+  const displayName = isLoggedIn
+    ? (localStorage.getItem('shinara_display_name') || 'You')
+    : (guestName || 'Guest');
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -238,24 +323,32 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
+  const chatEnabled = isOpen && !needsGuestSetup && !!chatToken;
+
   const { data: conversation, isLoading: conversationLoading } = useQuery<ChatConversationWithDetails>({
-    queryKey: ['/api/chat/conversation'],
-    enabled: isOpen,
+    queryKey: ['/api/chat/conversation', isLoggedIn ? 'user' : guestToken],
+    queryFn: async () => {
+      const res = await fetch('/api/chat/conversation', {
+        headers: chatToken ? { Authorization: `Bearer ${chatToken}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to load conversation');
+      return res.json();
+    },
+    enabled: chatEnabled,
   });
 
   const { data: messages = [], refetch: refetchMessages } = useQuery<ChatMessage[]>({
     queryKey: ['/api/chat/conversation', conversation?.id, 'messages'],
     queryFn: async () => {
       if (!conversation?.id) return [];
-      const token = getToken();
       const res = await fetch(`/api/chat/conversation/${conversation.id}/messages`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: chatToken ? { Authorization: `Bearer ${chatToken}` } : {},
       });
       if (!res.ok) return [];
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
-    enabled: isOpen && !!conversation?.id,
+    enabled: chatEnabled && !!conversation?.id,
     refetchInterval: 8000,
   });
 
@@ -278,14 +371,13 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isOpen || !conversation?.id || !userId) return;
+    if (!chatEnabled || !conversation?.id) return;
 
     const ws = new WebSocket(getWsUrl('/ws/chat'));
     wsRef.current = ws;
 
     ws.onopen = () => {
-      const token = getToken();
-      ws.send(JSON.stringify({ type: 'auth', userType: 'customer', token }));
+      ws.send(JSON.stringify({ type: 'auth', userType: 'customer', token: chatToken }));
     };
 
     ws.onmessage = (event) => {
@@ -316,7 +408,7 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
 
         case 'user_joined':
           if (data.userType === 'agent') {
-            queryClient.invalidateQueries({ queryKey: ['/api/chat/conversation'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/chat/conversation', isLoggedIn ? 'user' : guestToken] });
           }
           break;
       }
@@ -329,7 +421,7 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       ws.close();
     };
-  }, [isOpen, conversation?.id, userId]);
+  }, [chatEnabled, conversation?.id, chatToken]);
 
   // ── Typing indicator ───────────────────────────────────────────────────────
   const handleTyping = useCallback(() => {
@@ -355,7 +447,6 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
       };
       reader.readAsDataURL(file);
     });
-    // reset input so same file can be re-added
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -370,7 +461,6 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     if (!conversation?.id) return;
 
     setIsUploading(true);
-    const token = getToken();
 
     try {
       // Upload attachments first
@@ -378,7 +468,10 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
       for (const att of pendingAttachments) {
         const r = await fetch('/api/chat/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(chatToken ? { Authorization: `Bearer ${chatToken}` } : {}),
+          },
           body: JSON.stringify({ data: att.dataUrl, name: att.name, type: att.type }),
         });
         if (r.ok) {
@@ -396,7 +489,10 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
       } else {
         await fetch(`/api/chat/conversation/${conversation.id}/messages`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(chatToken ? { Authorization: `Bearer ${chatToken}` } : {}),
+          },
           body: JSON.stringify({ content: text || ' ', attachments: uploadedAttachments }),
         });
       }
@@ -407,7 +503,7 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     } finally {
       setIsUploading(false);
     }
-  }, [message, pendingAttachments, conversation?.id, wsConnected, refetchMessages]);
+  }, [message, pendingAttachments, conversation?.id, wsConnected, refetchMessages, chatToken]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -483,180 +579,196 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
         </Button>
       </div>
 
-      {/* ── Body ──────────────────────────────────────────────────────────── */}
-      {conversationLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+      {/* ── Guest name prompt ──────────────────────────────────────────────── */}
+      {needsGuestSetup ? (
+        guestTokenLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <GuestNamePrompt onSubmit={handleGuestNameSubmit} />
+        )
       ) : (
-        <>
-          <ScrollArea className="flex-1 px-4 py-3">
-            <div className="space-y-3">
-              {/* Empty state */}
-              {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-center select-none">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <MessageCircle className="h-8 w-8 text-primary" />
-                  </div>
-                  <p className="font-medium text-sm">Start a conversation</p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
-                    Our support team typically responds within a few minutes.
-                  </p>
-                </div>
-              )}
-
-              {/* Date separator helper */}
-              {messages.map((msg: any, idx) => {
-                const isOwn = msg.senderType === 'customer';
-                const prevMsg: any = messages[idx - 1];
-                const showDateSep =
-                  !prevMsg ||
-                  new Date(msg.createdAt!).toDateString() !== new Date(prevMsg.createdAt!).toDateString();
-
-                return (
-                  <div key={msg.id}>
-                    {showDateSep && (
-                      <div className="flex items-center gap-2 my-3">
-                        <div className="flex-1 h-px bg-border" />
-                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
-                          {isToday(new Date(msg.createdAt!))
-                            ? 'Today'
-                            : isYesterday(new Date(msg.createdAt!))
-                            ? 'Yesterday'
-                            : format(new Date(msg.createdAt!), 'MMM d, yyyy')}
-                        </span>
-                        <div className="flex-1 h-px bg-border" />
-                      </div>
-                    )}
-                    <MessageBubble
-                      msg={msg}
-                      isOwn={isOwn}
-                      userName={userName}
-                      wsRef={wsRef}
-                      wsConnected={wsConnected}
-                      conversationId={conversation?.id || ''}
-                    />
-                  </div>
-                );
-              })}
-
-              {/* Agent typing indicator */}
-              {isAgentTyping && (
-                <div className="flex gap-2 justify-start">
-                  <Avatar className="h-7 w-7 mt-1 shrink-0">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
-                      S
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-                    <div className="flex gap-1 items-center h-4">
-                      {[0, 150, 300].map((delay) => (
-                        <span
-                          key={delay}
-                          className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce"
-                          style={{ animationDelay: `${delay}ms` }}
-                        />
-                      ))}
+        /* ── Body ────────────────────────────────────────────────────────── */
+        conversationLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <ScrollArea className="flex-1 px-4 py-3">
+              <div className="space-y-3">
+                {/* Empty state */}
+                {messages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center select-none">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                      <MessageCircle className="h-8 w-8 text-primary" />
                     </div>
+                    <p className="font-medium text-sm">Start a conversation</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+                      Our support team typically responds within a few minutes.
+                    </p>
+                    {!isLoggedIn && guestName && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Chatting as <span className="font-medium text-foreground">{guestName}</span>
+                      </p>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
 
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
+                {/* Date separator helper */}
+                {messages.map((msg: any, idx) => {
+                  const isOwn = msg.senderType === 'customer';
+                  const prevMsg: any = messages[idx - 1];
+                  const showDateSep =
+                    !prevMsg ||
+                    new Date(msg.createdAt!).toDateString() !== new Date(prevMsg.createdAt!).toDateString();
 
-          {/* ── Input area ────────────────────────────────────────────────── */}
-          <div className="border-t bg-background shrink-0 px-3 pb-3 pt-2 space-y-2">
-            {/* Pending attachments preview */}
-            {pendingAttachments.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {pendingAttachments.map((att, i) => {
-                  const isImage = att.type.startsWith('image/');
                   return (
-                    <div key={i} className="relative group">
-                      {isImage ? (
-                        <img
-                          src={att.dataUrl}
-                          alt={att.name}
-                          className="h-16 w-16 rounded-lg object-cover border border-zinc-200 dark:border-zinc-700"
-                        />
-                      ) : (
-                        <div className="h-16 w-16 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1 p-1">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-[9px] text-muted-foreground text-center leading-tight truncate w-full px-1">
-                            {att.name}
+                    <div key={msg.id}>
+                      {showDateSep && (
+                        <div className="flex items-center gap-2 my-3">
+                          <div className="flex-1 h-px bg-border" />
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                            {isToday(new Date(msg.createdAt!))
+                              ? 'Today'
+                              : isYesterday(new Date(msg.createdAt!))
+                              ? 'Yesterday'
+                              : format(new Date(msg.createdAt!), 'MMM d, yyyy')}
                           </span>
+                          <div className="flex-1 h-px bg-border" />
                         </div>
                       )}
-                      <button
-                        onClick={() => removePendingAttachment(i)}
-                        className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold"
-                      >
-                        ×
-                      </button>
+                      <MessageBubble
+                        msg={msg}
+                        isOwn={isOwn}
+                        userName={displayName}
+                        wsRef={wsRef}
+                        wsConnected={wsConnected}
+                        conversationId={conversation?.id || ''}
+                      />
                     </div>
                   );
                 })}
-              </div>
-            )}
 
-            {/* Textarea + buttons */}
-            <div className="flex items-end gap-2">
-              {/* File upload */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,.pdf,.doc,.docx,.txt"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                title="Attach file"
-                type="button"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-
-              {/* Textarea */}
-              <div className="flex-1 relative">
-                <Textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type a message… (Enter to send)"
-                  rows={1}
-                  className="resize-none min-h-[36px] max-h-[120px] py-2 pr-2 text-sm rounded-2xl border-zinc-200 dark:border-zinc-700 focus-visible:ring-1 focus-visible:ring-primary"
-                  disabled={isUploading}
-                  data-testid="input-chat-message"
-                />
-              </div>
-
-              {/* Send */}
-              <Button
-                onClick={handleSend}
-                disabled={(!message.trim() && pendingAttachments.length === 0) || isUploading}
-                size="icon"
-                className="shrink-0 h-9 w-9 rounded-full"
-                data-testid="button-send-message"
-              >
-                {isUploading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
+                {/* Agent typing indicator */}
+                {isAgentTyping && (
+                  <div className="flex gap-2 justify-start">
+                    <Avatar className="h-7 w-7 mt-1 shrink-0">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                        S
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                      <div className="flex gap-1 items-center h-4">
+                        {[0, 150, 300].map((delay) => (
+                          <span
+                            key={delay}
+                            className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce"
+                            style={{ animationDelay: `${delay}ms` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </Button>
-            </div>
 
-            <p className="text-[10px] text-muted-foreground text-center">
-              Shift+Enter for new line · Hover a message to react
-            </p>
-          </div>
-        </>
+                <div ref={messagesEndRef} />
+              </div>
+            </ScrollArea>
+
+            {/* ── Input area ────────────────────────────────────────────────── */}
+            <div className="border-t bg-background shrink-0 px-3 pb-3 pt-2 space-y-2">
+              {/* Pending attachments preview */}
+              {pendingAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {pendingAttachments.map((att, i) => {
+                    const isImage = att.type.startsWith('image/');
+                    return (
+                      <div key={i} className="relative group">
+                        {isImage ? (
+                          <img
+                            src={att.dataUrl}
+                            alt={att.name}
+                            className="h-16 w-16 rounded-lg object-cover border border-zinc-200 dark:border-zinc-700"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1 p-1">
+                            <FileText className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-[9px] text-muted-foreground text-center leading-tight truncate w-full px-1">
+                              {att.name}
+                            </span>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => removePendingAttachment(i)}
+                          className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Textarea + buttons */}
+              <div className="flex items-end gap-2">
+                {/* File upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Attach file"
+                  type="button"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+
+                {/* Textarea */}
+                <div className="flex-1 relative">
+                  <Textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a message… (Enter to send)"
+                    rows={1}
+                    className="resize-none min-h-[36px] max-h-[120px] py-2 pr-2 text-sm rounded-2xl border-zinc-200 dark:border-zinc-700 focus-visible:ring-1 focus-visible:ring-primary"
+                    disabled={isUploading}
+                    data-testid="input-chat-message"
+                  />
+                </div>
+
+                {/* Send */}
+                <Button
+                  onClick={handleSend}
+                  disabled={(!message.trim() && pendingAttachments.length === 0) || isUploading}
+                  size="icon"
+                  className="shrink-0 h-9 w-9 rounded-full"
+                  data-testid="button-send-message"
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground text-center">
+                Shift+Enter for new line · Hover a message to react
+              </p>
+            </div>
+          </>
+        )
       )}
     </div>
   );
