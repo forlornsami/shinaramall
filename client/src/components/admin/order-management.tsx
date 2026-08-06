@@ -821,7 +821,7 @@ export default function OrderManagement() {
               Update Order — {orderToUpdate?.orderNumber}
             </DialogTitle>
             <DialogDescription>
-              Change the order status, payment status, or assign a tracking number.
+              Change the order status or assign a tracking number. Payment status is managed in the Payments module.
             </DialogDescription>
           </DialogHeader>
 
@@ -842,26 +842,6 @@ export default function OrderManagement() {
                   <SelectItem value="shipped">Shipped</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancel Order…</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Payment Status */}
-            <div className="space-y-2">
-              <Label htmlFor="update-payment">Payment Status</Label>
-              <Select
-                value={updateForm.paymentStatus}
-                onValueChange={(v) => setUpdateForm({ ...updateForm, paymentStatus: v })}
-              >
-                <SelectTrigger id="update-payment">
-                  <SelectValue placeholder="Select payment status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
                 </SelectContent>
               </Select>
             </div>
