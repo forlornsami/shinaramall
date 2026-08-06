@@ -69,58 +69,52 @@ export default function OrderManagement() {
     }
   };
 
-  const buildPrintData = (order: Order): PrintOrderData => ({
-    orderNumber: order.orderNumber,
-    createdAt: order.createdAt as string,
-    status: order.status,
-    paymentMethod: order.paymentMethod || '',
-    paymentStatus: order.paymentStatus,
-    trackingNumber: (order as any).trackingNumber,
-    customerName: `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim()
-      || (order as any).guestName || 'N/A',
-    phone: order.shippingAddress?.phone || (order as any).guestPhone || '',
-    email: (order as any).guestEmail,
-    address: order.shippingAddress?.address || '',
-    city: order.shippingAddress?.city || '',
-    postalCode: order.shippingAddress?.postalCode,
-    total: parseFloat(order.total as any),
+  const detailFromRaw = (d: any): PrintOrderData => ({
+    orderNumber: d.orderNumber,
+    createdAt: d.createdAt as string,
+    status: d.status,
+    paymentMethod: d.paymentMethod || '',
+    trackingNumber: d.trackingNumber,
+    customerName: `${d.shippingAddress?.firstName || ''} ${d.shippingAddress?.lastName || ''}`.trim()
+      || d.guestName || 'N/A',
+    phone: d.shippingAddress?.phone || d.guestPhone || '',
+    email: d.guestEmail,
+    address: d.shippingAddress?.address || '',
+    city: d.shippingAddress?.city || '',
+    postalCode: d.shippingAddress?.postalCode,
+    subtotal: d.subtotal != null ? parseFloat(d.subtotal) : undefined,
+    shippingCost: d.shippingCost != null ? parseFloat(d.shippingCost) : undefined,
+    total: parseFloat(d.total),
+    items: d.items?.map((item: any) => ({
+      name: item.product?.name || 'Unknown',
+      sku: item.product?.sku,
+      quantity: item.quantity,
+      price: parseFloat(item.price),
+      total: parseFloat(item.total),
+    })),
   });
 
-  const handlePrintSelected = () => {
-    const toPrint = filteredAndSortedOrders
-      .filter((o: Order) => selectedOrderIds.has(o.id))
-      .map((o: Order) => buildPrintData(o));
-    if (toPrint.length) printOrders(toPrint, storeSettings?.storeName);
+  const handlePrintSelected = async () => {
+    const selectedOrders = filteredAndSortedOrders.filter((o: Order) => selectedOrderIds.has(o.id));
+    if (!selectedOrders.length) return;
+    const token = localStorage.getItem('adminToken');
+    try {
+      const details = await Promise.all(
+        selectedOrders.map((o: Order) =>
+          fetch(`/api/admin/orders/${o.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(r => r.json())
+        )
+      );
+      printOrders(details.map(detailFromRaw), storeSettings?.storeName, storeSettings?.storeLogo ?? undefined);
+    } catch {
+      toast({ title: 'Print failed', description: 'Could not load order details.', variant: 'destructive' });
+    }
   };
 
   const handlePrintSingle = () => {
     if (!orderDetails) return;
-    const data: PrintOrderData = {
-      orderNumber: orderDetails.orderNumber,
-      createdAt: orderDetails.createdAt as string,
-      status: orderDetails.status,
-      paymentMethod: orderDetails.paymentMethod || '',
-      paymentStatus: orderDetails.paymentStatus,
-      trackingNumber: (orderDetails as any).trackingNumber,
-      customerName: `${orderDetails.shippingAddress?.firstName || ''} ${orderDetails.shippingAddress?.lastName || ''}`.trim()
-        || (orderDetails as any).guestName || 'N/A',
-      phone: orderDetails.shippingAddress?.phone || (orderDetails as any).guestPhone || '',
-      email: (orderDetails as any).guestEmail,
-      address: orderDetails.shippingAddress?.address || '',
-      city: orderDetails.shippingAddress?.city || '',
-      postalCode: orderDetails.shippingAddress?.postalCode,
-      subtotal: parseFloat(orderDetails.subtotal as any),
-      shippingCost: parseFloat(orderDetails.shippingCost as any),
-      total: parseFloat(orderDetails.total as any),
-      items: orderDetails.items?.map((item: any) => ({
-        name: item.product?.name || 'Unknown',
-        sku: item.product?.sku,
-        quantity: item.quantity,
-        price: parseFloat(item.price),
-        total: parseFloat(item.total),
-      })),
-    };
-    printOrders([data], storeSettings?.storeName);
+    printOrders([detailFromRaw(orderDetails)], storeSettings?.storeName, storeSettings?.storeLogo ?? undefined);
   };
   const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
 
