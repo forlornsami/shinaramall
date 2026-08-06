@@ -115,6 +115,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  const clearCartMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', '/api/cart');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
   const enrichedItems = useMemo(() => {
     if (isAuthenticated && serverCart) {
       return serverCart.map(item => ({
@@ -216,14 +225,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => {
     if (isAuthenticated) {
-      serverCart?.forEach(item => {
-        removeFromCartMutation.mutate(item.productId);
-      });
+      clearCartMutation.mutate();
     } else {
       setLocalCart([]);
       clearStoredCart();
     }
-  }, [isAuthenticated, serverCart, removeFromCartMutation]);
+  }, [isAuthenticated, clearCartMutation]);
 
   const isLoading = serverCartLoading && isAuthenticated;
   const isAddingToCart = addToCartMutation.isPending;
