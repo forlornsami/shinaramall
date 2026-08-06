@@ -1672,7 +1672,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(limit as string), 
         parseInt(offset as string)
       );
-      res.json(orders);
+      // Only show COD orders or non-COD orders whose payment has been approved.
+      // All other payment-method orders are managed via the Payments module first.
+      const filtered = orders.filter((o: any) =>
+        o.paymentMethod === 'cod' || o.verificationStatus === 'approved'
+      );
+      res.json(filtered);
     } catch (error) {
       console.error("Error fetching admin orders:", error);
       res.status(500).json({ message: "Failed to fetch orders" });

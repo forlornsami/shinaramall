@@ -115,7 +115,7 @@ import {
   type InsertUserAddress,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, like, ilike, isNull, sql, count } from "drizzle-orm";
+import { eq, desc, and, or, like, ilike, isNull, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (Internal Auth)
@@ -1060,10 +1060,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingOrdersCount(): Promise<number> {
+    // Only count orders visible in Order Management:
+    // COD orders OR non-COD orders with approved payment
     const result = await db
       .select({ count: count() })
       .from(orders)
-      .where(eq(orders.status, 'pending'));
+      .where(
+        and(
+          eq(orders.status, 'pending'),
+          or(
+            eq(orders.paymentMethod, 'cod'),
+            eq(orders.verificationStatus, 'approved')
+          )
+        )
+      );
     return result[0]?.count || 0;
   }
 
