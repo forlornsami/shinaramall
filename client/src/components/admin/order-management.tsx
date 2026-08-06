@@ -12,8 +12,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getProductThumbnail } from "@/lib/utils";
-import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X, AlertTriangle, Pencil, Copy, Check } from "lucide-react";
+import { Eye, Package, Truck, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, X, AlertTriangle, Pencil, Copy, Check, Printer } from "lucide-react";
 import type { Order, OrderItem, Product, StoreSettings } from "@shared/schema";
+import { printOrders, type PrintOrderData } from "@/lib/print-order";
 
 type SortField = 'orderNumber' | 'customer' | 'amount' | 'status' | 'paymentStatus' | 'date';
 type SortDirection = 'asc' | 'desc';
@@ -48,6 +49,79 @@ export default function OrderManagement() {
     paymentStatus: "",
     trackingNumber: "",
   });
+
+  // Print / bulk-select states
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectOrder = (id: string) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.size === filteredAndSortedOrders.length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(filteredAndSortedOrders.map((o: Order) => o.id)));
+    }
+  };
+
+  const buildPrintData = (order: Order): PrintOrderData => ({
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt as string,
+    status: order.status,
+    paymentMethod: order.paymentMethod || '',
+    paymentStatus: order.paymentStatus,
+    trackingNumber: (order as any).trackingNumber,
+    customerName: `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim()
+      || (order as any).guestName || 'N/A',
+    phone: order.shippingAddress?.phone || (order as any).guestPhone || '',
+    email: (order as any).guestEmail,
+    address: order.shippingAddress?.address || '',
+    city: order.shippingAddress?.city || '',
+    postalCode: order.shippingAddress?.postalCode,
+    total: parseFloat(order.total as any),
+  });
+
+  const handlePrintSelected = () => {
+    const toPrint = filteredAndSortedOrders
+      .filter((o: Order) => selectedOrderIds.has(o.id))
+      .map((o: Order) => buildPrintData(o));
+    if (toPrint.length) printOrders(toPrint, storeSettings?.storeName);
+  };
+
+  const handlePrintSingle = () => {
+    if (!orderDetails) return;
+    const data: PrintOrderData = {
+      orderNumber: orderDetails.orderNumber,
+      createdAt: orderDetails.createdAt as string,
+      status: orderDetails.status,
+      paymentMethod: orderDetails.paymentMethod || '',
+      paymentStatus: orderDetails.paymentStatus,
+      trackingNumber: (orderDetails as any).trackingNumber,
+      customerName: `${orderDetails.shippingAddress?.firstName || ''} ${orderDetails.shippingAddress?.lastName || ''}`.trim()
+        || (orderDetails as any).guestName || 'N/A',
+      phone: orderDetails.shippingAddress?.phone || (orderDetails as any).guestPhone || '',
+      email: (orderDetails as any).guestEmail,
+      address: orderDetails.shippingAddress?.address || '',
+      city: orderDetails.shippingAddress?.city || '',
+      postalCode: orderDetails.shippingAddress?.postalCode,
+      subtotal: parseFloat(orderDetails.subtotal as any),
+      shippingCost: parseFloat(orderDetails.shippingCost as any),
+      total: parseFloat(orderDetails.total as any),
+      items: orderDetails.items?.map((item: any) => ({
+        name: item.product?.name || 'Unknown',
+        sku: item.product?.sku,
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+        total: parseFloat(item.total),
+      })),
+    };
+    printOrders([data], storeSettings?.storeName);
+  };
   const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
 
   // Fetch store settings
@@ -470,7 +544,21 @@ export default function OrderManagement() {
       {/* Orders Table */}
       <Card data-testid="card-orders-table">
         <CardHeader>
-          <CardTitle>All Orders</CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle>All Orders</CardTitle>
+            {selectedOrderIds.size > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintSelected}
+                className="flex items-center gap-2 rounded-xl"
+                data-testid="button-print-selected"
+              >
+                <Printer className="h-4 w-4" />
+                Print Selected ({selectedOrderIds.size})
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -497,6 +585,14 @@ export default function OrderManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={filteredAndSortedOrders.length > 0 && selectedOrderIds.size === filteredAndSortedOrders.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all orders"
+                        data-testid="checkbox-select-all"
+                      />
+                    </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('orderNumber')}
@@ -563,6 +659,14 @@ export default function OrderManagement() {
                 <TableBody>
                   {filteredAndSortedOrders.map((order: Order) => (
                     <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                      <TableCell className="w-10">
+                        <Checkbox
+                          checked={selectedOrderIds.has(order.id)}
+                          onCheckedChange={() => toggleSelectOrder(order.id)}
+                          aria-label={`Select order ${order.orderNumber}`}
+                          data-testid={`checkbox-order-${order.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium" data-testid={`text-order-number-${order.id}`}>
                         {order.orderNumber}
                       </TableCell>
@@ -644,6 +748,19 @@ export default function OrderManagement() {
             </DialogTitle>
           </DialogHeader>
           {orderDetails && (
+            <div>
+            <div className="flex justify-end pb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintSingle}
+                className="flex items-center gap-2 rounded-xl"
+                data-testid="button-print-order"
+              >
+                <Printer className="h-4 w-4" />
+                Print Slip
+              </Button>
+            </div>
             <div className="space-y-6" data-testid="order-details-content">
               {/* Order Summary */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -807,6 +924,7 @@ export default function OrderManagement() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
             </div>
           )}
         </DialogContent>
