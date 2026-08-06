@@ -39,6 +39,7 @@ import {
   Loader2,
   Upload,
 } from "lucide-react";
+import AddressBook from "@/components/storefront/AddressBook";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -450,6 +451,11 @@ export default function AccountView() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Address Book */}
+      <div className="border-0 shadow-sm bg-card rounded-2xl p-6">
+        <AddressBook />
       </div>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
