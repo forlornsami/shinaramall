@@ -1235,18 +1235,19 @@ var init_schema = __esm({
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
-var pool, db;
+var connectionString, pool, db;
 var init_db = __esm({
   "server/db.ts"() {
     "use strict";
     init_schema();
     neonConfig.webSocketConstructor = ws;
-    if (!process.env.DATABASE_URL) {
+    connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+    if (!connectionString) {
       throw new Error(
         "DATABASE_URL must be set. Did you forget to provision a database?"
       );
     }
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    pool = new Pool({ connectionString });
     db = drizzle({ client: pool, schema: schema_exports });
   }
 });
