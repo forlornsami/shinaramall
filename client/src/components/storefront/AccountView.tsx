@@ -31,9 +31,6 @@ import {
   User,
   Mail,
   Save,
-  Shield,
-  Bell,
-  CreditCard,
   Camera,
   Trash2,
   Loader2,
@@ -419,37 +416,6 @@ export default function AccountView() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Quick Links</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start rounded-xl h-11"
-                data-testid="link-security"
-              >
-                <Shield className="w-4 h-4 mr-3 text-primary" />
-                Security Settings
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start rounded-xl h-11"
-                data-testid="link-notifications"
-              >
-                <Bell className="w-4 h-4 mr-3 text-primary" />
-                Notifications
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start rounded-xl h-11"
-                data-testid="link-payment-methods"
-              >
-                <CreditCard className="w-4 h-4 mr-3 text-primary" />
-                Payment Methods
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
