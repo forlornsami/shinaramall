@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useCart } from '@/contexts/CartContext';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -294,6 +295,9 @@ function GuestNamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
 
 // ── Main widget ───────────────────────────────────────────────────────────────
 export function ChatWidget() {
+  const { itemCount } = useCart();
+  // On desktop (lg+), shift left of the cart sidebar (w-72 = 18rem, gap = 1.5rem → 19.5rem)
+  const cartOpen = itemCount > 0;
   const [isOpen, setIsOpen] = useState(false);
 
   // External open trigger (mobile header button)
@@ -585,7 +589,7 @@ export function ChatWidget() {
     const unread = serverMessages.filter((m: any) => m.senderType === 'agent' && !m.isRead).length;
     return (
       <button onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-5 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-50 bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
+        className={`fixed bottom-24 right-5 sm:bottom-6 h-14 w-14 rounded-full shadow-xl z-50 bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all ${cartOpen ? "sm:right-6 lg:right-[19.5rem]" : "sm:right-6"}`}
         data-testid="button-chat-open" aria-label="Open support chat">
         <MessageCircle className="h-6 w-6" />
         {unread > 0 && (
@@ -599,7 +603,7 @@ export function ChatWidget() {
 
   // ── Open widget ─────────────────────────────────────────────────────────────
   return (
-    <div className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-auto sm:right-6 sm:w-[380px] h-[88vh] sm:h-[580px] bg-background border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden"
+    <div className={`fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-auto sm:w-[380px] h-[88vh] sm:h-[580px] bg-background border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden ${cartOpen ? "sm:right-6 lg:right-[19.5rem]" : "sm:right-6"}`}
       data-testid="chat-widget-container">
 
       {/* Header */}

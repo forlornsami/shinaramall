@@ -12,7 +12,7 @@ import AccountView from "@/components/storefront/AccountView";
 import HelpView from "@/components/storefront/HelpView";
 import WalletView from "@/components/storefront/WalletView";
 import { ChatWidget } from "@/components/storefront/ChatWidget";
-import { CartProvider } from "@/contexts/CartContext";
+import { CartProvider, useCart } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { useAuth } from "@/hooks/useAuth";
 import SEO from "@/components/SEO";
@@ -130,30 +130,52 @@ export default function Storefront() {
             url={typeof window !== 'undefined' ? window.location.href : undefined}
           />
         )}
-        <div className="min-h-screen bg-background">
-          <StorefrontSidebar
-            activeSection={activeSection}
-            onSectionChange={handleSectionChange}
-          />
-          
-          <MobileHeader
-            activeSection={activeSection}
-            onSectionChange={handleSectionChange}
-          />
-
-          <main className={`lg:ml-72 pt-16 lg:pt-0 min-h-screen transition-all ${activeSection !== "cart" ? "lg:mr-72" : ""}`}>
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              {renderContent()}
-            </div>
-          </main>
-
-          {activeSection !== "cart" && (
-            <CartSidebar onGoToCart={() => handleSectionChange("cart")} />
-          )}
-
-          <ChatWidget />
-        </div>
+        <StorefrontLayout
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          renderContent={renderContent}
+        />
       </WishlistProvider>
     </CartProvider>
+  );
+}
+
+// Inner component so useCart works (must be inside CartProvider)
+function StorefrontLayout({
+  activeSection,
+  onSectionChange,
+  renderContent,
+}: {
+  activeSection: string;
+  onSectionChange: (s: any) => void;
+  renderContent: () => React.ReactNode;
+}) {
+  const { itemCount } = useCart();
+  const showCartSidebar = activeSection !== "cart" && itemCount > 0;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <StorefrontSidebar
+        activeSection={activeSection as any}
+        onSectionChange={onSectionChange}
+      />
+
+      <MobileHeader
+        activeSection={activeSection as any}
+        onSectionChange={onSectionChange}
+      />
+
+      <main className={`lg:ml-72 pt-16 lg:pt-0 min-h-screen transition-all ${showCartSidebar ? "lg:mr-72" : ""}`}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {renderContent()}
+        </div>
+      </main>
+
+      {showCartSidebar && (
+        <CartSidebar onGoToCart={() => onSectionChange("cart")} />
+      )}
+
+      <ChatWidget />
+    </div>
   );
 }

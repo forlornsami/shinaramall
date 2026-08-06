@@ -165,6 +165,9 @@ export default function CartSidebar({ onGoToCart }: CartSidebarProps) {
     </div>
   );
 
+  // Hide entirely when cart is empty
+  if (items.length === 0) return null;
+
   return (
     <>
       {/* ── Desktop sidebar panel ── */}
