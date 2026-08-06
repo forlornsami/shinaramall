@@ -926,6 +926,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes
+  // Strip internal-only fields from public product responses
+  function toPublicProduct(p: any) {
+    const { costPrice, supplierId, ...pub } = p;
+    return pub;
+  }
+
   app.get('/api/products', async (req, res) => {
     try {
       const { 
@@ -946,7 +952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         offset: parseInt(offset as string),
       });
       
-      res.json(products);
+      res.json(products.map(toPublicProduct));
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ message: "Failed to fetch products" });
@@ -960,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true,
         limit: 8 
       });
-      res.json(products);
+      res.json(products.map(toPublicProduct));
     } catch (error) {
       console.error("Error fetching featured products:", error);
       res.status(500).json({ message: "Failed to fetch featured products" });
@@ -973,7 +979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      res.json(product);
+      res.json(toPublicProduct(product));
     } catch (error) {
       console.error("Error fetching product:", error);
       res.status(500).json({ message: "Failed to fetch product" });

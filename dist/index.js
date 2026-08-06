@@ -62696,6 +62696,10 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to delete category" });
     }
   });
+  function toPublicProduct(p2) {
+    const { costPrice, supplierId, ...pub } = p2;
+    return pub;
+  }
   app2.get("/api/products", async (req, res) => {
     try {
       const {
@@ -62714,7 +62718,7 @@ async function registerRoutes(app2) {
         limit: parseInt(limit),
         offset: parseInt(offset)
       });
-      res.json(products2);
+      res.json(products2.map(toPublicProduct));
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ message: "Failed to fetch products" });
@@ -62727,7 +62731,7 @@ async function registerRoutes(app2) {
         isActive: true,
         limit: 8
       });
-      res.json(products2);
+      res.json(products2.map(toPublicProduct));
     } catch (error) {
       console.error("Error fetching featured products:", error);
       res.status(500).json({ message: "Failed to fetch featured products" });
@@ -62739,7 +62743,7 @@ async function registerRoutes(app2) {
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      res.json(product);
+      res.json(toPublicProduct(product));
     } catch (error) {
       console.error("Error fetching product:", error);
       res.status(500).json({ message: "Failed to fetch product" });
