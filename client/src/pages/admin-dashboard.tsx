@@ -589,7 +589,61 @@ export default function AdminDashboard() {
               </p>
             </div>
             
-            <AdminNotificationBell />
+            {/* Top-right: notification bell + user profile + sign out */}
+            <div className="flex items-center gap-2 ml-auto">
+              <AdminNotificationBell />
+
+              {/* User info */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50">
+                {adminUserWithProfile?.profilePicture ? (
+                  <img
+                    src={adminUserWithProfile.profilePicture}
+                    alt={adminUserWithProfile.username}
+                    className="w-8 h-8 rounded-lg object-cover"
+                    data-testid="img-topbar-admin-profile"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
+                    <span className="text-white font-semibold text-xs">
+                      {adminUser?.username?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold text-foreground">{adminUser?.username}</p>
+                  <p className="text-xs text-muted-foreground">{adminUser?.email}</p>
+                </div>
+              </div>
+
+              {/* Mobile avatar only */}
+              <div className="sm:hidden">
+                {adminUserWithProfile?.profilePicture ? (
+                  <img
+                    src={adminUserWithProfile.profilePicture}
+                    alt={adminUserWithProfile?.username}
+                    className="w-8 h-8 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                    <span className="text-white font-semibold text-xs">
+                      {adminUser?.username?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Sign out */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                onClick={handleLogout}
+                title="Sign out"
+                data-testid="topbar-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
         
