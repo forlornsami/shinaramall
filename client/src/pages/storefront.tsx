@@ -6,6 +6,7 @@ import ProductsView from "@/components/storefront/ProductsView";
 import ProductDetailsView from "@/components/storefront/ProductDetailsView";
 import CategoriesView from "@/components/storefront/CategoriesView";
 import CartView from "@/components/storefront/CartView";
+import CartSidebar from "@/components/storefront/CartSidebar";
 import OrdersView from "@/components/storefront/OrdersView";
 import AccountView from "@/components/storefront/AccountView";
 import HelpView from "@/components/storefront/HelpView";
@@ -140,11 +141,15 @@ export default function Storefront() {
             onSectionChange={handleSectionChange}
           />
 
-          <main className="lg:ml-72 pt-16 lg:pt-0 min-h-screen">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <main className={`lg:ml-72 pt-16 lg:pt-0 min-h-screen transition-all ${activeSection !== "cart" ? "lg:mr-72" : ""}`}>
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               {renderContent()}
             </div>
           </main>
+
+          {activeSection !== "cart" && (
+            <CartSidebar onGoToCart={() => handleSectionChange("cart")} />
+          )}
 
           <ChatWidget />
         </div>
