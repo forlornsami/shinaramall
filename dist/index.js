@@ -37781,7 +37781,11 @@ var init_schema2 = __esm({
     ]);
     chatConversations = pgTable("chat_conversations", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+      customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }),
+      guestId: varchar("guest_id"),
+      // set when the visitor is not logged in
+      guestName: varchar("guest_name"),
+      // display name provided by guest
       assignedAgentId: varchar("assigned_agent_id").references(() => adminUsers.id, { onDelete: "set null" }),
       status: chatConversationStatusEnum("status").notNull().default("open"),
       subject: varchar("subject"),
@@ -48595,30 +48599,29 @@ var init_storage = __esm({
         const conversations = await db.select().from(chatConversations).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(chatConversations.lastMessageAt));
         const conversationsWithDetails = [];
         for (const conv of conversations) {
-          const customer = await this.getUser(conv.customerId);
+          const customer = conv.customerId ? await this.getUser(conv.customerId) : null;
           const agent = conv.assignedAgentId ? await this.getAdminUser(conv.assignedAgentId) : null;
           const unreadCount = await this.getUnreadMessageCount(conv.id, "customer");
-          if (customer) {
-            conversationsWithDetails.push({
-              ...conv,
-              customer,
-              assignedAgent: agent,
-              unreadCount
-            });
-          }
+          conversationsWithDetails.push({
+            ...conv,
+            customer: customer ?? void 0,
+            guestDisplayName: conv.guestName || (conv.guestId ? `Guest (${conv.guestId.slice(0, 8)})` : null),
+            assignedAgent: agent,
+            unreadCount
+          });
         }
         return conversationsWithDetails;
       }
       async getChatConversation(id) {
         const [conversation] = await db.select().from(chatConversations).where(eq(chatConversations.id, id));
         if (!conversation) return void 0;
-        const customer = await this.getUser(conversation.customerId);
+        const customer = conversation.customerId ? await this.getUser(conversation.customerId) : null;
         const agent = conversation.assignedAgentId ? await this.getAdminUser(conversation.assignedAgentId) : null;
         const messages = await this.getChatMessages(id);
-        if (!customer) return void 0;
         return {
           ...conversation,
-          customer,
+          customer: customer ?? void 0,
+          guestDisplayName: conversation.guestName || (conversation.guestId ? `Guest (${conversation.guestId.slice(0, 8)})` : null),
           assignedAgent: agent,
           messages
         };
@@ -48627,6 +48630,15 @@ var init_storage = __esm({
         const [conversation] = await db.select().from(chatConversations).where(
           and(
             eq(chatConversations.customerId, customerId),
+            sql`${chatConversations.status} IN ('open', 'in_progress')`
+          )
+        ).orderBy(desc(chatConversations.createdAt)).limit(1);
+        return conversation;
+      }
+      async getGuestConversation(guestId) {
+        const [conversation] = await db.select().from(chatConversations).where(
+          and(
+            eq(chatConversations.guestId, guestId),
             sql`${chatConversations.status} IN ('open', 'in_progress')`
           )
         ).orderBy(desc(chatConversations.createdAt)).limit(1);
@@ -54263,18 +54275,27 @@ function setupChatWebSocket(server) {
 }
 async function handleAuth(ws2, message) {
   try {
+    const JWT_SECRET3 = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
     if (message.userType === "customer") {
       const token = message.token;
       if (!token) return null;
-      const JWT_SECRET3 = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
       const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET3);
+      if (decoded.type === "guest") {
+        return {
+          ws: ws2,
+          userId: `guest:${decoded.guestId}`,
+          userType: "customer",
+          isGuest: true,
+          guestName: decoded.guestName || "Guest"
+        };
+      }
       const user = await storage.getUser(decoded.userId);
       if (!user || !user.isActive) return null;
-      return { ws: ws2, userId: user.id, userType: "customer" };
+      return { ws: ws2, userId: user.id, userType: "customer", isGuest: false };
     } else if (message.userType === "agent") {
       const token = message.token;
       if (!token) return null;
-      const decoded = import_jsonwebtoken2.default.verify(token, process.env.SESSION_SECRET || process.env.JWT_SECRET || "admin-secret");
+      const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET3);
       const admin = await storage.getAdminUser(decoded.adminId);
       if (!admin) return null;
       return { ws: ws2, userId: admin.id, userType: "agent" };
@@ -54290,9 +54311,12 @@ async function handleJoinConversation(client, conversationId) {
     client.ws.send(JSON.stringify({ type: "error", error: "Conversation not found" }));
     return;
   }
-  if (client.userType === "customer" && conversation.customerId !== client.userId) {
-    client.ws.send(JSON.stringify({ type: "error", error: "Unauthorized" }));
-    return;
+  if (client.userType === "customer") {
+    const authorized = client.isGuest ? conversation.guestId === client.userId.replace("guest:", "") : conversation.customerId === client.userId;
+    if (!authorized) {
+      client.ws.send(JSON.stringify({ type: "error", error: "Unauthorized" }));
+      return;
+    }
   }
   const senderType = client.userType === "agent" ? "customer" : "agent";
   await storage.markMessagesAsRead(conversationId, senderType);
@@ -54373,6 +54397,7 @@ async function createAgentNotification(conversationId, message) {
 async function createCustomerNotification(conversationId, message) {
   const conversation = await storage.getChatConversation(conversationId);
   if (!conversation) return;
+  if (!conversation.customerId) return;
   const customerClient = clients.get(conversation.customerId);
   if (!customerClient || customerClient.conversationId !== conversationId) {
     await storage.createNotification({
@@ -64570,7 +64595,48 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to mark all notifications as read" });
     }
   });
-  app2.post("/api/chat/upload", isAuthenticated, async (req, res) => {
+  app2.post("/api/chat/guest-token", async (req, res) => {
+    try {
+      const { guestId, guestName } = req.body;
+      if (!guestId || typeof guestId !== "string" || guestId.length < 8) {
+        return res.status(400).json({ message: "Invalid guestId" });
+      }
+      const JWT_SECRET3 = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
+      const jwtLib = await Promise.resolve().then(() => __toESM(require_jsonwebtoken(), 1));
+      const token = jwtLib.default.sign(
+        { guestId, guestName: guestName || "Guest", type: "guest" },
+        JWT_SECRET3,
+        { expiresIn: "7d" }
+      );
+      res.json({ token });
+    } catch (error) {
+      console.error("Guest token error:", error);
+      res.status(500).json({ message: "Failed to create guest token" });
+    }
+  });
+  async function isAuthenticatedOrGuest(req, res, next) {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const token = auth.slice(7);
+    try {
+      const JWT_SECRET3 = process.env.SESSION_SECRET || process.env.JWT_SECRET || "shinara-mall-secret-key-change-in-production";
+      const jwtLib = await Promise.resolve().then(() => __toESM(require_jsonwebtoken(), 1));
+      const decoded = jwtLib.default.verify(token, JWT_SECRET3);
+      if (decoded.type === "guest") {
+        req.guest = { guestId: decoded.guestId, guestName: decoded.guestName || "Guest" };
+        return next();
+      }
+      const user = await storage.getUser(decoded.userId);
+      if (!user || !user.isActive) return res.status(401).json({ message: "Unauthorized" });
+      req.user = user;
+      next();
+    } catch {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+  }
+  app2.post("/api/chat/upload", isAuthenticatedOrGuest, async (req, res) => {
     try {
       const { data, name, type } = req.body;
       if (!data || !name) return res.status(400).json({ message: "Missing file data" });
@@ -64589,22 +64655,27 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Upload failed" });
     }
   });
-  app2.post("/api/chat/conversation/:id/messages/:msgId/reactions", isAuthenticated, async (req, res) => {
+  function ownsConversation(req, conversation) {
+    if (req.user) return conversation.customerId === req.user.id;
+    if (req.guest) return conversation.guestId === req.guest.guestId;
+    return false;
+  }
+  app2.post("/api/chat/conversation/:id/messages/:msgId/reactions", isAuthenticatedOrGuest, async (req, res) => {
     try {
-      const userId = req.user.id;
+      const reactorId = req.user?.id || req.guest?.guestId;
       const { emoji } = req.body;
       const conversation = await storage.getChatConversation(req.params.id);
-      if (!conversation || conversation.customerId !== userId) {
+      if (!conversation || !ownsConversation(req, conversation)) {
         return res.status(404).json({ message: "Conversation not found" });
       }
       const msg = await storage.getChatMessage(req.params.msgId);
       if (!msg) return res.status(404).json({ message: "Message not found" });
       const reactions = msg.reactions || {};
-      const users2 = reactions[req.body.emoji] || [];
-      const idx = users2.indexOf(userId);
-      if (idx === -1) reactions[emoji] = [...users2, userId];
+      const users2 = reactions[emoji] || [];
+      const idx = users2.indexOf(reactorId);
+      if (idx === -1) reactions[emoji] = [...users2, reactorId];
       else {
-        reactions[emoji] = users2.filter((u) => u !== userId);
+        reactions[emoji] = users2.filter((u) => u !== reactorId);
         if (reactions[emoji].length === 0) delete reactions[emoji];
       }
       const updated = await storage.updateChatMessageReactions(req.params.msgId, reactions);
@@ -64614,15 +64685,26 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to update reaction" });
     }
   });
-  app2.get("/api/chat/conversation", isAuthenticated, async (req, res) => {
+  app2.get("/api/chat/conversation", isAuthenticatedOrGuest, async (req, res) => {
     try {
-      const userId = req.user.id;
-      let conversation = await storage.getCustomerConversation(userId);
-      if (!conversation) {
-        conversation = await storage.createChatConversation({
-          customerId: userId,
-          status: "open"
-        });
+      let conversation;
+      if (req.user) {
+        conversation = await storage.getCustomerConversation(req.user.id);
+        if (!conversation) {
+          conversation = await storage.createChatConversation({
+            customerId: req.user.id,
+            status: "open"
+          });
+        }
+      } else {
+        conversation = await storage.getGuestConversation(req.guest.guestId);
+        if (!conversation) {
+          conversation = await storage.createChatConversation({
+            guestId: req.guest.guestId,
+            guestName: req.guest.guestName,
+            status: "open"
+          });
+        }
       }
       const fullConversation = await storage.getChatConversation(conversation.id);
       res.json(fullConversation);
@@ -64631,11 +64713,10 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to get conversation" });
     }
   });
-  app2.get("/api/chat/conversation/:id/messages", isAuthenticated, async (req, res) => {
+  app2.get("/api/chat/conversation/:id/messages", isAuthenticatedOrGuest, async (req, res) => {
     try {
-      const userId = req.user.id;
       const conversation = await storage.getChatConversation(req.params.id);
-      if (!conversation || conversation.customerId !== userId) {
+      if (!conversation || !ownsConversation(req, conversation)) {
         return res.status(404).json({ message: "Conversation not found" });
       }
       const messages = await storage.getChatMessages(req.params.id);
@@ -64645,27 +64726,28 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to get messages" });
     }
   });
-  app2.post("/api/chat/conversation/:id/messages", isAuthenticated, async (req, res) => {
+  app2.post("/api/chat/conversation/:id/messages", isAuthenticatedOrGuest, async (req, res) => {
     try {
-      const userId = req.user.id;
+      const senderId = req.user?.id || req.guest?.guestId;
       const { content } = req.body;
       const conversation = await storage.getChatConversation(req.params.id);
-      if (!conversation || conversation.customerId !== userId) {
+      if (!conversation || !ownsConversation(req, conversation)) {
         return res.status(404).json({ message: "Conversation not found" });
       }
       const message = await storage.createChatMessage({
         conversationId: req.params.id,
-        senderId: userId,
+        senderId,
         senderType: "customer",
         message: content.trim()
       });
       if (conversation.assignedAgentId) {
+        const displayName = req.user ? conversation.customer?.firstName || "Customer" : req.guest?.guestName || "Guest";
         await storage.createNotification({
           recipientType: "admin",
           recipientId: conversation.assignedAgentId,
           type: "chat_message",
           title: "New Chat Message",
-          message: `Customer ${conversation.customer?.firstName || "Customer"} sent a message`,
+          message: `${displayName} sent a message`,
           data: { conversationId: req.params.id, messageId: message.id }
         });
       }
