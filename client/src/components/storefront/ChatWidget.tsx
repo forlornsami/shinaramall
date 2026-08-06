@@ -218,6 +218,13 @@ function MessageBubble({
 // ── Main widget ──────────────────────────────────────────────────────────────
 export function ChatWidget({ userId, userName }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Allow external triggers (e.g. mobile header chat button) to open the widget
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener('shinara:openChat', handler);
+    return () => window.removeEventListener('shinara:openChat', handler);
+  }, []);
   const [message, setMessage] = useState('');
   const [wsConnected, setWsConnected] = useState(false);
   const [isAgentTyping, setIsAgentTyping] = useState(false);
@@ -415,7 +422,7 @@ export function ChatWidget({ userId, userName }: ChatWidgetProps) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-50 bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
+        className="fixed bottom-24 right-5 sm:bottom-6 sm:right-6 h-14 w-14 rounded-full shadow-xl z-50 bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
         data-testid="button-chat-open"
         aria-label="Open support chat"
       >

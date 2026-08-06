@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Wallet,
+  MessageCircle,
 } from "lucide-react";
 import { useState } from "react";
 import type { StorefrontSection } from "./StorefrontSidebar";
@@ -268,6 +269,19 @@ export default function MobileHeader({ activeSection, onSectionChange }: MobileH
             {storeSettings?.storeName || "Shinara Mall"}
           </span>
         </div>
+
+        {isAuthenticated && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl"
+            onClick={() => window.dispatchEvent(new CustomEvent('shinara:openChat'))}
+            aria-label="Open support chat"
+            data-testid="button-mobile-chat"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </Button>
+        )}
 
         <Button
           variant="ghost"
