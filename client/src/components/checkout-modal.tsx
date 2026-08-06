@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -6,14 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal, Ticket, UserCircle, LogIn } from "lucide-react";
+import { X, Lock, ShieldCheck, Truck, CreditCard, CheckCircle2, ArrowLeft, ArrowRight, Smartphone, Wallet, Banknote, Copy, Upload, ImageIcon, Loader2, WalletMinimal, Ticket, UserCircle, LogIn, MapPin, Star } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProductThumbnail } from "@/lib/utils";
-import type { CartItem, Product, PaymentAccount, Wallet as WalletType, StoreSettings } from "@shared/schema";
+import type { CartItem, Product, PaymentAccount, Wallet as WalletType, StoreSettings, UserAddress } from "@shared/schema";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -126,7 +126,31 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     queryKey: ["/api/wallet"],
     enabled: isAuthenticated,
   });
-  
+
+  // Fetch saved addresses (authenticated only)
+  const { data: savedAddresses = [] } = useQuery<UserAddress[]>({
+    queryKey: ["/api/addresses"],
+    enabled: isAuthenticated,
+  });
+
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+
+  // Auto-fill default address when modal opens (authenticated only)
+  useEffect(() => {
+    if (!isOpen || !isAuthenticated || savedAddresses.length === 0) return;
+    const def = savedAddresses.find(a => a.isDefault) ?? savedAddresses[0];
+    if (!def) return;
+    setSelectedAddressId(def.id);
+    setShippingInfo({
+      firstName: def.firstName,
+      lastName: def.lastName ?? "",
+      address: def.address,
+      city: def.city,
+      postalCode: def.postalCode ?? "",
+      phone: def.phone,
+    });
+  }, [isOpen, isAuthenticated, savedAddresses]);
+
   const walletBalance = parseFloat(wallet?.balance || "0");
 
   // Fetch payment accounts for selected method
@@ -485,6 +509,7 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setGuestInfo({ name: "", phone: "", email: "" });
     setGuestToken(null);
     setShippingInfo({ firstName: "", lastName: "", address: "", city: "", postalCode: "", phone: "" });
+    setSelectedAddressId(null);
   };
   
   const handleApplyWallet = () => {
@@ -654,7 +679,81 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     <Truck className="w-5 h-5 text-primary" />
                     Shipping Information
                   </h3>
-                  
+
+                  {/* Saved address picker — authenticated users only */}
+                  {effectiveMode === "auth" && savedAddresses.length > 0 && (
+                    <div className="mb-5">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Saved Addresses
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {savedAddresses.map(addr => (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAddressId(addr.id);
+                              setShippingInfo({
+                                firstName: addr.firstName,
+                                lastName: addr.lastName ?? "",
+                                address: addr.address,
+                                city: addr.city,
+                                postalCode: addr.postalCode ?? "",
+                                phone: addr.phone,
+                              });
+                            }}
+                            className={`w-full text-left p-3 rounded-xl border-2 transition-colors ${
+                              selectedAddressId === addr.id
+                                ? "border-primary bg-primary/5"
+                                : "border-border bg-background hover:border-primary/40"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {addr.label}
+                                  </span>
+                                  {addr.isDefault && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary">
+                                      <Star className="w-2.5 h-2.5 fill-primary" /> Default
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm font-medium truncate">{addr.firstName} {addr.lastName}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {addr.address}, {addr.city}{addr.postalCode ? ` ${addr.postalCode}` : ""} · {addr.phone}
+                                </p>
+                              </div>
+                              <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                                selectedAddressId === addr.id ? "border-primary bg-primary" : "border-muted-foreground/40"
+                              }`}>
+                                {selectedAddressId === addr.id && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAddressId(null);
+                            setShippingInfo({ firstName: "", lastName: "", address: "", city: "", postalCode: "", phone: "" });
+                          }}
+                          className={`w-full text-left p-3 rounded-xl border-2 border-dashed transition-colors ${
+                            selectedAddressId === null
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-muted-foreground">+ Enter a new address</p>
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">Or edit the fields below to customise:</p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
