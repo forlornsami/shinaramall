@@ -134,6 +134,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   });
 
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [saveAddressLabel, setSaveAddressLabel] = useState("Home");
 
   // Auto-fill default address when modal opens (authenticated only)
   useEffect(() => {
@@ -326,6 +328,22 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         queryClient.invalidateQueries({ queryKey: ['/api/wallet/transactions'] });
       }
       
+      // Save address to account if requested (new address, checkbox ticked)
+      if (saveNewAddress && selectedAddressId === null) {
+        apiRequest('POST', '/api/addresses', {
+          label: saveAddressLabel,
+          firstName: shippingInfo.firstName,
+          lastName: shippingInfo.lastName,
+          address: shippingInfo.address,
+          city: shippingInfo.city,
+          postalCode: shippingInfo.postalCode,
+          phone: shippingInfo.phone,
+          isDefault: savedAddresses.length === 0,
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/addresses'] });
+        }).catch(() => {/* non-critical — order already placed */});
+      }
+
       // If wallet covers full amount or COD, complete immediately
       if (walletCoversFullAmount) {
         toast({
@@ -510,6 +528,8 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setGuestToken(null);
     setShippingInfo({ firstName: "", lastName: "", address: "", city: "", postalCode: "", phone: "" });
     setSelectedAddressId(null);
+    setSaveNewAddress(false);
+    setSaveAddressLabel("Home");
   };
   
   const handleApplyWallet = () => {
@@ -827,6 +847,40 @@ export default function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                       data-testid="input-phone"
                     />
                   </div>
+
+                  {/* Save address checkbox — only for logged-in users entering a new address */}
+                  {effectiveMode === "auth" && selectedAddressId === null && (
+                    <div className="mt-4 p-3 rounded-xl border-2 border-dashed border-border bg-muted/20">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={saveNewAddress}
+                          onChange={e => setSaveNewAddress(e.target.checked)}
+                          className="w-4 h-4 accent-primary"
+                          data-testid="checkbox-save-address"
+                        />
+                        <span className="text-sm font-medium">Save this address to my account</span>
+                      </label>
+                      {saveNewAddress && (
+                        <div className="flex gap-2 mt-3">
+                          {["Home", "Office", "Other"].map(l => (
+                            <button
+                              key={l}
+                              type="button"
+                              onClick={() => setSaveAddressLabel(l)}
+                              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                                saveAddressLabel === l
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-background border-border text-muted-foreground hover:border-primary"
+                              }`}
+                            >
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
