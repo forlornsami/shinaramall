@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateToken, toSafeUser } from "./auth";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertCartItemSchema, registerUserSchema, loginUserSchema, orders as ordersTable, orderItems as orderItemsTable } from "@shared/schema";

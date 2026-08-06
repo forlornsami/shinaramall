@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import type { User, SafeUser } from "@shared/schema";
