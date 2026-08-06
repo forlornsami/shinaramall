@@ -12,10 +12,13 @@ import AccountView from "@/components/storefront/AccountView";
 import HelpView from "@/components/storefront/HelpView";
 import WalletView from "@/components/storefront/WalletView";
 import { ChatWidget } from "@/components/storefront/ChatWidget";
+import { CustomerNotificationBell } from "@/components/storefront/NotificationBell";
 import { CartProvider, useCart } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { useAuth } from "@/hooks/useAuth";
 import SEO from "@/components/SEO";
+import { Button } from "@/components/ui/button";
+import { LogOut, LogIn } from "lucide-react";
 
 function parseSection(search: string): StorefrontSection {
   const params = new URLSearchParams(search);
@@ -151,7 +154,13 @@ function StorefrontLayout({
   renderContent: () => React.ReactNode;
 }) {
   const { itemCount } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
   const showCartSidebar = activeSection !== "cart" && itemCount > 0;
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,7 +174,54 @@ function StorefrontLayout({
         onSectionChange={onSectionChange}
       />
 
-      <main className={`lg:ml-72 pt-16 lg:pt-0 min-h-screen transition-all ${showCartSidebar ? "lg:mr-72" : ""}`}>
+      {/* Desktop top bar — hidden on mobile (MobileHeader handles that) */}
+      <div className="hidden lg:flex fixed top-0 right-0 z-40 items-center gap-2 px-6 py-3 ml-72" style={{ left: '18rem' }}>
+        <div className="flex-1" />
+        {isAuthenticated && user ? (
+          <>
+            <CustomerNotificationBell />
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/60 border border-border/40">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0 overflow-hidden">
+                {user.profileImageUrl ? (
+                  <img src={user.profileImageUrl} alt={user.firstName || 'User'} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white font-semibold text-xs">
+                    {(user.firstName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-foreground">
+                  {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Customer'}
+                </p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+              onClick={handleLogout}
+              title="Sign out"
+              data-testid="topbar-signout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            className="rounded-xl btn-modern"
+            onClick={() => { window.location.href = '/auth'; }}
+            data-testid="topbar-signin"
+          >
+            <LogIn className="h-4 w-4 mr-2" />
+            Sign In
+          </Button>
+        )}
+      </div>
+
+      <main className={`lg:ml-72 pt-16 lg:pt-14 min-h-screen transition-all ${showCartSidebar ? "lg:mr-72" : ""}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {renderContent()}
         </div>

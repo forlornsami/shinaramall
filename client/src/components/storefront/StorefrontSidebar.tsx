@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/contexts/CartContext";
-import { CustomerNotificationBell } from "./NotificationBell";
+
 import type { Category, StoreSettings } from "@shared/schema";
 import {
   Package,
@@ -16,8 +16,6 @@ import {
   User,
   HelpCircle,
   ChevronRight,
-  LogIn,
-  LogOut,
   Tag,
   ChevronDown,
   ChevronUp,
@@ -105,7 +103,7 @@ const helpNavItems = [
 ];
 
 export default function StorefrontSidebar({ activeSection, onSectionChange }: StorefrontSidebarProps) {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { itemCount } = useCart();
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
@@ -125,11 +123,6 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
 
   const handleLogin = () => {
     window.location.href = '/auth';
-  };
-
-  const handleLogout = () => {
-    logout();
-    window.location.href = '/';
   };
 
   const renderNavItem = (item: typeof mainNavItems[0] & { badge?: number; requiresAuth?: boolean; hasSubmenu?: boolean }) => {
@@ -281,53 +274,6 @@ export default function StorefrontSidebar({ activeSection, onSectionChange }: St
         </div>
       </nav>
       
-      <div className="p-4 border-t border-border">
-        {isAuthenticated && user ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                {user.profileImageUrl ? (
-                  <img 
-                    src={user.profileImageUrl} 
-                    alt={user.firstName || 'User'} 
-                    className="w-full h-full rounded-xl object-cover"
-                  />
-                ) : (
-                  <span className="text-white font-semibold text-sm">
-                    {(user.firstName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Customer'}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-              </div>
-              <CustomerNotificationBell />
-            </div>
-            
-            <Button
-              variant="outline"
-              className="w-full justify-start text-sm font-medium rounded-xl h-11 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
-              onClick={handleLogout}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4 mr-3" />
-              Sign Out
-            </Button>
-          </div>
-        ) : (
-          <Button
-            className="w-full justify-center text-sm font-medium rounded-xl h-11 btn-modern"
-            onClick={handleLogin}
-            data-testid="button-login"
-          >
-            <LogIn className="h-4 w-4 mr-2" />
-            Sign In
-          </Button>
-        )}
-      </div>
     </div>
   );
 }
