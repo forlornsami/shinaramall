@@ -175,7 +175,7 @@ function StorefrontLayout({
       />
 
       {/* Desktop top bar — hidden on mobile (MobileHeader handles that) */}
-      <div className="hidden lg:flex fixed top-0 right-0 z-40 items-center gap-2 px-6 py-3 ml-72" style={{ left: '18rem' }}>
+      <div className={`hidden lg:flex fixed top-0 z-40 items-center gap-2 px-6 py-3 transition-all ${showCartSidebar ? "right-72" : "right-0"}`} style={{ left: '18rem' }}>
         <div className="flex-1" />
         {isAuthenticated && user ? (
           <>
