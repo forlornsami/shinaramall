@@ -2,7 +2,8 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = 'Shinara Mall <onboarding@resend.dev>';
+const FROM_EMAIL = 'Shinara Mall <noreply@shinaramall.com>';
+const REPLY_TO = 'support@shinaramall.com';
 
 interface EmailResult {
   success: boolean;
@@ -21,6 +22,7 @@ export async function sendVerificationEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
+      replyTo: REPLY_TO,
       subject: 'Verify Your Email - Shinara Mall',
       html: `
         <!DOCTYPE html>
@@ -78,6 +80,7 @@ export async function sendOrderConfirmationEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
+      replyTo: REPLY_TO,
       subject: `Order Confirmation #${orderId.slice(-8).toUpperCase()} - Shinara Mall`,
       html: `
         <!DOCTYPE html>
@@ -152,6 +155,7 @@ export async function sendOrderStatusUpdateEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
+      replyTo: REPLY_TO,
       subject: `${statusInfo.title} - Order #${orderId.slice(-8).toUpperCase()}`,
       html: `
         <!DOCTYPE html>
@@ -211,6 +215,7 @@ export async function sendPaymentVerifiedEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
+      replyTo: REPLY_TO,
       subject: `Payment Confirmed - Order #${orderId.slice(-8).toUpperCase()}`,
       html: `
         <!DOCTYPE html>
@@ -274,6 +279,7 @@ export async function sendPasswordResetEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
+      replyTo: REPLY_TO,
       subject: 'Reset Your Password - Shinara Mall',
       html: `
         <!DOCTYPE html>

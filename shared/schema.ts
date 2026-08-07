@@ -728,7 +728,7 @@ export const storeSettings = pgTable("store_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   storeName: varchar("store_name").notNull().default("Shinara Mall"),
   storeLogo: varchar("store_logo"),
-  storeEmail: varchar("store_email").notNull().default("contact@shinaramall.com"),
+  storeEmail: varchar("store_email").notNull().default("info@shinaramall.com"),
   storePhone: varchar("store_phone").notNull().default("+92 300 1234567"),
   storeAddress: varchar("store_address").default("Lahore, Pakistan"),
   currency: varchar("currency").default("PKR"),
