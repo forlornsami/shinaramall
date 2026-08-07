@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import StorefrontSidebar, { type StorefrontSection } from "@/components/storefront/StorefrontSidebar";
 import MobileHeader from "@/components/storefront/MobileHeader";
 import ProductsView from "@/components/storefront/ProductsView";
@@ -45,6 +46,7 @@ function isValidSection(section: string): section is StorefrontSection {
 export default function Storefront() {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"] });
   const [activeSection, setActiveSection] = useState<StorefrontSection>(() => {
     const search = window.location.search;
     return parseSection(search);
@@ -221,10 +223,15 @@ function StorefrontLayout({
         )}
       </div>
 
-      <main className={`lg:ml-72 pt-16 lg:pt-14 min-h-screen transition-all ${showCartSidebar ? "lg:mr-72" : ""}`}>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={`lg:ml-72 pt-16 lg:pt-14 min-h-screen transition-all flex flex-col ${showCartSidebar ? "lg:mr-72" : ""}`}>
+        <div className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
           {renderContent()}
         </div>
+        <footer className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 mt-4 border-t border-border/40">
+          <p className="text-center text-xs text-muted-foreground">
+            &copy; {new Date().getFullYear()} {storeSettings?.storeName || "Shinara Mall"}. All rights reserved.
+          </p>
+        </footer>
       </main>
 
       {showCartSidebar && (
