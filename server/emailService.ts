@@ -1,9 +1,17 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_SECURE !== 'false', // true for port 465 (SSL)
+  auth: {
+    user: process.env.SMTP_USER || 'noreply@shinaramall.com',
+    pass: process.env.SMTP_PASSWORD,
+  },
+});
 
-const FROM_EMAIL = 'Shinara Mall <noreply@shinaramall.com>';
-const REPLY_TO = 'support@shinaramall.com';
+const FROM_EMAIL = process.env.SMTP_FROM || 'Shinara Mall <noreply@shinaramall.com>';
+const REPLY_TO  = process.env.SMTP_REPLY_TO || 'support@shinaramall.com';
 
 interface EmailResult {
   success: boolean;
@@ -17,11 +25,11 @@ export async function sendVerificationEmail(
   verificationToken: string
 ): Promise<EmailResult> {
   const verificationUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/verify-email?token=${verificationToken}`;
-  
+
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM_EMAIL,
-      to: [to],
+      to,
       replyTo: REPLY_TO,
       subject: 'Verify Your Email - Shinara Mall',
       html: `
@@ -54,13 +62,7 @@ export async function sendVerificationEmail(
         </html>
       `,
     });
-
-    if (error) {
-      console.error('Email send error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('Email service error:', error);
     return { success: false, error: error.message };
@@ -75,11 +77,11 @@ export async function sendOrderConfirmationEmail(
   paymentMethod: string
 ): Promise<EmailResult> {
   const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/orders/${orderId}`;
-  
+
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM_EMAIL,
-      to: [to],
+      to,
       replyTo: REPLY_TO,
       subject: `Order Confirmation #${orderId.slice(-8).toUpperCase()} - Shinara Mall`,
       html: `
@@ -121,13 +123,7 @@ export async function sendOrderConfirmationEmail(
         </html>
       `,
     });
-
-    if (error) {
-      console.error('Email send error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('Email service error:', error);
     return { success: false, error: error.message };
@@ -141,20 +137,20 @@ export async function sendOrderStatusUpdateEmail(
   newStatus: string
 ): Promise<EmailResult> {
   const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/orders/${orderId}`;
-  
+
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     processing: { title: 'Order Processing', message: 'Your order is being processed and will be shipped soon.', color: '#17a2b8' },
-    shipped: { title: 'Order Shipped', message: 'Great news! Your order has been shipped and is on its way.', color: '#28a745' },
-    delivered: { title: 'Order Delivered', message: 'Your order has been delivered. We hope you enjoy your purchase!', color: '#28a745' },
-    cancelled: { title: 'Order Cancelled', message: 'Your order has been cancelled. If you have any questions, please contact us.', color: '#dc3545' },
+    shipped:    { title: 'Order Shipped',    message: 'Great news! Your order has been shipped and is on its way.',       color: '#28a745' },
+    delivered:  { title: 'Order Delivered',  message: 'Your order has been delivered. We hope you enjoy your purchase!', color: '#28a745' },
+    cancelled:  { title: 'Order Cancelled',  message: 'Your order has been cancelled. If you have any questions, please contact us.', color: '#dc3545' },
   };
 
   const statusInfo = statusMessages[newStatus] || { title: 'Order Update', message: `Your order status has been updated to: ${newStatus}`, color: '#6c757d' };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM_EMAIL,
-      to: [to],
+      to,
       replyTo: REPLY_TO,
       subject: `${statusInfo.title} - Order #${orderId.slice(-8).toUpperCase()}`,
       html: `
@@ -190,13 +186,7 @@ export async function sendOrderStatusUpdateEmail(
         </html>
       `,
     });
-
-    if (error) {
-      console.error('Email send error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('Email service error:', error);
     return { success: false, error: error.message };
@@ -210,11 +200,11 @@ export async function sendPaymentVerifiedEmail(
   orderTotal: string
 ): Promise<EmailResult> {
   const orderUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/orders/${orderId}`;
-  
+
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM_EMAIL,
-      to: [to],
+      to,
       replyTo: REPLY_TO,
       subject: `Payment Confirmed - Order #${orderId.slice(-8).toUpperCase()}`,
       html: `
@@ -255,13 +245,7 @@ export async function sendPaymentVerifiedEmail(
         </html>
       `,
     });
-
-    if (error) {
-      console.error('Email send error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('Email service error:', error);
     return { success: false, error: error.message };
@@ -274,11 +258,11 @@ export async function sendPasswordResetEmail(
   resetToken: string
 ): Promise<EmailResult> {
   const resetUrl = `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://shinaramall.com'}/reset-password?token=${resetToken}`;
-  
+
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM_EMAIL,
-      to: [to],
+      to,
       replyTo: REPLY_TO,
       subject: 'Reset Your Password - Shinara Mall',
       html: `
@@ -312,13 +296,7 @@ export async function sendPasswordResetEmail(
         </html>
       `,
     });
-
-    if (error) {
-      console.error('Email send error:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('Email service error:', error);
     return { success: false, error: error.message };
