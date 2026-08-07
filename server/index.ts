@@ -6,6 +6,10 @@ import { serveStatic } from "./static";
 
 const app = express();
 
+// Trust reverse-proxy headers (Hostinger CDN / any load balancer).
+// This makes req.protocol return 'https' when X-Forwarded-Proto: https is set.
+app.set('trust proxy', 1);
+
 // CORS — allow the storefront domain and Replit dev tunnels
 app.use((req, res, next) => {
   const allowed = [
