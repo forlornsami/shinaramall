@@ -46,7 +46,6 @@ function isValidSection(section: string): section is StorefrontSection {
 export default function Storefront() {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"] });
   const [activeSection, setActiveSection] = useState<StorefrontSection>(() => {
     const search = window.location.search;
     return parseSection(search);
@@ -157,6 +156,7 @@ function StorefrontLayout({
 }) {
   const { itemCount } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
+  const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"] });
   const showCartSidebar = activeSection !== "cart" && itemCount > 0;
 
   const handleLogout = () => {
