@@ -4646,63 +4646,75 @@ Sitemap: ${baseUrl}/sitemap.xml
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const products = await storage.getProducts();
       const categories = await storage.getCategories();
-      
+      const today = new Date().toISOString().split('T')[0];
+
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
       const urls: string[] = [];
-      
-      // Static pages
+
+      // Homepage
       urls.push(`
-    <url>
-      <loc>${baseUrl}/</loc>
-      <changefreq>daily</changefreq>
-      <priority>1.0</priority>
-    </url>`);
-      
-      urls.push(`
-    <url>
-      <loc>${baseUrl}/?view=products</loc>
-      <changefreq>daily</changefreq>
-      <priority>0.9</priority>
-    </url>`);
-      
-      urls.push(`
-    <url>
-      <loc>${baseUrl}/?view=categories</loc>
-      <changefreq>weekly</changefreq>
-      <priority>0.8</priority>
-    </url>`);
-      
-      urls.push(`
-    <url>
-      <loc>${baseUrl}/?view=featured</loc>
-      <changefreq>daily</changefreq>
-      <priority>0.8</priority>
-    </url>`);
-      
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>`);
+
+      // Listing pages
+      for (const [view, freq, pri] of [
+        ['products',   'daily',  '0.9'],
+        ['featured',   'daily',  '0.8'],
+        ['categories', 'weekly', '0.8'],
+      ] as const) {
+        urls.push(`
+  <url>
+    <loc>${baseUrl}/?view=${view}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${freq}</changefreq>
+    <priority>${pri}</priority>
+  </url>`);
+      }
+
       // Category pages
       for (const category of categories) {
+        const imageTag = (category as any).imageUrl
+          ? `\n    <image:image><image:loc>${esc((category as any).imageUrl)}</image:loc><image:title>${esc(category.name)}</image:title></image:image>`
+          : '';
         urls.push(`
-    <url>
-      <loc>${baseUrl}/?view=category-${category.id}</loc>
-      <changefreq>weekly</changefreq>
-      <priority>0.7</priority>
-    </url>`);
+  <url>
+    <loc>${baseUrl}/?view=category-${category.id}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>${imageTag}
+  </url>`);
       }
-      
+
       // Product pages
       for (const product of products) {
+        const imgUrl = (product as any).imageUrls?.[0] || (product as any).imageUrl;
+        const imageTag = imgUrl
+          ? `\n    <image:image><image:loc>${esc(imgUrl)}</image:loc><image:title>${esc(product.name)}</image:title></image:image>`
+          : '';
+        const lastmod = (product as any).updatedAt
+          ? new Date((product as any).updatedAt).toISOString().split('T')[0]
+          : today;
         urls.push(`
-    <url>
-      <loc>${baseUrl}/?view=product-${product.id}</loc>
-      <changefreq>weekly</changefreq>
-      <priority>0.6</priority>
-    </url>`);
+  <url>
+    <loc>${baseUrl}/?view=product-${product.id}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>${imageTag}
+  </url>`);
       }
-      
+
       const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls.join('')}
 </urlset>`;
-      
+
+      res.setHeader('Cache-Control', 'public, max-age=3600');
       res.type('application/xml');
       res.send(sitemap);
     } catch (error) {
