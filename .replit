@@ -44,3 +44,13 @@ integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_database:1.0.
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 120000
+
+[userenv]
+
+[userenv.shared]
+SMTP_FROM = "Shinara Mall <noreply@shinaramall.com>"
+SMTP_HOST = "smtp.hostinger.com"
+SMTP_PORT = "465"
+SMTP_REPLY_TO = "support@shinaramall.com"
+SMTP_SECURE = "true"
+SMTP_USER = "noreply@shinaramall.com"
