@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import fs from "fs";
+import path from "path";
 import { storage } from "./storage";
 import { isAuthenticated, optionalAuth, hashPassword, comparePassword, generateToken, toSafeUser } from "./auth";
 import bcrypt from "bcryptjs";
@@ -12,19 +14,27 @@ import { shouldSendAdminNotification, shouldSendEmailNotification, invalidateNot
 import { sendAdminNotification, sendCustomerNotification, defaultNotificationMessages } from "./notificationSender";
 import { sendVerificationEmail, sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendPaymentVerifiedEmail, sendPasswordResetEmail } from "./emailService";
 
-// Generate a secure JWT secret - use environment variable or generate a secure random secret
+// Generate a secure JWT secret - use environment variable or persist to file
 const getJwtSecret = (): string => {
-  if (process.env.SESSION_SECRET) {
-    return process.env.SESSION_SECRET;
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+
+  // Persist a generated secret so it survives server restarts (e.g. on Hostinger)
+  const secretFile = path.join(process.cwd(), '.jwt_secret');
+  try {
+    if (fs.existsSync(secretFile)) {
+      const saved = fs.readFileSync(secretFile, 'utf-8').trim();
+      if (saved.length >= 32) return saved;
+    }
+    const generated = crypto.randomBytes(64).toString('hex');
+    fs.writeFileSync(secretFile, generated, { mode: 0o600 });
+    console.warn('[auth] SESSION_SECRET not set — generated and saved a persistent secret to .jwt_secret. Set SESSION_SECRET in your environment for production.');
+    return generated;
+  } catch {
+    // Filesystem not writable — fall back to a fixed string so restarts don't log everyone out
+    console.warn('[auth] SESSION_SECRET not set and .jwt_secret not writable. Admin sessions will persist across restarts but use a weak fallback secret. Set SESSION_SECRET in your environment.');
+    return 'shinara-mall-fallback-secret-set-SESSION_SECRET-in-env';
   }
-  if (process.env.JWT_SECRET) {
-    return process.env.JWT_SECRET;
-  }
-  // Generate a secure random secret for this server instance
-  // Note: This will change on server restart, logging out all admin users
-  const generatedSecret = crypto.randomBytes(64).toString('hex');
-  console.warn('WARNING: SESSION_SECRET not set in environment. Using generated secret. Admin sessions will not persist across server restarts.');
-  return generatedSecret;
 };
 
 const JWT_SECRET = getJwtSecret();
