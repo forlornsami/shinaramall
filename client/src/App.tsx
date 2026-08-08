@@ -12,6 +12,7 @@ import AuthPage from "@/pages/auth";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import VerifyEmailPage from "@/pages/verify-email";
+import CheckInboxPage from "@/pages/check-inbox";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/login" component={AuthPage} />
       <Route path="/register" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/check-inbox" component={CheckInboxPage} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />

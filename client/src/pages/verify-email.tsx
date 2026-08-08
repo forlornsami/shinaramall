@@ -69,14 +69,14 @@ export default function VerifyEmailPage() {
           {status === 'success' && (
             <div className="space-y-3">
               <p className="text-center text-muted-foreground">
-                Your email has been verified. You can now enjoy all features of Shinara Mall.
+                Your email has been verified. You can now sign in to your account.
               </p>
               <Button 
                 className="w-full" 
-                onClick={() => setLocation('/')}
+                onClick={() => setLocation('/auth')}
                 data-testid="button-continue-shopping"
               >
-                Continue Shopping
+                Sign In
               </Button>
             </div>
           )}

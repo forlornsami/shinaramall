@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ShoppingBag, ArrowLeft } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, ShoppingBag, ArrowLeft, Mail } from "lucide-react";
 import { Link } from "wouter";
 import type { StoreSettings } from "@shared/schema";
 
@@ -42,6 +43,13 @@ export default function AuthPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // Email-not-verified state for login form
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
   });
@@ -66,13 +74,59 @@ export default function AuthPage() {
     },
   });
 
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
+
   if (isAuthenticated) {
     setLocation("/");
     return null;
   }
 
+  const startResendCooldown = () => {
+    setResendCooldown(60);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleResendVerification = async () => {
+    if (!unverifiedEmail || resendCooldown > 0) return;
+    setIsResending(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Email sent!", description: "Check your inbox for the verification link." });
+        startResendCooldown();
+      } else {
+        toast({ title: "Failed to resend", description: data.message || "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to resend", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleLogin = async (data: LoginFormData) => {
     setIsLoggingIn(true);
+    setEmailNotVerified(false);
     try {
       await login(data);
       toast({
@@ -81,14 +135,19 @@ export default function AuthPage() {
       });
       setLocation("/");
     } catch (error: any) {
-      const message = error.message?.includes("401") 
-        ? "Invalid email or password" 
-        : "Login failed. Please try again.";
-      toast({
-        title: "Login failed",
-        description: message,
-        variant: "destructive",
-      });
+      if (error.code === "EMAIL_NOT_VERIFIED") {
+        setEmailNotVerified(true);
+        setUnverifiedEmail(data.email);
+      } else {
+        const message = error.status === 401
+          ? "Invalid email or password"
+          : "Login failed. Please try again.";
+        toast({
+          title: "Login failed",
+          description: message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -104,15 +163,23 @@ export default function AuthPage() {
         lastName: data.lastName,
         mobile: data.mobile,
       });
-      toast({
-        title: "Account created!",
-        description: `Welcome to ${storeSettings?.storeName || "Shinara Mall"}!`,
-      });
-      setLocation("/");
     } catch (error: any) {
-      const message = error.message?.includes("400") 
-        ? "Email already registered" 
-        : "Registration failed. Please try again.";
+      if (error.code === "REGISTRATION_SUCCESS") {
+        setLocation("/check-inbox");
+        return;
+      }
+      if (error.code === "VERIFICATION_RESENT") {
+        toast({
+          title: "Verification email resent",
+          description: "We resent a verification link to your inbox.",
+        });
+        setLocation("/check-inbox");
+        return;
+      }
+      // Real errors
+      const message = error.message?.includes("already exists")
+        ? "An account with this email already exists."
+        : error.message || "Registration failed. Please try again.";
       toast({
         title: "Registration failed",
         description: message,
@@ -163,6 +230,32 @@ export default function AuthPage() {
                 <CardDescription className="mb-4">
                   Enter your email and password to sign in
                 </CardDescription>
+
+                {emailNotVerified && (
+                  <Alert className="mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+                    <Mail className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <AlertDescription className="text-amber-800 dark:text-amber-300">
+                      <p className="font-medium mb-2">Please verify your email first.</p>
+                      <p className="text-sm mb-3">Check your inbox for the verification link we sent you.</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                        onClick={handleResendVerification}
+                        disabled={isResending || resendCooldown > 0}
+                        data-testid="button-resend-verification"
+                      >
+                        {isResending ? (
+                          <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Sending...</>
+                        ) : resendCooldown > 0 ? (
+                          `Resend in ${resendCooldown}s`
+                        ) : (
+                          "Resend Verification Email"
+                        )}
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
                 
                 <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">

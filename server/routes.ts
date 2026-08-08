@@ -61,6 +61,11 @@ const adminAuth = async (req: any, res: any, next: any) => {
   }
 };
 
+// In-memory rate limit for the public resend-verification-email endpoint
+// Keyed by lowercased email; value is the timestamp of the last send.
+const resendRateLimitMap = new Map<string, number>();
+const RESEND_RATE_LIMIT_MS = 60 * 1000; // 60 seconds per email
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== CUSTOMER AUTH ROUTES ====================
   
@@ -80,7 +85,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
-        return res.status(400).json({ message: "Email already registered" });
+        if (existingUser.emailVerified) {
+          // Verified account — reject with clear message
+          return res.status(400).json({ message: "An account with this email already exists" });
+        }
+        // Unverified account — rotate token and resend without creating a duplicate
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await storage.updateUser(existingUser.id, {
+          emailVerificationToken: verificationToken,
+          emailVerificationExpires: verificationExpires,
+          updatedAt: new Date(),
+        });
+        sendVerificationEmail(email, existingUser.firstName || '', verificationToken)
+          .then(result => {
+            if (!result.success) console.error('Failed to resend verification email:', result.error);
+          })
+          .catch(err => console.error('Resend verification email error:', err));
+        return res.status(200).json({
+          code: "VERIFICATION_RESENT",
+          message: "We resent a verification link to your inbox.",
+        });
       }
 
       // Generate email verification token
@@ -108,12 +133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .catch(err => console.error('Verification email error:', err));
 
-      // Generate token
-      const token = generateToken({ userId: user.id, email: user.email });
-
       res.status(201).json({
-        token,
-        user: toSafeUser(user),
+        code: "REGISTRATION_SUCCESS",
         message: "Registration successful! Please check your email to verify your account.",
       });
     } catch (error) {
@@ -149,6 +170,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isValidPassword = await comparePassword(password, user.passwordHash);
       if (!isValidPassword) {
         return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Block unverified accounts
+      if (!user.emailVerified) {
+        return res.status(403).json({
+          code: "EMAIL_NOT_VERIFIED",
+          message: "Please verify your email before logging in.",
+        });
       }
 
       // Generate token
@@ -231,6 +260,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "Verification email sent!" });
     } catch (error) {
       console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to send verification email" });
+    }
+  });
+
+  // Resend verification email by email address (public — for users blocked at login)
+  app.post('/api/auth/resend-verification-email', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Server-side rate limit: one send per email per 60 seconds
+      const lastSent = resendRateLimitMap.get(normalizedEmail);
+      if (lastSent && Date.now() - lastSent < RESEND_RATE_LIMIT_MS) {
+        // Throttled — return generic success to avoid leaking timing info
+        return res.json({ success: true, message: "If an unverified account exists for that email, a verification link has been sent." });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      // Always return success to avoid leaking whether an email exists
+      if (!user || user.emailVerified) {
+        return res.json({ success: true, message: "If an unverified account exists for that email, a verification link has been sent." });
+      }
+
+      // Only rotate token if current one is expired or missing
+      let verificationToken = user.emailVerificationToken || '';
+      const tokenExpired = !user.emailVerificationExpires || new Date() > user.emailVerificationExpires;
+      if (!verificationToken || tokenExpired) {
+        verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await storage.updateUser(user.id, {
+          emailVerificationToken: verificationToken,
+          emailVerificationExpires: verificationExpires,
+          updatedAt: new Date(),
+        });
+      }
+
+      // Record the send time before sending (prevents retry spam on slow email provider)
+      resendRateLimitMap.set(normalizedEmail, Date.now());
+
+      const result = await sendVerificationEmail(user.email, user.firstName || '', verificationToken);
+      if (!result.success) {
+        // Remove from rate limit map so user can retry
+        resendRateLimitMap.delete(normalizedEmail);
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+
+      res.json({ success: true, message: "Verification email sent!" });
+    } catch (error) {
+      console.error("Public resend verification error:", error);
       res.status(500).json({ message: "Failed to send verification email" });
     }
   });
