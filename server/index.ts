@@ -1,8 +1,32 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes";
 import { log } from "./log";
 import { serveStatic } from "./static";
+import { pool } from "./db";
+
+// Run all SQL migration files in order on startup.
+// Every migration uses IF NOT EXISTS / IF EXISTS guards so re-running is safe.
+async function runMigrations() {
+  const migrationsDir = path.join(process.cwd(), "migrations");
+  if (!fs.existsSync(migrationsDir)) return;
+
+  const files = fs.readdirSync(migrationsDir)
+    .filter(f => f.endsWith(".sql"))
+    .sort(); // alphabetical = chronological given NNN_ prefix naming
+
+  const client = await pool.connect();
+  try {
+    for (const file of files) {
+      const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+      await client.query(sql);
+      log(`[migration] applied ${file}`);
+    }
+  } finally {
+    client.release();
+  }
+}
 
 const app = express();
 
@@ -67,6 +91,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runMigrations();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
