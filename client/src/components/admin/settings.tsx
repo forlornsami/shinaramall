@@ -63,6 +63,11 @@ export default function SettingsSection() {
     guestCheckoutEnabled: false,
     shippingFee: "300",
     freeShippingThreshold: "5000",
+    socialFacebook: "",
+    socialInstagram: "",
+    socialLinkedin: "",
+    socialTiktok: "",
+    socialYoutube: "",
   });
 
   const [notifications, setNotifications] = useState({
@@ -108,6 +113,11 @@ export default function SettingsSection() {
         guestCheckoutEnabled: settings.guestCheckoutEnabled ?? false,
         shippingFee: settings.shippingFee ?? "300",
         freeShippingThreshold: settings.freeShippingThreshold ?? "5000",
+        socialFacebook: (settings as any).socialFacebook || "",
+        socialInstagram: (settings as any).socialInstagram || "",
+        socialLinkedin: (settings as any).socialLinkedin || "",
+        socialTiktok: (settings as any).socialTiktok || "",
+        socialYoutube: (settings as any).socialYoutube || "",
       });
       setNotifications({
         orderNotifications: settings.orderNotifications ?? true,
@@ -835,6 +845,75 @@ export default function SettingsSection() {
                   <p className="text-sm text-muted-foreground">English (Default)</p>
                 </div>
                 <Badge variant="outline">English</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                Social Links
+              </CardTitle>
+              <CardDescription>
+                Social media profile URLs shown in the storefront footer. Leave blank to hide an icon.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="socialFacebook">Facebook URL</Label>
+                <Input
+                  id="socialFacebook"
+                  type="url"
+                  placeholder="https://www.facebook.com/yourpage"
+                  value={storeSettings.socialFacebook}
+                  onChange={(e) => setStoreSettings({ ...storeSettings, socialFacebook: e.target.value })}
+                  data-testid="input-social-facebook"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialInstagram">Instagram URL</Label>
+                <Input
+                  id="socialInstagram"
+                  type="url"
+                  placeholder="https://www.instagram.com/yourhandle"
+                  value={storeSettings.socialInstagram}
+                  onChange={(e) => setStoreSettings({ ...storeSettings, socialInstagram: e.target.value })}
+                  data-testid="input-social-instagram"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialLinkedin">LinkedIn URL</Label>
+                <Input
+                  id="socialLinkedin"
+                  type="url"
+                  placeholder="https://www.linkedin.com/company/yourcompany"
+                  value={storeSettings.socialLinkedin}
+                  onChange={(e) => setStoreSettings({ ...storeSettings, socialLinkedin: e.target.value })}
+                  data-testid="input-social-linkedin"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialTiktok">TikTok URL</Label>
+                <Input
+                  id="socialTiktok"
+                  type="url"
+                  placeholder="https://www.tiktok.com/@yourhandle"
+                  value={storeSettings.socialTiktok}
+                  onChange={(e) => setStoreSettings({ ...storeSettings, socialTiktok: e.target.value })}
+                  data-testid="input-social-tiktok"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="socialYoutube">YouTube URL</Label>
+                <Input
+                  id="socialYoutube"
+                  type="url"
+                  placeholder="https://www.youtube.com/@yourchannel"
+                  value={storeSettings.socialYoutube}
+                  onChange={(e) => setStoreSettings({ ...storeSettings, socialYoutube: e.target.value })}
+                  data-testid="input-social-youtube"
+                />
               </div>
             </CardContent>
           </Card>

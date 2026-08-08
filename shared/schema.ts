@@ -744,6 +744,11 @@ export const storeSettings = pgTable("store_settings", {
   guestCheckoutEnabled: boolean("guest_checkout_enabled").default(false),
   shippingFee: decimal("shipping_fee", { precision: 10, scale: 2 }).default("300"),
   freeShippingThreshold: decimal("free_shipping_threshold", { precision: 10, scale: 2 }).default("5000"),
+  socialFacebook: varchar("social_facebook"),
+  socialInstagram: varchar("social_instagram"),
+  socialLinkedin: varchar("social_linkedin"),
+  socialTiktok: varchar("social_tiktok"),
+  socialYoutube: varchar("social_youtube"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
