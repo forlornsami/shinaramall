@@ -3255,6 +3255,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'guestCheckoutEnabled', 'shippingFee', 'freeShippingThreshold',
         'socialFacebook', 'socialInstagram', 'socialLinkedin', 'socialTiktok', 'socialYoutube'
       ];
+
+      const socialFieldNames = ['socialFacebook', 'socialInstagram', 'socialLinkedin', 'socialTiktok', 'socialYoutube'];
+      const isValidSocialUrl = (value: unknown): boolean => {
+        if (typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        if (!trimmed) return true; // blank = hide icon, allowed
+        try {
+          const url = new URL(trimmed);
+          return url.protocol === 'https:' && url.hostname.length > 0;
+        } catch {
+          return false;
+        }
+      };
+      const socialErrors: Record<string, string> = {};
+      for (const field of socialFieldNames) {
+        const value = req.body[field];
+        if (value !== undefined && !isValidSocialUrl(value)) {
+          socialErrors[field] = `${field} must be a valid HTTPS URL (e.g. https://example.com)`;
+        }
+      }
+      if (Object.keys(socialErrors).length > 0) {
+        return res.status(400).json({ message: "Invalid social link URLs. Each must be a valid URL starting with https://", errors: socialErrors });
+      }
+
+      // Trim social link values before saving
+      for (const field of socialFieldNames) {
+        if (typeof req.body[field] === 'string') {
+          req.body[field] = req.body[field].trim();
+        }
+      }
       
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {

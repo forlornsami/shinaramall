@@ -51,6 +51,38 @@ export default function SettingsSection() {
   const { toast } = useToast();
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
   
+  const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
+
+  const socialFields = [
+    { key: "socialFacebook", label: "Facebook URL" },
+    { key: "socialInstagram", label: "Instagram URL" },
+    { key: "socialLinkedin", label: "LinkedIn URL" },
+    { key: "socialTiktok", label: "TikTok URL" },
+    { key: "socialYoutube", label: "YouTube URL" },
+  ] as const;
+
+  const isValidSocialUrl = (raw: string): boolean => {
+    const value = raw.trim();
+    if (!value) return true; // blank is fine — means "hide this icon"
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && url.hostname.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const validateSocialLinks = (): boolean => {
+    const errors: Record<string, string> = {};
+    for (const { key, label } of socialFields) {
+      if (!isValidSocialUrl(storeSettings[key])) {
+        errors[key] = `${label} must be a valid URL starting with https://`;
+      }
+    }
+    setSocialErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const [storeSettings, setStoreSettings] = useState({
     storeName: "",
     storeLogo: "",
@@ -343,8 +375,25 @@ export default function SettingsSection() {
   });
 
   const handleSaveSettings = async () => {
+    if (!validateSocialLinks()) {
+      toast({
+        title: "Invalid Social Links",
+        description: "Please fix the social link errors before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Trim social link values before persisting
+    const trimmedSocials = {
+      socialFacebook: storeSettings.socialFacebook.trim(),
+      socialInstagram: storeSettings.socialInstagram.trim(),
+      socialLinkedin: storeSettings.socialLinkedin.trim(),
+      socialTiktok: storeSettings.socialTiktok.trim(),
+      socialYoutube: storeSettings.socialYoutube.trim(),
+    };
     saveSettingsMutation.mutate({
       ...storeSettings,
+      ...trimmedSocials,
       ...notifications,
     });
   };
@@ -867,9 +916,16 @@ export default function SettingsSection() {
                   type="url"
                   placeholder="https://www.facebook.com/yourpage"
                   value={storeSettings.socialFacebook}
-                  onChange={(e) => setStoreSettings({ ...storeSettings, socialFacebook: e.target.value })}
+                  onChange={(e) => {
+                    setStoreSettings({ ...storeSettings, socialFacebook: e.target.value });
+                    if (socialErrors.socialFacebook) setSocialErrors({ ...socialErrors, socialFacebook: "" });
+                  }}
+                  className={socialErrors.socialFacebook ? "border-destructive" : ""}
                   data-testid="input-social-facebook"
                 />
+                {socialErrors.socialFacebook && (
+                  <p className="text-xs text-destructive" data-testid="error-social-facebook">{socialErrors.socialFacebook}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="socialInstagram">Instagram URL</Label>
@@ -878,9 +934,16 @@ export default function SettingsSection() {
                   type="url"
                   placeholder="https://www.instagram.com/yourhandle"
                   value={storeSettings.socialInstagram}
-                  onChange={(e) => setStoreSettings({ ...storeSettings, socialInstagram: e.target.value })}
+                  onChange={(e) => {
+                    setStoreSettings({ ...storeSettings, socialInstagram: e.target.value });
+                    if (socialErrors.socialInstagram) setSocialErrors({ ...socialErrors, socialInstagram: "" });
+                  }}
+                  className={socialErrors.socialInstagram ? "border-destructive" : ""}
                   data-testid="input-social-instagram"
                 />
+                {socialErrors.socialInstagram && (
+                  <p className="text-xs text-destructive" data-testid="error-social-instagram">{socialErrors.socialInstagram}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="socialLinkedin">LinkedIn URL</Label>
@@ -889,9 +952,16 @@ export default function SettingsSection() {
                   type="url"
                   placeholder="https://www.linkedin.com/company/yourcompany"
                   value={storeSettings.socialLinkedin}
-                  onChange={(e) => setStoreSettings({ ...storeSettings, socialLinkedin: e.target.value })}
+                  onChange={(e) => {
+                    setStoreSettings({ ...storeSettings, socialLinkedin: e.target.value });
+                    if (socialErrors.socialLinkedin) setSocialErrors({ ...socialErrors, socialLinkedin: "" });
+                  }}
+                  className={socialErrors.socialLinkedin ? "border-destructive" : ""}
                   data-testid="input-social-linkedin"
                 />
+                {socialErrors.socialLinkedin && (
+                  <p className="text-xs text-destructive" data-testid="error-social-linkedin">{socialErrors.socialLinkedin}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="socialTiktok">TikTok URL</Label>
@@ -900,9 +970,16 @@ export default function SettingsSection() {
                   type="url"
                   placeholder="https://www.tiktok.com/@yourhandle"
                   value={storeSettings.socialTiktok}
-                  onChange={(e) => setStoreSettings({ ...storeSettings, socialTiktok: e.target.value })}
+                  onChange={(e) => {
+                    setStoreSettings({ ...storeSettings, socialTiktok: e.target.value });
+                    if (socialErrors.socialTiktok) setSocialErrors({ ...socialErrors, socialTiktok: "" });
+                  }}
+                  className={socialErrors.socialTiktok ? "border-destructive" : ""}
                   data-testid="input-social-tiktok"
                 />
+                {socialErrors.socialTiktok && (
+                  <p className="text-xs text-destructive" data-testid="error-social-tiktok">{socialErrors.socialTiktok}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="socialYoutube">YouTube URL</Label>
@@ -911,9 +988,16 @@ export default function SettingsSection() {
                   type="url"
                   placeholder="https://www.youtube.com/@yourchannel"
                   value={storeSettings.socialYoutube}
-                  onChange={(e) => setStoreSettings({ ...storeSettings, socialYoutube: e.target.value })}
+                  onChange={(e) => {
+                    setStoreSettings({ ...storeSettings, socialYoutube: e.target.value });
+                    if (socialErrors.socialYoutube) setSocialErrors({ ...socialErrors, socialYoutube: "" });
+                  }}
+                  className={socialErrors.socialYoutube ? "border-destructive" : ""}
                   data-testid="input-social-youtube"
                 />
+                {socialErrors.socialYoutube && (
+                  <p className="text-xs text-destructive" data-testid="error-social-youtube">{socialErrors.socialYoutube}</p>
+                )}
               </div>
             </CardContent>
           </Card>
