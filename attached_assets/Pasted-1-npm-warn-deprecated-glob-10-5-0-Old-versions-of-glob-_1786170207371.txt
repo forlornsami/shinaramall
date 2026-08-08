@@ -1,0 +1,95 @@
+1
+
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+2
+
+npm error code ENOTFOUND
+
+3
+
+npm error syscall getaddrinfo
+
+4
+
+npm error errno ENOTFOUND
+
+5
+
+npm error network request to http://package-firewall.replit.local/npm/nodemailer/-/nodemailer-9.0.5.tgz failed, reason: getaddrinfo ENOTFOUND package-firewall.replit.local
+
+6
+
+npm error network This is a problem related to network connectivity.
+
+7
+
+npm error network In most cases you are behind a proxy or have bad network settings.
+
+8
+
+npm error network
+
+9
+
+npm error network If you are behind a proxy, please make sure that the
+
+10
+
+npm error network 'proxy' config is set properly. See: 'npm help config'
+
+11
+
+npm error A complete log of this run can be found in: /home/u983047254/.npm/_logs/2026-08-08T06_07_54_409Z-debug-0.log
+
+12
+
+ERROR: Failed to install dependencies
+
+13
+
+NOTICE: Attempting to install with legacy peer dependencies enabled
+
+14
+
+npm error code ENOTFOUND
+
+15
+
+npm error syscall getaddrinfo
+
+16
+
+npm error errno ENOTFOUND
+
+17
+
+npm error network request to http://package-firewall.replit.local/npm/nodemailer/-/nodemailer-9.0.5.tgz failed, reason: getaddrinfo ENOTFOUND package-firewall.replit.local
+
+18
+
+npm error network This is a problem related to network connectivity.
+
+19
+
+npm error network In most cases you are behind a proxy or have bad network settings.
+
+20
+
+npm error network
+
+21
+
+npm error network If you are behind a proxy, please make sure that the
+
+22
+
+npm error network 'proxy' config is set properly. See: 'npm help config'
+
+23
+
+npm error A complete log of this run can be found in: /home/u983047254/.npm/_logs/2026-08-08T06_09_10_531Z-debug-0.log
+
+24
+
+ERROR: Failed to install dependencies
