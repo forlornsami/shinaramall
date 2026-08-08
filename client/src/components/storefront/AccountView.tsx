@@ -35,7 +35,9 @@ import {
   Trash2,
   Loader2,
   Upload,
+  ShieldAlert,
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import AddressBook from "@/components/storefront/AddressBook";
 
 const profileSchema = z.object({
@@ -51,6 +53,42 @@ export default function AccountView() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Tick the cooldown counter down every second
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/auth/resend-verification-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user?.email }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to send verification email');
+      }
+    },
+    onSuccess: () => {
+      setResendCooldown(60);
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your inbox and click the link to verify your email.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send verification email. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -222,6 +260,36 @@ export default function AccountView() {
           <p className="text-sm text-muted-foreground">Manage your profile and preferences</p>
         </div>
       </div>
+
+      {/* Unverified email banner */}
+      {user && !user.emailVerified && (
+        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30" data-testid="banner-unverified-email">
+          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-800 dark:text-amber-300">Email not verified</AlertTitle>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-3 text-amber-700 dark:text-amber-400">
+            <span>Please verify your email address to access all features.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start sm:self-auto shrink-0 rounded-xl border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/50"
+              onClick={() => resendVerificationMutation.mutate()}
+              disabled={resendVerificationMutation.isPending || resendCooldown > 0}
+              data-testid="button-resend-verification"
+            >
+              {resendVerificationMutation.isPending ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  Sending…
+                </>
+              ) : resendCooldown > 0 ? (
+                `Resend in ${resendCooldown}s`
+              ) : (
+                "Resend verification email"
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
