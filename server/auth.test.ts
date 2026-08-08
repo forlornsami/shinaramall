@@ -174,6 +174,107 @@ describe("POST /api/auth/register", () => {
   });
 });
 
+describe("POST /api/auth/resend-verification-email", () => {
+  const endpoint = "/api/auth/resend-verification-email";
+  const payload = { email: "unverified@example.com" };
+
+  const unverifiedUser = () =>
+    makeUser({
+      email: payload.email,
+      emailVerified: false,
+      emailVerificationToken: "existing-token",
+      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+
+  it("returns generic success for a non-existent email without sending", async () => {
+    const { sendVerificationEmail } = await import("./emailService");
+    vi.mocked(storage.getUserByEmail).mockResolvedValue(null);
+
+    const res = await supertest(app).post(endpoint).send(payload);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(vi.mocked(sendVerificationEmail)).not.toHaveBeenCalled();
+  });
+
+  it("returns generic success for an already-verified email without sending", async () => {
+    const { sendVerificationEmail } = await import("./emailService");
+    vi.mocked(storage.getUserByEmail).mockResolvedValue(
+      makeUser({ email: payload.email, emailVerified: true }),
+    );
+
+    const res = await supertest(app).post(endpoint).send(payload);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(vi.mocked(sendVerificationEmail)).not.toHaveBeenCalled();
+  });
+
+  it("sends a verification email for an unverified account", async () => {
+    const { sendVerificationEmail } = await import("./emailService");
+    vi.mocked(storage.getUserByEmail).mockResolvedValue(unverifiedUser());
+    vi.mocked(storage.updateUser).mockResolvedValue(unverifiedUser());
+
+    const res = await supertest(app).post(endpoint).send(payload);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(vi.mocked(sendVerificationEmail)).toHaveBeenCalledTimes(1);
+  });
+
+  it("concurrent requests for an expired-token account never exceed 3 sends in the same hour", async () => {
+    const { sendVerificationEmail } = await import("./emailService");
+
+    // Expired token — forces the endpoint to rotate the token (the case
+    // that was previously vulnerable to the race condition).
+    const expiredUser = makeUser({
+      email: payload.email,
+      emailVerified: false,
+      emailVerificationToken: "old-token",
+      emailVerificationExpires: new Date(Date.now() - 1000), // already expired
+    });
+
+    vi.mocked(storage.getUserByEmail).mockResolvedValue(expiredUser);
+    vi.mocked(storage.updateUser).mockResolvedValue(expiredUser);
+
+    // Fire 5 concurrent requests; only the first 3 should result in sends.
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        supertest(app).post(endpoint).send(payload),
+      ),
+    );
+
+    // All responses must be 200 (generic success — no info leak)
+    for (const r of responses) {
+      expect(r.status).toBe(200);
+    }
+
+    // Critical assertion: never more than 3 sends regardless of concurrency
+    expect(vi.mocked(sendVerificationEmail).mock.calls.length).toBeLessThanOrEqual(3);
+  });
+
+  it("returns generic success (not a rate-limit error) when throttled", async () => {
+    const { sendVerificationEmail } = await import("./emailService");
+    vi.mocked(storage.getUserByEmail).mockResolvedValue(unverifiedUser());
+    vi.mocked(storage.updateUser).mockResolvedValue(unverifiedUser());
+
+    // Exhaust the quota
+    await Promise.all(
+      Array.from({ length: 3 }, () =>
+        supertest(app).post(endpoint).send(payload),
+      ),
+    );
+
+    vi.mocked(sendVerificationEmail).mockClear();
+
+    // 4th request should be throttled but still return generic success
+    const res = await supertest(app).post(endpoint).send(payload);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(vi.mocked(sendVerificationEmail)).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/auth/login", () => {
   const credentials = { email: "test@example.com", password: "correct-password" };
 

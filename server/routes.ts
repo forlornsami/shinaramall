@@ -62,9 +62,10 @@ const adminAuth = async (req: any, res: any, next: any) => {
 };
 
 // In-memory rate limit for the public resend-verification-email endpoint
-// Keyed by lowercased email; value is the timestamp of the last send.
-const resendRateLimitMap = new Map<string, number>();
-const RESEND_RATE_LIMIT_MS = 60 * 1000; // 60 seconds per email
+// Keyed by lowercased email; value is an array of send timestamps in the last hour.
+const resendRateLimitMap = new Map<string, number[]>();
+const RESEND_MAX_PER_HOUR = 3;
+const RESEND_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== CUSTOMER AUTH ROUTES ====================
@@ -266,25 +267,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Resend verification email by email address (public — for users blocked at login)
   app.post('/api/auth/resend-verification-email', async (req, res) => {
+    const GENERIC_OK = { success: true, message: "If an unverified account exists for that email, a verification link has been sent." };
+    let normalizedEmail = '';
+    // reservedAt is set to a unique symbol once we claim a rate-limit slot so we
+    // can surgically remove only our own reservation on any failure path.
+    let reservedAt: number | null = null;
+
+    const releaseSlot = () => {
+      if (reservedAt === null) return;
+      const current = resendRateLimitMap.get(normalizedEmail) || [];
+      const idx = current.indexOf(reservedAt);
+      if (idx !== -1) {
+        const next = [...current];
+        next.splice(idx, 1);
+        if (next.length === 0) resendRateLimitMap.delete(normalizedEmail);
+        else resendRateLimitMap.set(normalizedEmail, next);
+      }
+      reservedAt = null;
+    };
+
     try {
       const { email } = req.body;
       if (!email || typeof email !== 'string') {
         return res.status(400).json({ message: "Email is required" });
       }
 
-      const normalizedEmail = email.toLowerCase().trim();
+      normalizedEmail = email.toLowerCase().trim();
 
-      // Server-side rate limit: one send per email per 60 seconds
-      const lastSent = resendRateLimitMap.get(normalizedEmail);
-      if (lastSent && Date.now() - lastSent < RESEND_RATE_LIMIT_MS) {
+      // ── Rate-limit check + reservation (synchronous, no await in between) ──
+      const now = Date.now();
+      const timestamps = (resendRateLimitMap.get(normalizedEmail) || []).filter(
+        t => now - t < RESEND_WINDOW_MS
+      );
+      if (timestamps.length >= RESEND_MAX_PER_HOUR) {
         // Throttled — return generic success to avoid leaking timing info
-        return res.json({ success: true, message: "If an unverified account exists for that email, a verification link has been sent." });
+        return res.json(GENERIC_OK);
       }
+      // Claim a slot immediately so concurrent requests see the updated count.
+      reservedAt = Date.now();
+      resendRateLimitMap.set(normalizedEmail, [...timestamps, reservedAt]);
+      // ── End of synchronous section ──────────────────────────────────────────
 
       const user = await storage.getUserByEmail(email);
-      // Always return success to avoid leaking whether an email exists
+      // Always return success to avoid leaking whether an email exists.
+      // Release the slot for users who don't need a send (no account or already verified).
       if (!user || user.emailVerified) {
-        return res.json({ success: true, message: "If an unverified account exists for that email, a verification link has been sent." });
+        releaseSlot();
+        return res.json(GENERIC_OK);
       }
 
       // Only rotate token if current one is expired or missing
@@ -300,18 +329,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Record the send time before sending (prevents retry spam on slow email provider)
-      resendRateLimitMap.set(normalizedEmail, Date.now());
-
       const result = await sendVerificationEmail(user.email, user.firstName || '', verificationToken);
       if (!result.success) {
-        // Remove from rate limit map so user can retry
-        resendRateLimitMap.delete(normalizedEmail);
+        // Email provider failed — release our slot so the user can retry
+        releaseSlot();
         return res.status(500).json({ message: "Failed to send verification email" });
       }
 
       res.json({ success: true, message: "Verification email sent!" });
     } catch (error) {
+      releaseSlot();
       console.error("Public resend verification error:", error);
       res.status(500).json({ message: "Failed to send verification email" });
     }

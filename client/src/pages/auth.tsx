@@ -50,6 +50,12 @@ export default function AuthPage() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Standalone "didn't get the email?" panel
+  const [showResendPanel, setShowResendPanel] = useState(false);
+  const [resendPanelEmail, setResendPanelEmail] = useState("");
+  const [resendPanelSubmitting, setResendPanelSubmitting] = useState(false);
+  const [resendPanelSuccess, setResendPanelSuccess] = useState(false);
+
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
   });
@@ -121,6 +127,26 @@ export default function AuthPage() {
       toast({ title: "Failed to resend", description: "Please try again.", variant: "destructive" });
     } finally {
       setIsResending(false);
+    }
+  };
+
+  const handleResendPanelSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resendPanelEmail || resendPanelSubmitting) return;
+    setResendPanelSubmitting(true);
+    try {
+      await fetch("/api/auth/resend-verification-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendPanelEmail }),
+      });
+      // Always show success regardless of outcome (don't leak whether email exists)
+      setResendPanelSuccess(true);
+    } catch {
+      // Still show success to avoid leaking info
+      setResendPanelSuccess(true);
+    } finally {
+      setResendPanelSubmitting(false);
     }
   };
 
@@ -312,6 +338,63 @@ export default function AuthPage() {
                     </Button>
                   </form>
                 </Form>
+
+                {/* Standalone resend-verification panel */}
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+                    onClick={() => {
+                      setShowResendPanel(p => !p);
+                      setResendPanelSuccess(false);
+                      setResendPanelEmail("");
+                    }}
+                    data-testid="link-resend-verification-panel"
+                  >
+                    Didn&apos;t get the verification email?
+                  </button>
+                </div>
+
+                {showResendPanel && (
+                  <div className="mt-3 rounded-lg border border-muted bg-muted/30 p-4" data-testid="resend-verification-panel">
+                    {resendPanelSuccess ? (
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground" data-testid="resend-verification-success">
+                        <Mail className="h-4 w-4 mt-0.5 shrink-0 text-green-600 dark:text-green-400" />
+                        <p>
+                          If an unverified account exists for that email, we&apos;ve sent a new verification link. Check your inbox (and spam folder).
+                        </p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleResendPanelSubmit} className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Enter your email address and we&apos;ll send a fresh verification link.
+                        </p>
+                        <Input
+                          type="email"
+                          placeholder="your@email.com"
+                          value={resendPanelEmail}
+                          onChange={e => setResendPanelEmail(e.target.value)}
+                          required
+                          data-testid="input-resend-verification-email"
+                        />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          disabled={resendPanelSubmitting || !resendPanelEmail}
+                          data-testid="button-resend-verification-panel"
+                        >
+                          {resendPanelSubmitting ? (
+                            <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Sending...</>
+                          ) : (
+                            "Send Verification Email"
+                          )}
+                        </Button>
+                      </form>
+                    )}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="register" className="mt-0">
